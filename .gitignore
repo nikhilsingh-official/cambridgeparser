@@ -1,0 +1,44 @@
+# Python caches and local environments
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+env/
+
+# Local editor and agent state
+.idea/
+.vscode/
+.agents/
+.codex/
+
+# Logs and temporary files
+*.log
+*.tmp
+*.bak
+.DS_Store
+
+# Corpus inputs: large and/or externally sourced
+resources/pdfs/
+resources/ocr/
+
+# Generated pipeline outputs
+legacy/
+normalize/
+qp_output/
+ms_output/
+pseudocode_writing_hits/
+output/
+
+# Debug and rendered image artifacts
+*.png
+*.jpg
+*.jpeg
+*.tif
+*.tiff
+
