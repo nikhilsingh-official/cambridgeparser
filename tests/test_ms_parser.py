@@ -207,6 +207,21 @@ class MarkSchemeParserTests(unittest.TestCase):
         self.assertEqual(primary["answer_text"], "first line\ncontinued line")
         self.assertEqual(primary["marks_value"], 1)
 
+    def test_append_row_collects_underlined_spans(self):
+        questions_map = {}
+        parsed = parse_question_marker("2(b)")
+        tree_ref = _get_or_create_question_tree(questions_map, parsed, make_row(4, "2(b)", "ans", "3"))
+        span = {"text": "DECLARE StartDate", "bbox": [1.0, 2.0, 3.0, 4.0], "char_flags": 2}
+        _append_row_to_node(
+            tree_ref["node"],
+            make_row(4, "2(b)", "ans", "3"),
+            {"words": [], "spans": [], "underlined_spans": [span]},
+            {"words": [], "spans": [], "underlined_spans": []},
+        )
+        node = tree_ref["node"]
+        self.assertEqual(node["answer_underlined_spans"], [span])
+        self.assertEqual(node["marks_underlined_spans"], [])
+
     def test_fallback_marker_parser_uses_relative_subparts(self):
         marker, remainder = _parse_marker_with_context("3 (b) (i) http answer", None)
         self.assertEqual(marker["normalized_key"], "q3|(b)|(i)")

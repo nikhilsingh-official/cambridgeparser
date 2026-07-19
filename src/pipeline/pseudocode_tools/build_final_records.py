@@ -29,7 +29,10 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from .extract_marking_points import extract_structured_marking_points
+from .extract_marking_points import (
+    extract_structured_marking_points,
+    marking_points_from_underlined_spans,
+)
 
 SCHEMA_VERSION = "pseudocode-question-record/v1"
 TRAILING_MARKS_PATTERN = re.compile(r"\[\s*(\d+)\s*\]\s*$")
@@ -340,6 +343,17 @@ def build_records(
 
         extraction = extract_structured_marking_points(answer_text)
         marking_points = extraction["points"]
+        if not marking_points:
+            # No text rubric: recover the "one mark per underlined ..." schemes
+            # from the underlined spans ms_parser captured, using the node's mark
+            # value to decide how finely to split them.
+            underlined_points = marking_points_from_underlined_spans(
+                ms_node.get("answer_underlined_spans"),
+                target_marks=marks_value if isinstance(marks_value, int) else None,
+            )
+            if underlined_points:
+                marking_points = underlined_points
+                diagnostics.append("marking_points_from_underlined_spans")
         if not marking_points:
             diagnostics.append("no_marking_points_extracted")
 

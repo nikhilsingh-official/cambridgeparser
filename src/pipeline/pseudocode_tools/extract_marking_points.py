@@ -350,6 +350,114 @@ def extract_structured_marking_points(text: Optional[str]) -> Dict[str, Any]:
     return {"points": points, "max_marks": max_marks}
 
 
+# Private-use glyphs the mark-scheme font uses for pseudocode operators.
+_GLYPH_REPLACEMENTS = {"\uf0ac": "\u2190", "\uf0e0": "\u2192", "\uf0b3": "\u2265", "\uf0a3": "\u2264"}
+
+
+def _clean_underline_text(text: str) -> str:
+    for glyph, replacement in _GLYPH_REPLACEMENTS.items():
+        text = text.replace(glyph, replacement)
+    return _clean_item_text(text)
+
+
+def _valid_span_bbox(bbox: Any) -> bool:
+    return (
+        isinstance(bbox, (list, tuple))
+        and len(bbox) == 4
+        and all(isinstance(v, (int, float)) for v in bbox)
+    )
+
+
+def marking_points_from_underlined_spans(
+    spans: Any, target_marks: Optional[int] = None, line_tolerance: float = 6.0
+) -> list[Dict[str, Any]]:
+    """Turn a node's underlined spans into marking points.
+
+    Cambridge "one mark per underlined word / expression" schemes leave no text
+    rubric; the marks *are* the underlined runs in the model answer, recovered by
+    ms_parser via ``TEXT_COLLECT_STYLES``. Underline boundaries alone are
+    ambiguous — a single statement may be several style-split spans, while
+    several words on one line may be several marks — so ``target_marks`` (the
+    node's mark value) drives granularity: starting from one group per span, the
+    smallest same-line gaps are merged until exactly ``target_marks`` groups
+    remain. Without a target, spans are merged per line (one mark per line).
+    """
+
+    valid = [
+        s for s in spans or [] if (s.get("text") or "").strip() and _valid_span_bbox(s.get("bbox"))
+    ]
+    if not valid:
+        return []
+
+    # Cluster spans into visual lines, then read each line left to right. A pure
+    # (y, x) sort misorders spans whose baselines differ slightly (e.g. the "←"
+    # operator glyph sits a touch higher than its neighbours).
+    lines: list[list[Dict[str, Any]]] = []
+    for span in sorted(valid, key=lambda s: (s["bbox"][1] + s["bbox"][3]) / 2.0):
+        mid = (span["bbox"][1] + span["bbox"][3]) / 2.0
+        if lines and abs(mid - lines[-1][0]) <= line_tolerance:
+            lines[-1][1].append(span)  # type: ignore[index]
+        else:
+            lines.append([mid, [span]])  # type: ignore[list-item]
+    ordered: list[Dict[str, Any]] = []
+    line_of: list[int] = []
+    for line_index, (_mid, line_spans) in enumerate(lines):
+        for span in sorted(line_spans, key=lambda s: s["bbox"][0]):
+            ordered.append(span)
+            line_of.append(line_index)
+
+    count = len(ordered)
+    parent = list(range(count))
+
+    def find(node: int) -> int:
+        while parent[node] != node:
+            parent[node] = parent[parent[node]]
+            node = parent[node]
+        return node
+
+    # Candidate merges: consecutive spans on the same text line, cheapest gap first.
+    edges = []
+    for i in range(1, count):
+        if line_of[i] != line_of[i - 1]:
+            continue
+        gap = ordered[i]["bbox"][0] - ordered[i - 1]["bbox"][2]
+        edges.append((gap, i - 1, i))
+    edges.sort(key=lambda e: e[0])
+
+    target = target_marks if isinstance(target_marks, int) and target_marks > 0 else None
+    groups = count
+    for _gap, left, right in edges:
+        if target is not None and groups <= target:
+            break
+        if find(left) != find(right):
+            parent[find(right)] = find(left)
+            groups -= 1
+
+    grouped: Dict[int, list[str]] = {}
+    order: list[int] = []
+    for i in range(count):
+        root = find(i)
+        if root not in grouped:
+            grouped[root] = []
+            order.append(root)
+        grouped[root].append(ordered[i]["text"])
+
+    points: list[Dict[str, Any]] = []
+    for root in order:
+        text = _clean_underline_text(" ".join(grouped[root]))
+        if text:
+            points.append(
+                {
+                    "id": f"mp{len(points) + 1}",
+                    "text": text,
+                    "marks": 1,
+                    "confidence": "high",
+                    "style": "underlined",
+                }
+            )
+    return points
+
+
 def _find_primary_node(ms_entry: Dict[str, Any], primary_marker: Any) -> Optional[Dict[str, Any]]:
     target = _normalize_marker(primary_marker)
     for part in ms_entry.get("primary_subparts", []):

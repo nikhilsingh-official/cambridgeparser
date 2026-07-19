@@ -159,3 +159,8 @@ python -m src.pipeline.runners.qsplitter_batch \
 - Mark-scheme parsing is table-first. A full audit on the checked-in corpus
   leaves some older 2015/2016 mark schemes with empty question lists; treat that
   as parser coverage work, not as a hidden fallback path.
+- `ms_parser` records underlined answer spans (`answer_underlined_spans`) via
+  PyMuPDF `TEXT_COLLECT_STYLES` (`char_flags & 2`). `build_final_records` turns
+  them into marking points for the "one mark per underlined word / expression"
+  schemes when no text rubric exists, using the node's mark value to decide how
+  finely to split runs (`marking_points_from_underlined_spans`).

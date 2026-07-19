@@ -17,6 +17,13 @@ ANSWER_CELL = "answer"
 MARKS_CELL = "marks"
 SECONDARY_ROMAN_PATTERN = r"(?:i|ii|iii|iv|v|vi|vii|viii|ix|x)"
 
+# Text-decoration collection (underline/strikeout) was added in PyMuPDF 1.25.2;
+# getattr keeps this import-safe on older builds, where char_flags stays 0 and
+# underline detection simply yields nothing rather than raising.
+_STYLE_DICT_FLAGS = fitz.TEXTFLAGS_DICT | getattr(fitz, "TEXT_COLLECT_STYLES", 0)
+# char_flags bit 1 (value 2) marks an underlined span.
+_UNDERLINE_CHAR_FLAG = 2
+
 def _render_table_debug_image(
     pdf_path: Path,
     page_index: int,
@@ -761,7 +768,7 @@ def _extract_pdf_font_metadata(
     marker_page_bbox: Optional[List[float]] = None,
 ) -> Dict[str, List[Dict[str, Any]]]:
     if not bbox or len(bbox) != 4:
-        return {"words": [], "spans": []}
+        return {"words": [], "spans": [], "underlined_spans": []}
 
     page = pdf_document.load_page(page_index)
     pdf_page_bbox = [0.0, 0.0, float(page.rect.width), float(page.rect.height)]
@@ -785,7 +792,12 @@ def _extract_pdf_font_metadata(
         )
 
     spans: List[Dict[str, Any]] = []
-    text_dict = page.get_text("dict")
+    underlined_spans: List[Dict[str, Any]] = []
+    # TEXT_COLLECT_STYLES makes PyMuPDF (>= 1.25.2) populate span["char_flags"],
+    # whose underline bit is the only reliable first-party signal for the "one
+    # mark per underlined ..." mark-scheme convention. It is OR-ed onto the
+    # default dict flags so ligatures/whitespace handling is unchanged.
+    text_dict = page.get_text("dict", flags=_STYLE_DICT_FLAGS)
     clip_bbox = [float(v) for v in pdf_bbox]
     for block in text_dict.get("blocks", []):
         if block.get("type") != 0:
@@ -799,17 +811,31 @@ def _extract_pdf_font_metadata(
                 span_bbox_f = [float(v) for v in span_bbox]
                 if not _bbox_intersects(span_bbox_f, clip_bbox):
                     continue
-                spans.append(
-                    {
-                        "text": span_text,
-                        "bbox": _scale_bbox_between_spaces(span_bbox_f, pdf_page_bbox, marker_space_bbox),
-                        "pdf_bbox": span_bbox_f,
-                        "font_name": span.get("font"),
-                        "font_size": float(span.get("size") or 0.0),
-                        "flags": int(span.get("flags") or 0),
-                        "is_bold": _span_is_bold(span.get("font") or "", span.get("flags")),
-                    }
-                )
+                marker_bbox = _scale_bbox_between_spaces(span_bbox_f, pdf_page_bbox, marker_space_bbox)
+                char_flags = int(span.get("char_flags") or 0)
+                underlined = bool(char_flags & _UNDERLINE_CHAR_FLAG)
+                span_record = {
+                    "text": span_text,
+                    "bbox": marker_bbox,
+                    "pdf_bbox": span_bbox_f,
+                    "font_name": span.get("font"),
+                    "font_size": float(span.get("size") or 0.0),
+                    "flags": int(span.get("flags") or 0),
+                    "char_flags": char_flags,
+                    "is_bold": _span_is_bold(span.get("font") or "", span.get("flags")),
+                    "underlined": underlined,
+                }
+                spans.append(span_record)
+                if underlined:
+                    underlined_spans.append(
+                        {
+                            "text": span_text,
+                            "bbox": marker_bbox,
+                            "pdf_bbox": span_bbox_f,
+                            "char_flags": char_flags,
+                            "font_size": span_record["font_size"],
+                        }
+                    )
 
     for word in words:
         word_center_x = (word["bbox"][0] + word["bbox"][2]) / 2.0
@@ -822,7 +848,7 @@ def _extract_pdf_font_metadata(
                 word["is_bold"] = span.get("is_bold")
                 break
 
-    return {"words": words, "spans": spans}
+    return {"words": words, "spans": spans, "underlined_spans": underlined_spans}
 
 
 def _marker_dict(
@@ -930,6 +956,8 @@ def _new_node(marker_text: str, parsed: Dict[str, Optional[str]], row: Dict[str,
         "marks_word_boxes": [],
         "answer_spans": [],
         "marks_spans": [],
+        "answer_underlined_spans": [],
+        "marks_underlined_spans": [],
     }
 
 
@@ -1015,6 +1043,12 @@ def _append_row_to_node(
     node["marks_word_boxes"].extend(marks_metadata.get("words", []))
     node["answer_spans"].extend(answer_metadata.get("spans", []))
     node["marks_spans"].extend(marks_metadata.get("spans", []))
+    node.setdefault("answer_underlined_spans", []).extend(
+        answer_metadata.get("underlined_spans", [])
+    )
+    node.setdefault("marks_underlined_spans", []).extend(
+        marks_metadata.get("underlined_spans", [])
+    )
 
 
 def _roman_to_int(value: str) -> int:
@@ -1118,12 +1152,12 @@ def _build_questions_from_rows(
         answer_metadata = (
             _extract_pdf_font_metadata(pdf_document, int(row["page_index"]), answer_bbox, marker_page_bbox)
             if answer_bbox
-            else {"words": [], "spans": []}
+            else {"words": [], "spans": [], "underlined_spans": []}
         )
         marks_metadata = (
             _extract_pdf_font_metadata(pdf_document, int(row["page_index"]), marks_bbox, marker_page_bbox)
             if marks_bbox
-            else {"words": [], "spans": []}
+            else {"words": [], "spans": [], "underlined_spans": []}
         )
         _append_row_to_node(node, row_with_status, answer_metadata, marks_metadata)
 

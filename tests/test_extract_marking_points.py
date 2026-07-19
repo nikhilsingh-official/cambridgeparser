@@ -2,7 +2,12 @@ import unittest
 
 from src.pipeline.pseudocode_tools.extract_marking_points import (
     extract_structured_marking_points,
+    marking_points_from_underlined_spans,
 )
+
+
+def uspan(text, x0, x1, y0):
+    return {"text": text, "bbox": [x0, y0, x1, y0 + 12.0]}
 
 
 class StructuredMarkingPointTests(unittest.TestCase):
@@ -285,6 +290,79 @@ class StructuredMarkingPointTests(unittest.TestCase):
         # Two consecutive numbered items are trusted as a list even so.
         pair = extract_structured_marking_points("1 First real point\n2 Second real point")
         self.assertEqual(len(pair["points"]), 2)
+
+
+class UnderlinedSpanMarkingPointTests(unittest.TestCase):
+    def test_one_run_per_line_when_marks_match_lines(self):
+        # Three underlined expressions on three lines -> three marks.
+        spans = [
+            uspan("breakpoint", 174, 232, 118),
+            uspan("report/watch window", 377, 478, 131),
+            uspan("single stepping", 147, 223, 144),
+        ]
+
+        points = marking_points_from_underlined_spans(spans, target_marks=3)
+
+        self.assertEqual(
+            [p["text"] for p in points],
+            ["breakpoint", "report/watch window", "single stepping"],
+        )
+        self.assertTrue(all(p["style"] == "underlined" for p in points))
+
+    def test_spans_merge_to_hit_target_marks(self):
+        # Five style-split spans across two lines collapse to three marks, and
+        # the private-use arrow glyph is normalised and correctly ordered.
+        spans = [
+            uspan("DECLARE StartDate", 118, 237, 674),
+            uspan("DATE", 250, 283, 674),
+            uspan("StartDate", 118, 178, 726),
+            uspan("\uf0ac", 181, 192, 724),  # slightly higher baseline
+            uspan(" SETDATE (15, 11, 2005)", 192, 350, 726),
+        ]
+
+        points = marking_points_from_underlined_spans(spans, target_marks=3)
+
+        self.assertEqual(
+            [p["text"] for p in points],
+            ["DECLARE StartDate", "DATE", "StartDate ← SETDATE (15, 11, 2005)"],
+        )
+
+    def test_multiple_words_on_one_line_split_to_target(self):
+        spans = [
+            uspan("array", 150, 179, 234),
+            uspan("records", 191, 231, 234),
+            uspan("array", 256, 285, 234),
+            uspan("type", 344, 368, 234),
+        ]
+
+        points = marking_points_from_underlined_spans(spans, target_marks=2)
+
+        self.assertEqual(len(points), 2)
+
+    def test_fewer_spans_than_marks_keeps_all_spans(self):
+        spans = [uspan("breakpoint", 174, 232, 118), uspan("watch window", 377, 478, 131)]
+
+        points = marking_points_from_underlined_spans(spans, target_marks=4)
+
+        self.assertEqual([p["text"] for p in points], ["breakpoint", "watch window"])
+
+    def test_no_target_merges_per_line(self):
+        spans = [
+            uspan("DECLARE StartDate", 118, 237, 674),
+            uspan("DATE", 250, 283, 674),
+            uspan("assignment line", 118, 350, 726),
+        ]
+
+        points = marking_points_from_underlined_spans(spans, target_marks=None)
+
+        self.assertEqual(
+            [p["text"] for p in points],
+            ["DECLARE StartDate DATE", "assignment line"],
+        )
+
+    def test_empty_spans_yield_no_points(self):
+        self.assertEqual(marking_points_from_underlined_spans(None), [])
+        self.assertEqual(marking_points_from_underlined_spans([]), [])
 
 
 if __name__ == "__main__":
