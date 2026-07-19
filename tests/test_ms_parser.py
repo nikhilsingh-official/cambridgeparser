@@ -5,11 +5,30 @@ from src.pipeline.msplitter.ms_parser import (
     _extract_table_rows,
     _get_or_create_question_tree,
     _parse_marker_with_context,
+    _region_text_from_chars,
     _split_marks_from_text,
     _sort_question_entries,
     paper_year_from_code,
     parse_question_marker,
 )
+
+
+def make_char(text, x0, y0, x1, y1):
+    return {
+        "c": text,
+        "bbox": [x0, y0, x1, y1],
+        "cx": (x0 + x1) / 2.0,
+        "cy": (y0 + y1) / 2.0,
+        "height": y1 - y0,
+    }
+
+
+def chars_for_word(word, x, y, width=4.0, height=8.0):
+    chars = []
+    for offset, ch in enumerate(word):
+        x0 = x + offset * width
+        chars.append(make_char(ch, x0, y, x0 + width, y + height))
+    return chars
 
 
 def make_cell(text, bbox):
@@ -200,6 +219,53 @@ class MarkSchemeParserTests(unittest.TestCase):
         marker, remainder = _parse_marker_with_context("(c) primary answer", marker)
         self.assertEqual(marker["normalized_key"], "q3|(c)")
         self.assertEqual(remainder, "primary answer")
+
+    def test_region_text_rebuilds_lines_and_word_gaps(self):
+        chars = (
+            chars_for_word("INPUT", 10.0, 10.0)
+            + chars_for_word("StartPos", 34.0, 10.0)
+            + chars_for_word("ENDFOR", 10.0, 24.0)
+        )
+
+        text = _region_text_from_chars(chars, [0.0, 0.0, 200.0, 40.0])
+
+        self.assertEqual(text, "INPUT StartPos\nENDFOR")
+
+    def test_region_text_merges_spurious_column_fragments_in_line_order(self):
+        # Characters belonging to one visual line must be read left to right
+        # even when table detection split the region into narrow columns.
+        chars = chars_for_word("OUT", 10.0, 10.0) + chars_for_word("PUT", 22.0, 10.0)
+
+        text = _region_text_from_chars(chars, [0.0, 0.0, 100.0, 30.0])
+
+        self.assertEqual(text, "OUTPUT")
+
+    def test_region_text_outside_bbox_is_excluded(self):
+        chars = chars_for_word("VISIBLE", 10.0, 10.0) + chars_for_word(
+            "HIDDEN", 10.0, 100.0
+        )
+
+        text = _region_text_from_chars(chars, [0.0, 0.0, 200.0, 30.0])
+
+        self.assertEqual(text, "VISIBLE")
+
+    def test_double_rendered_text_is_deduplicated(self):
+        import fitz
+
+        from src.pipeline.msplitter.ms_parser import _page_visible_chars
+
+        document = fitz.open()
+        page = document.new_page(width=595, height=842)
+        # Fake-bold: same text drawn twice with a sub-point offset, as in
+        # Cambridge mark-scheme marking tables.
+        page.insert_text((100, 100), "Answer", fontsize=10)
+        page.insert_text((100.3, 100.2), "Answer", fontsize=10)
+
+        chars = _page_visible_chars(page)
+        text = _region_text_from_chars(chars, [0.0, 0.0, 595.0, 842.0])
+        document.close()
+
+        self.assertEqual(text, "Answer")
 
     def test_split_marks_from_text_extracts_trailing_square_bracket_marks(self):
         answer, marks = _split_marks_from_text("C = data bus [3]")

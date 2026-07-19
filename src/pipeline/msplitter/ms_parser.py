@@ -328,6 +328,119 @@ def _assign_column(cell_bbox: List[float], col_bboxes: Dict[str, List[float]]) -
     return best_label
 
 
+def _page_visible_chars(page: fitz.Page) -> List[Dict[str, Any]]:
+    """Non-space characters on a page with double-rendered duplicates removed.
+
+    Cambridge mark schemes emulate bold by drawing text twice with a sub-point
+    offset. Extracting text through cell clips then interleaves both layers
+    ("Answer" -> "An nsw we r"), so all row text must be rebuilt from a
+    deduplicated character set instead of clip extraction.
+    """
+    raw = page.get_text("rawdict")
+    kept: List[Dict[str, Any]] = []
+    buckets: Dict[Tuple[str, int], List[Tuple[float, float]]] = {}
+    for block in raw.get("blocks", []):
+        if block.get("type") != 0:
+            continue
+        for line in block.get("lines", []):
+            for span in line.get("spans", []):
+                for char in span.get("chars", []):
+                    text = char.get("c") or ""
+                    if not text or text.isspace():
+                        continue
+                    bbox = char.get("bbox")
+                    if not bbox or len(bbox) != 4:
+                        continue
+                    center_x = (float(bbox[0]) + float(bbox[2])) / 2.0
+                    center_y = (float(bbox[1]) + float(bbox[3])) / 2.0
+                    width = max(float(bbox[2]) - float(bbox[0]), 0.1)
+                    height = max(float(bbox[3]) - float(bbox[1]), 0.1)
+                    band = int(center_y // 2)
+                    duplicate = False
+                    for probe in (band - 1, band, band + 1):
+                        for prev_x, prev_y in buckets.get((text, probe), []):
+                            if (
+                                abs(prev_x - center_x) < width * 0.5
+                                and abs(prev_y - center_y) < height * 0.5
+                            ):
+                                duplicate = True
+                                break
+                        if duplicate:
+                            break
+                    if duplicate:
+                        continue
+                    buckets.setdefault((text, band), []).append((center_x, center_y))
+                    kept.append(
+                        {
+                            "c": text,
+                            "bbox": [float(v) for v in bbox],
+                            "cx": center_x,
+                            "cy": center_y,
+                            "height": height,
+                        }
+                    )
+    return kept
+
+
+def _region_text_from_chars(
+    page_chars: List[Dict[str, Any]], bbox: Optional[List[float]]
+) -> str:
+    """Rebuild reading-order text for a region from deduplicated characters.
+
+    Lines are clustered by vertical center and read left to right; a space is
+    inserted where the horizontal gap between characters exceeds a fraction of
+    the line height. This reconstructs row text even when table detection
+    produced spurious internal columns.
+    """
+    if not bbox or len(bbox) != 4:
+        return ""
+    x0, y0, x1, y1 = (float(v) for v in bbox)
+    selected = [
+        char
+        for char in page_chars
+        if x0 <= char["cx"] <= x1 and y0 <= char["cy"] <= y1
+    ]
+    if not selected:
+        return ""
+
+    selected.sort(key=lambda char: (char["cy"], char["bbox"][0]))
+    lines: List[List[Dict[str, Any]]] = []
+    current: List[Dict[str, Any]] = []
+    current_y: Optional[float] = None
+    for char in selected:
+        if current_y is None or abs(char["cy"] - current_y) <= char["height"] * 0.6:
+            current.append(char)
+            current_y = (
+                char["cy"]
+                if current_y is None
+                else (current_y * (len(current) - 1) + char["cy"]) / len(current)
+            )
+        else:
+            lines.append(current)
+            current = [char]
+            current_y = char["cy"]
+    if current:
+        lines.append(current)
+
+    rendered_lines: List[str] = []
+    for line in lines:
+        line.sort(key=lambda char: char["bbox"][0])
+        pieces: List[str] = []
+        previous_end: Optional[float] = None
+        line_height = max(char["height"] for char in line)
+        gap_threshold = max(0.75, line_height * 0.22)
+        for char in line:
+            if previous_end is not None and char["bbox"][0] - previous_end > gap_threshold:
+                pieces.append(" ")
+            pieces.append(char["c"])
+            previous_end = max(
+                previous_end if previous_end is not None else char["bbox"][2],
+                char["bbox"][2],
+            )
+        rendered_lines.append("".join(pieces).strip())
+    return "\n".join(line for line in rendered_lines if line)
+
+
 def _fitz_table_to_cells(fitz_table, page: fitz.Page) -> List[Dict[str, Any]]:
     """Convert a fitz Table to cell dictionaries with bbox and html text.
     
@@ -339,28 +452,32 @@ def _fitz_table_to_cells(fitz_table, page: fitz.Page) -> List[Dict[str, Any]]:
         List of cell dicts with keys: bbox (list [x0,y0,x1,y1]), html (string)
     """
     cells = []
+    page_chars = _page_visible_chars(page)
     for row in fitz_table.rows:
         for cell_bbox in row.cells:
             if cell_bbox:  # Skip None cells (merged cells)
-                # Extract text from cell
-                text = page.get_text(clip=cell_bbox).strip()
                 # Convert Rect/tuple to list bbox
                 bbox = [cell_bbox[0], cell_bbox[1], cell_bbox[2], cell_bbox[3]] if isinstance(cell_bbox, (tuple, list)) else [
                     cell_bbox.x0, cell_bbox.y0, cell_bbox.x1, cell_bbox.y1
                 ]
+                # Rebuild text from deduplicated characters instead of clip
+                # extraction, which slices words and doubles fake-bold text.
+                text = _region_text_from_chars(page_chars, bbox)
                 cells.append({
                     "bbox": bbox,
                     "html": text,  # For consistency with Marker format
-                    "id": None
+                    "id": None,
                 })
     return cells
 
 
 def _extract_table_rows(table: Dict[str, Any], page_index: int, table_index: int, fitz_page: Optional[fitz.Page] = None) -> List[Dict[str, Any]]:
     # Support both Marker format (dict with children) and fitz format (fitz.Table)
+    page_chars: Optional[List[Dict[str, Any]]] = None
     if fitz_page is not None and hasattr(table, 'rows'):
         # This is a fitz.Table object
         cells = _fitz_table_to_cells(table, fitz_page)
+        page_chars = _page_visible_chars(fitz_page)
         table_bbox = [table.bbox[0], table.bbox[1], table.bbox[2], table.bbox[3]] if hasattr(table, 'bbox') else None
     else:
         # This is a Marker dict with children
@@ -487,14 +604,24 @@ def _extract_table_rows(table: Dict[str, Any], page_index: int, table_index: int
         q_cell = row["question_cell"]
         a_cells = row["answer_cells"]
         m_cells = row["marks_cells"]
-        
-        question_text = _strip_html_text(q_cell.get("html")).strip()
-        answer_text = "\n".join(
-            _strip_html_text(cell.get("html")) for cell in a_cells if _strip_html_text(cell.get("html"))
-        ).strip()
-        marks_text = "\n".join(
-            _strip_html_text(cell.get("html")) for cell in m_cells if _strip_html_text(cell.get("html"))
-        ).strip()
+
+        answer_region = _combine_bboxes(cell["bbox"] for cell in a_cells)
+        marks_region = _combine_bboxes(cell["bbox"] for cell in m_cells)
+        if page_chars is not None:
+            # Line-major reconstruction over the whole row region keeps
+            # reading order even when table detection produced spurious
+            # internal columns inside the answer area.
+            question_text = _region_text_from_chars(page_chars, q_cell.get("bbox")).strip()
+            answer_text = _region_text_from_chars(page_chars, answer_region).strip()
+            marks_text = _region_text_from_chars(page_chars, marks_region).strip()
+        else:
+            question_text = _strip_html_text(q_cell.get("html")).strip()
+            answer_text = "\n".join(
+                _strip_html_text(cell.get("html")) for cell in a_cells if _strip_html_text(cell.get("html"))
+            ).strip()
+            marks_text = "\n".join(
+                _strip_html_text(cell.get("html")) for cell in m_cells if _strip_html_text(cell.get("html"))
+            ).strip()
 
         if not (question_text or answer_text or marks_text):
             continue

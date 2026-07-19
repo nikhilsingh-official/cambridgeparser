@@ -10,8 +10,14 @@ from typing import Any, Dict, Iterable, Optional
 
 
 MP_LINE_PATTERN = re.compile(r"^\s*MP\s*([0-9][0-9,\s\-toand]*)\s*(.*)$", re.IGNORECASE)
-LIST_START_PATTERN = re.compile(r"^\s*mark\s+as\s+follows\s*:?\s*$", re.IGNORECASE)
-LIST_ITEM_PATTERN = re.compile(r"^\s*(\d+)[).]?\s+(.*)$")
+LIST_START_PATTERN = re.compile(
+    r"^\s*(?:mark\s+as\s+follows|mark\s+points?\s+as\s+circled.*|.*descriptions?\s+as\s+below)\s*:?\s*$",
+    re.IGNORECASE,
+)
+# Separator group distinguishes real list items ("1. Text" / "1) Text" and the
+# 9618-style "1 Text") from circled mark digits rendered inline with example
+# code ("2 OUTPUT ..."): bare-digit items whose text looks like code are noise.
+LIST_ITEM_PATTERN = re.compile(r"^\s*(\d+)([).])?\s+(.*)$")
 LIST_ITEM_NUMBER_ONLY_PATTERN = re.compile(r"^\s*(\d+)\s*$")
 STOP_LINE_PATTERN = re.compile(
     r"^(max\b|total\b|marks?\b|answer\s+scheme\b|guidance\b)",
@@ -146,14 +152,20 @@ def _collect_list_block(lines: list[str], start_index: int) -> tuple[list[str], 
         if STOP_LINE_PATTERN.match(line):
             break
         item_match = LIST_ITEM_PATTERN.match(line)
-        if item_match:
+        if item_match and not (
+            item_match.group(2) is None and CODE_LINE_PATTERN.match(item_match.group(3))
+        ):
             if current:
                 items.append(current.strip())
-            current = item_match.group(2).strip()
+            current = item_match.group(3).strip()
         elif LIST_ITEM_NUMBER_ONLY_PATTERN.match(line):
             if current:
                 items.append(current.strip())
             current = ""
+        elif CODE_LINE_PATTERN.match(line):
+            # Example-solution code between list items is never part of a
+            # marking-point description.
+            pass
         else:
             if current is not None:
                 current = f"{current} {line.strip()}"
