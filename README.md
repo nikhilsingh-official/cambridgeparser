@@ -110,6 +110,17 @@ layout draws on `--qp-dir` (segmented questions) and `--marker-root` (normalized
 Marker regions); see `src/pipeline/webapp/question_layout.py` and
 `marker_regions.py`.
 
+Evaluate grading quality against hand-authored answers (15 questions across
+fill-in / short / long types, each with high/medium/low candidates and the marks
+a human examiner would award). Dry-run without a key only exercises the harness;
+set `OPENROUTER_API_KEY` to measure how closely Qwen tracks the predicted marks:
+
+```bash
+python -m src.pipeline.grading.eval \
+  --records pseudocode_writing_hits/pseudocode_question_records.json \
+  --output-json pseudocode_writing_hits/grading_eval_results.json
+```
+
 OpenRouter configuration (grading falls back to a deterministic dry run when
 no key is set):
 
