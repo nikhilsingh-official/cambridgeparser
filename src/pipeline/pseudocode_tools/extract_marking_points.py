@@ -19,6 +19,19 @@ STOP_LINE_PATTERN = re.compile(
 )
 LEADING_TRIM_PATTERN = re.compile(r"^[\s•\-\–\—:.)]+")
 
+# Structured extraction additions. Cambridge mark schemes mix several rubric
+# styles; each extracted point records which style produced it.
+BULLET_LINE_PATTERN = re.compile("^\\s*(?:•|\uf0b7|\uf0a7|◦|▪|-|–|—)\\s*(.*)$")
+ONE_MARK_HEADER_PATTERN = re.compile(
+    r"^\s*one\s+mark\s+(?:per|for)\b.*$", re.IGNORECASE
+)
+MAX_MARKS_PATTERN = re.compile(r"^\s*max(?:imum)?\.?\s*(?:of\s*)?(\d+)\s*(?:marks?)?\b", re.IGNORECASE)
+CODE_LINE_PATTERN = re.compile(
+    r"^\s*(?:DECLARE|CONSTANT|FUNCTION|ENDFUNCTION|PROCEDURE|ENDPROCEDURE|IF\b|ELSE\b|ENDIF|"
+    r"WHILE\b|ENDWHILE|REPEAT\b|UNTIL\b|FOR\b|NEXT\b|CASE\b|ENDCASE|INPUT\b|OUTPUT\b|RETURNS?\b|"
+    r"OPENFILE|READFILE|WRITEFILE|CLOSEFILE|CALL\b|TYPE\b|ENDTYPE)"
+)
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -168,6 +181,145 @@ def _extract_marking_points(text: Optional[str]) -> list[str]:
             continue
         idx += 1
     return points
+
+
+def extract_structured_marking_points(text: Optional[str]) -> Dict[str, Any]:
+    """Extract structured marking points from mark-scheme answer text.
+
+    Returns {"points": [{id, text, marks, confidence, style}], "max_marks": int|None}.
+
+    Styles handled, in priority order:
+    - explicit MP labels ("MP1" on its own line or inline) — high confidence;
+    - "mark as follows" numbered lists — high confidence;
+    - bullet lines under a "One mark per/for ..." header — high confidence;
+    - other bullet lines outside code blocks — medium confidence fallback.
+
+    Example-solution code lines are never turned into points.
+    """
+    if not text:
+        return {"points": [], "max_marks": None}
+
+    lines = text.splitlines()
+    max_marks: Optional[int] = None
+    for line in lines:
+        match = MAX_MARKS_PATTERN.match(line.strip())
+        if match:
+            max_marks = int(match.group(1))
+            break
+
+    mp_points: list[Dict[str, Any]] = []
+    list_points: list[Dict[str, Any]] = []
+    bullet_points: list[Dict[str, Any]] = []
+    one_mark_header_seen = False
+
+    idx = 0
+    while idx < len(lines):
+        raw = lines[idx]
+        stripped = raw.strip()
+        if not stripped:
+            idx += 1
+            continue
+
+        if MP_LINE_PATTERN.match(stripped) and not CODE_LINE_PATTERN.match(stripped):
+            match = MP_LINE_PATTERN.match(stripped)
+            mp_numbers = _parse_mp_numbers(match.group(1))
+            desc_parts = [match.group(2).strip()] if match.group(2) else []
+            idx += 1
+            while idx < len(lines):
+                nxt = lines[idx].strip()
+                if (
+                    not nxt
+                    or MP_LINE_PATTERN.match(nxt)
+                    or LIST_START_PATTERN.match(nxt)
+                    or STOP_LINE_PATTERN.match(_clean_line(nxt))
+                    or CODE_LINE_PATTERN.match(nxt)
+                ):
+                    break
+                desc_parts.append(nxt)
+                idx += 1
+            description = " ".join(_trim_lines(desc_parts)).strip()
+            if description:
+                if not mp_numbers:
+                    mp_numbers = [len(mp_points) + 1]
+                for number in mp_numbers:
+                    mp_points.append(
+                        {
+                            "id": f"mp{number}",
+                            "text": description,
+                            "marks": 1,
+                            "confidence": "high",
+                            "style": "mp_label",
+                        }
+                    )
+            continue
+
+        if LIST_START_PATTERN.match(stripped):
+            items, idx = _collect_list_block(lines, idx)
+            for item in items:
+                if item:
+                    list_points.append(
+                        {
+                            "id": f"mp{len(list_points) + 1}",
+                            "text": item,
+                            "marks": 1,
+                            "confidence": "high",
+                            "style": "numbered_list",
+                        }
+                    )
+            continue
+
+        if ONE_MARK_HEADER_PATTERN.match(stripped):
+            one_mark_header_seen = True
+            idx += 1
+            continue
+
+        bullet_match = BULLET_LINE_PATTERN.match(raw)
+        if bullet_match and not CODE_LINE_PATTERN.match(bullet_match.group(1)):
+            item_text = bullet_match.group(1).strip()
+            # A bullet marker may sit on its own line with the item text on
+            # the following lines.
+            idx += 1
+            while idx < len(lines):
+                nxt = lines[idx]
+                nxt_stripped = nxt.strip()
+                if (
+                    not nxt_stripped
+                    or BULLET_LINE_PATTERN.match(nxt)
+                    or MP_LINE_PATTERN.match(nxt_stripped)
+                    or LIST_START_PATTERN.match(nxt_stripped)
+                    or ONE_MARK_HEADER_PATTERN.match(nxt_stripped)
+                    or STOP_LINE_PATTERN.match(_clean_line(nxt_stripped))
+                    or CODE_LINE_PATTERN.match(nxt_stripped)
+                ):
+                    break
+                item_text = f"{item_text} {nxt_stripped}".strip()
+                idx += 1
+            if item_text:
+                bullet_points.append(
+                    {
+                        "id": f"mp{len(bullet_points) + 1}",
+                        "text": item_text,
+                        "marks": 1,
+                        "confidence": "high" if one_mark_header_seen else "medium",
+                        "style": "one_mark_bullet" if one_mark_header_seen else "bullet",
+                    }
+                )
+            continue
+
+        idx += 1
+
+    if mp_points:
+        points = mp_points
+    elif list_points:
+        points = list_points
+    else:
+        points = bullet_points
+
+    # Re-number sequentially so IDs are stable and unique per node.
+    for position, point in enumerate(points, start=1):
+        point["id"] = f"mp{position}"
+
+    return {"points": points, "max_marks": max_marks}
 
 
 def _find_primary_node(ms_entry: Dict[str, Any], primary_marker: Any) -> Optional[Dict[str, Any]]:
