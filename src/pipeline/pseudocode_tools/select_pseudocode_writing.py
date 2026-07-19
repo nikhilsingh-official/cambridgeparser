@@ -152,6 +152,43 @@ def _segment_record(
     }
 
 
+def _supersede_ancestors_with_selected_descendant(
+    q_record: Dict[str, Any],
+    primary_groups: list[tuple[Dict[str, Any], list[Dict[str, Any]]]],
+) -> None:
+    """Demote a whole-question or whole-primary hit when a more specific subpart is selected.
+
+    A question node's ``content_text`` concatenates all of its subparts, so a
+    subpart whose stem says "write pseudocode" makes the ancestor question match
+    the same positive phrase. Keeping both produces a duplicate whole-question
+    record whose aggregated mark scheme mixes the non-pseudocode subparts (e.g.
+    the marks for a structure-chart part (a)) into the pseudocode subpart (b).
+    The specific pseudocode subpart is the real target; the whole question stays
+    available only as context. So any ancestor that still has a selected
+    descendant is superseded.
+    """
+
+    def supersede(record: Dict[str, Any], by: str) -> None:
+        if record["decision"] == "selected":
+            record["decision"] = "superseded"
+            record["decision_reason"] = (
+                f"Superseded by a more specific selected {by}; the pseudocode-writing "
+                "prompt lives in that subpart and the whole segment is kept only as context."
+            )
+
+    for p_record, s_records in primary_groups:
+        if any(s["decision"] == "selected" for s in s_records):
+            supersede(p_record, "secondary subpart")
+
+    descendant_selected = any(
+        rec["decision"] == "selected"
+        for p_record, s_records in primary_groups
+        for rec in (p_record, *s_records)
+    )
+    if descendant_selected:
+        supersede(q_record, "subpart")
+
+
 def _extract_records_from_payload(
     payload: Dict[str, Any],
     positive_patterns: list[Pattern[str]],
@@ -163,52 +200,56 @@ def _extract_records_from_payload(
         q_marker = question["question"].get("text", "?")
         q_node = question["question"]
         q_text = q_node.get("content_text", "")
-        records.append(
-            _segment_record(
-                paper_code=paper_code,
-                question_marker=q_marker,
-                segment_kind="question",
-                marker=q_node,
-                text=q_text,
-                positive_patterns=positive_patterns,
-                negative_patterns=negative_patterns,
-            )
+        q_record = _segment_record(
+            paper_code=paper_code,
+            question_marker=q_marker,
+            segment_kind="question",
+            marker=q_node,
+            text=q_text,
+            positive_patterns=positive_patterns,
+            negative_patterns=negative_patterns,
         )
+        records.append(q_record)
 
+        primary_groups: list[tuple[Dict[str, Any], list[Dict[str, Any]]]] = []
         for primary in question.get("primary_subparts", []):
             p_node = primary["primary"]
             p_marker = p_node.get("text", "?")
             p_text = p_node.get("content_text", "")
-            records.append(
-                _segment_record(
-                    paper_code=paper_code,
-                    question_marker=q_marker,
-                    primary_marker=p_marker,
-                    segment_kind="primary",
-                    marker=p_node,
-                    text=p_text,
-                    positive_patterns=positive_patterns,
-                    negative_patterns=negative_patterns,
-                )
+            p_record = _segment_record(
+                paper_code=paper_code,
+                question_marker=q_marker,
+                primary_marker=p_marker,
+                segment_kind="primary",
+                marker=p_node,
+                text=p_text,
+                positive_patterns=positive_patterns,
+                negative_patterns=negative_patterns,
             )
+            records.append(p_record)
 
+            s_records: list[Dict[str, Any]] = []
             for secondary in primary.get("secondary_subparts", []):
                 s_node = secondary["secondary"]
                 s_marker = s_node.get("text", "?")
                 s_text = s_node.get("content_text", "")
-                records.append(
-                    _segment_record(
-                        paper_code=paper_code,
-                        question_marker=q_marker,
-                        primary_marker=p_marker,
-                        secondary_marker=s_marker,
-                        segment_kind="secondary",
-                        marker=s_node,
-                        text=s_text,
-                        positive_patterns=positive_patterns,
-                        negative_patterns=negative_patterns,
-                    )
+                s_record = _segment_record(
+                    paper_code=paper_code,
+                    question_marker=q_marker,
+                    primary_marker=p_marker,
+                    secondary_marker=s_marker,
+                    segment_kind="secondary",
+                    marker=s_node,
+                    text=s_text,
+                    positive_patterns=positive_patterns,
+                    negative_patterns=negative_patterns,
                 )
+                records.append(s_record)
+                s_records.append(s_record)
+
+            primary_groups.append((p_record, s_records))
+
+        _supersede_ancestors_with_selected_descendant(q_record, primary_groups)
     return records
 
 
@@ -242,6 +283,7 @@ def run_selection(
     selected = [r for r in all_records if r["decision"] == "selected"]
     review = [r for r in all_records if r["decision"] == "review"]
     rejected = [r for r in all_records if r["decision"] == "rejected"]
+    superseded = [r for r in all_records if r["decision"] == "superseded"]
 
     report = {
         "source_files": [str(path) for path in source_files],
@@ -249,6 +291,7 @@ def run_selection(
         "selected_count": len(selected),
         "review_count": len(review),
         "rejected_count": len(rejected),
+        "superseded_count": len(superseded),
         "positive_rules": positive_rule_strings,
         "negative_rules": negative_rule_strings,
     }
@@ -257,6 +300,7 @@ def run_selection(
     _write_json(output_dir / "pseudocode_writing_selected.json", selected)
     _write_json(output_dir / "pseudocode_writing_review.json", review)
     _write_json(output_dir / "pseudocode_writing_rejected.json", rejected)
+    _write_json(output_dir / "pseudocode_writing_superseded.json", superseded)
     _write_json(output_dir / "pseudocode_rule_report.json", report)
     _write_json(output_dir / "pseudocode_rule_records.json", all_records)
 
@@ -274,7 +318,8 @@ def main() -> int:
     )
     print(
         f"Selection complete: {report['selected_count']} selected, "
-        f"{report['review_count']} review, {report['rejected_count']} rejected."
+        f"{report['review_count']} review, {report['rejected_count']} rejected, "
+        f"{report['superseded_count']} superseded by a subpart."
     )
     print(f"Outputs written to {args.output_dir}")
     return 0

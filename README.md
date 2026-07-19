@@ -141,6 +141,11 @@ python -m src.pipeline.runners.qsplitter_batch \
   `src/pipeline/pseudocode_tools/classify_pseudocode.py` are legacy standalone
   helpers. The current production path uses `segmented_questions.json` plus
   `select_pseudocode_writing.py`.
+- `select_pseudocode_writing.py` matches every question/subpart level. Because a
+  question node's `content_text` concatenates its subparts, a pseudocode-writing
+  subpart also makes the whole question match; the selector supersedes such
+  ancestors (written to `pseudocode_writing_superseded.json`) so only the specific
+  pseudocode subpart is graded and the whole question remains as context.
 - Mark-scheme parsing is table-first. A full audit on the checked-in corpus
   leaves some older 2015/2016 mark schemes with empty question lists; treat that
   as parser coverage work, not as a hidden fallback path.
