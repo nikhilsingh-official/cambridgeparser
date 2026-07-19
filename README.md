@@ -74,6 +74,15 @@ python -m src.pipeline.analysis.diagnostics.validate_extraction \
   --output-json pseudocode_writing_hits/extraction_validation.json
 ```
 
+Audit marking-point quality (read-only; a severity-ranked scope baseline and
+regression gate for grading-safety of the extracted marking points):
+
+```bash
+python -m src.pipeline.analysis.diagnostics.validate_marking_points \
+  --records pseudocode_writing_hits/pseudocode_question_records.json \
+  --output-json pseudocode_writing_hits/marking_point_validation.json
+```
+
 ## Grading Stack
 
 Build the Rust pseudocode parser (wraps the root `ast.rs`/`parser.rs`):
