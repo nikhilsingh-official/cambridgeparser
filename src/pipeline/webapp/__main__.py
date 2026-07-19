@@ -33,6 +33,24 @@ def parse_args() -> argparse.Namespace:
         default=10.0,
         help="Seconds allowed for one Rust parser invocation.",
     )
+    parser.add_argument(
+        "--qp-dir",
+        type=Path,
+        default=Path("qp_output"),
+        help="Directory of per-paper segmented_questions.json (for layout reconstruction).",
+    )
+    parser.add_argument(
+        "--marker-root",
+        type=Path,
+        default=Path("normalize/normalized_marker_output"),
+        help="Directory of normalized Marker layout outputs (for figure/table regions).",
+    )
+    parser.add_argument(
+        "--pdf-dir",
+        type=Path,
+        default=Path("resources/pdfs/cs_papers"),
+        help="Directory of source question-paper PDFs (for figure crops).",
+    )
     return parser.parse_args()
 
 
@@ -48,6 +66,9 @@ def main() -> int:
         host=args.host,
         port=args.port,
         parse_timeout=args.parse_timeout,
+        qp_dir=args.qp_dir,
+        marker_root=args.marker_root,
+        pdf_dir=args.pdf_dir,
     )
 
     config = OpenRouterConfig()

@@ -100,6 +100,16 @@ python -m src.pipeline.webapp \
   --port 8000
 ```
 
+Each record renders the cropped question image as the canonical view with a
+"Text" toggle that reconstructs the on-page layout from the qsplitter word
+boxes: words keep their original positions (selectable and copyable), Marker
+figure/diagram/table regions are shown as crisp crops taken straight from the
+PDF (`--pdf-dir`) rather than garbled text, and dotted/underscored blanks become
+interactive input fields whose contents can be copied into the answer box. The
+layout draws on `--qp-dir` (segmented questions) and `--marker-root` (normalized
+Marker regions); see `src/pipeline/webapp/question_layout.py` and
+`marker_regions.py`.
+
 OpenRouter configuration (grading falls back to a deterministic dry run when
 no key is set):
 
