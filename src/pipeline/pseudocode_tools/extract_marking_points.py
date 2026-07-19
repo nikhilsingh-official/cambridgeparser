@@ -9,18 +9,44 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, Optional
 
 
-MP_LINE_PATTERN = re.compile(r"^\s*MP\s*([0-9][0-9,\s\-toand]*)\s*(.*)$", re.IGNORECASE)
-LIST_START_PATTERN = re.compile(
-    r"^\s*(?:mark\s+as\s+follows|mark\s+points?\s+as\s+circled.*|.*descriptions?\s+as\s+below)\s*:?\s*$",
+# One marking-point item, in any of the styles Cambridge mixes. The separator
+# group in NUM_ITEM_PATTERN distinguishes real numbered items ("1. Text" /
+# "1) Text" and the 9618-style bare "1 Text") from circled mark digits rendered
+# inline with example code ("2 OUTPUT ..."): bare-digit items whose text looks
+# like code are noise, rejected by a code guard at the call site.
+MP_ITEM_PATTERN = re.compile(r"^\s*MP\s*(\d+)\b[.):\-\s]*(.*)$", re.IGNORECASE)
+NUM_ITEM_PATTERN = re.compile(r"^\s*(\d+)([.)])?\s+(.*)$")
+
+# Rubric headers that introduce a marking list. "mark as follows" and the
+# circled/descriptions phrasings are distinctive enough to match anywhere in a
+# line (they carry leading context like "For loop-based solutions, mark as
+# follows:"); the "N mark(s) for/per" family is anchored to the line start so it
+# is not mistaken for the same words inside an item's description.
+HEADER_PATTERNS = (
+    re.compile(r"mark\s+as\s+follows", re.IGNORECASE),
+    re.compile(r"mark\s+point.{0,40}?circled", re.IGNORECASE),
+    re.compile(r"descriptions?\s+as\s+below", re.IGNORECASE),
+    re.compile(
+        r"^\s*(?:for\b[^:]{0,60}?,\s*)?(?:award\s+)?"
+        r"(?:one|two|three|four|five|six|\d+)\s+marks?\s+(?:for|per)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(r"^\s*award\s+(?:one|\d+)\s+marks?\b", re.IGNORECASE),
+)
+STOP_LINE_PATTERN = re.compile(
+    r"^(total\b|answer\s+scheme\b|guidance\b)",
     re.IGNORECASE,
 )
-# Separator group distinguishes real list items ("1. Text" / "1) Text" and the
-# 9618-style "1 Text") from circled mark digits rendered inline with example
-# code ("2 OUTPUT ..."): bare-digit items whose text looks like code are noise.
-LIST_ITEM_PATTERN = re.compile(r"^\s*(\d+)([).])?\s+(.*)$")
-LIST_ITEM_NUMBER_ONLY_PATTERN = re.compile(r"^\s*(\d+)\s*$")
-STOP_LINE_PATTERN = re.compile(
-    r"^(max\b|total\b|marks?\b|answer\s+scheme\b|guidance\b)",
+# Meta / guidance lines that close the current item without becoming one or
+# extending it: notes, alternative-solution headings, example-solution labels,
+# and standalone "OR" separators between answer variants.
+META_BOUNDARY_PATTERN = re.compile(
+    r"^(note\b|n\.?b\.?\b|alternative\b|example\s+(?:solution|of)"
+    r"|expected\s+output|guidance\b|or)\s*:?\s*$",
+    re.IGNORECASE,
+)
+META_PREFIX_PATTERN = re.compile(
+    r"^(note\s*:|alternative\b|example\s+(?:solution|of)|expected\s+output|guidance\s*:)",
     re.IGNORECASE,
 )
 LEADING_TRIM_PATTERN = re.compile(r"^[\s•\-\–\—:.)]+")
@@ -28,15 +54,22 @@ LEADING_TRIM_PATTERN = re.compile(r"^[\s•\-\–\—:.)]+")
 # Structured extraction additions. Cambridge mark schemes mix several rubric
 # styles; each extracted point records which style produced it.
 BULLET_LINE_PATTERN = re.compile("^\\s*(?:•|\uf0b7|\uf0a7|◦|▪|-|–|—)\\s*(.*)$")
+# The "one mark per/for" subset drives the one_mark_bullet style and confidence.
 ONE_MARK_HEADER_PATTERN = re.compile(
-    r"^\s*one\s+mark\s+(?:per|for)\b.*$", re.IGNORECASE
+    r"^\s*(?:one|1)\s+marks?\s+(?:per|for)\b", re.IGNORECASE
 )
 MAX_MARKS_PATTERN = re.compile(r"^\s*max(?:imum)?\.?\s*(?:of\s*)?(\d+)\s*(?:marks?)?\b", re.IGNORECASE)
+# "(max 8)" inline in a header line, e.g. "One mark for each of the following (max 8):".
+MAX_MARKS_INLINE_PATTERN = re.compile(r"\(\s*max(?:imum)?\.?\s*(\d+)", re.IGNORECASE)
 CODE_LINE_PATTERN = re.compile(
     r"^\s*(?:DECLARE|CONSTANT|FUNCTION|ENDFUNCTION|PROCEDURE|ENDPROCEDURE|IF\b|ELSE\b|ENDIF|"
     r"WHILE\b|ENDWHILE|REPEAT\b|UNTIL\b|FOR\b|NEXT\b|CASE\b|ENDCASE|INPUT\b|OUTPUT\b|RETURNS?\b|"
     r"OPENFILE|READFILE|WRITEFILE|CLOSEFILE|CALL\b|TYPE\b|ENDTYPE)"
 )
+# Further hints that a line is example-solution code, not rubric prose: the
+# pseudocode assignment arrow (real "<-" glyph or the mark-scheme font's
+# private-use glyph) and end-of-block keywords.
+CODE_HINT_PATTERN = re.compile("(?:\\u2190|\\uf0ac|:=|\\bENDFUNCTION\\b|\\bENDPROCEDURE\\b|\\bENDWHILE\\b|\\bENDFOR\\b)")
 
 
 def parse_args() -> argparse.Namespace:
@@ -77,122 +110,183 @@ def _normalize_marker(value: Any) -> str:
     return text
 
 
-def _clean_line(line: str) -> str:
-    cleaned = LEADING_TRIM_PATTERN.sub("", line.strip())
-    return cleaned.strip()
+def _is_header(stripped: str) -> bool:
+    return any(pattern.search(stripped) for pattern in HEADER_PATTERNS)
 
 
-def _trim_lines(lines: Iterable[str]) -> list[str]:
-    trimmed: list[str] = []
-    for line in lines:
-        cleaned = _clean_line(line)
-        if not cleaned:
-            continue
-        if STOP_LINE_PATTERN.match(cleaned):
-            break
-        trimmed.append(cleaned)
-    return trimmed
+def _is_code_line(stripped: str) -> bool:
+    return bool(CODE_LINE_PATTERN.match(stripped) or CODE_HINT_PATTERN.search(stripped))
 
 
-def _parse_mp_numbers(raw: str) -> list[int]:
-    numbers: list[int] = []
-    if not raw:
-        return numbers
-    normalized = raw.lower().replace("and", ",").replace("to", "-")
-    parts = [part.strip() for part in normalized.split(",") if part.strip()]
-    for part in parts:
-        if "-" in part:
-            bounds = [seg.strip() for seg in part.split("-", 1)]
-            if len(bounds) == 2 and bounds[0].isdigit() and bounds[1].isdigit():
-                start = int(bounds[0])
-                end = int(bounds[1])
-                step = 1 if end >= start else -1
-                numbers.extend(list(range(start, end + step, step)))
-                continue
-        if part.isdigit():
-            numbers.append(int(part))
-    return numbers
+def _mp_item(stripped: str) -> Optional[tuple[int, str]]:
+    """Return the (number, description) of a real MP-label item, or None.
 
+    A genuine ``MPn`` rubric line carries a natural-language description. The
+    inline convention (``MP1 MP2`` on a gap, or ``NEXT HardQ MP5`` appended to a
+    code line) is rejected: MPn must open the line and must not be immediately
+    followed by another MPn token. Out-of-sequence numbers (a wrapped
+    "``MP4`` to generate ..." cross-reference) are filtered by the caller.
+    """
 
-def _collect_mp_block(lines: list[str], start_index: int) -> tuple[list[str], int]:
-    line = lines[start_index]
-    match = MP_LINE_PATTERN.match(line)
+    match = MP_ITEM_PATTERN.match(stripped)
     if not match:
-        return ([], start_index + 1)
-    mp_numbers = _parse_mp_numbers(match.group(1))
-    desc_parts = [match.group(2).strip()] if match.group(2) else []
-    idx = start_index + 1
-    while idx < len(lines):
-        next_line = lines[idx]
-        if MP_LINE_PATTERN.match(next_line) or LIST_START_PATTERN.match(next_line):
-            break
-        cleaned = _clean_line(next_line)
-        if STOP_LINE_PATTERN.match(cleaned):
-            break
-        desc_parts.append(next_line)
-        idx += 1
-    cleaned_lines = _trim_lines(desc_parts)
-    description = " ".join(cleaned_lines).strip()
-    if not mp_numbers:
-        return ([description] if description else [""], idx)
-    return ([description for _ in mp_numbers], idx)
+        return None
+    remainder = match.group(2).strip()
+    if re.match(r"^MP\s*\d", remainder, re.IGNORECASE):
+        return None
+    return int(match.group(1)), remainder
 
 
-def _collect_list_block(lines: list[str], start_index: int) -> tuple[list[str], int]:
-    idx = start_index + 1
-    items: list[str] = []
-    current: Optional[str] = None
-    while idx < len(lines):
-        line = lines[idx].strip()
-        if not line:
-            idx += 1
+def _numbered_item(stripped: str) -> Optional[str]:
+    match = NUM_ITEM_PATTERN.match(stripped)
+    if not match:
+        return None
+    separator, text = match.group(2), match.group(3).strip()
+    if not text or not re.search(r"[A-Za-z]", text):
+        return None
+    # A bare "2 OUTPUT ..." with no separator is a circled mark digit on a code
+    # line, or a row of an expected-output table ("1 : OUTPUT \"1\""); leading
+    # punctuation is stripped before the code check so both are rejected.
+    if separator is None and _is_code_line(re.sub(r"^[^0-9A-Za-z]+", "", text)):
+        return None
+    return text
+
+
+def _bullet_item(raw: str) -> Optional[str]:
+    match = BULLET_LINE_PATTERN.match(raw)
+    if not match:
+        return None
+    text = match.group(1).strip()
+    if not text or _is_code_line(text):
+        return None
+    return text
+
+
+def _scan_rubric_items(lines: list[str]) -> tuple[list[Dict[str, Any]], bool, bool]:
+    """Scan mark-scheme lines into ordered marking-point items.
+
+    Returns (items, header_seen, one_mark_header_seen). Each item is a dict with
+    ``text``, ``style`` and a provisional ``confidence``. A single pass handles
+    the three interchangeable Cambridge styles (MP labels, numbered lists,
+    bullets) under optional headers; continuation lines extend the current item,
+    while code lines and stop lines close it. Style priority and header gating
+    are applied by the caller.
+    """
+
+    items: list[Dict[str, Any]] = []
+    current: Optional[Dict[str, Any]] = None
+    header_seen = False
+    one_mark_header_seen = False
+    last_mp_number = 0
+
+    def flush() -> None:
+        nonlocal current
+        if current is not None and current["text"].strip():
+            items.append(current)
+        current = None
+
+    for raw in lines:
+        stripped = raw.strip()
+        if not stripped:
+            flush()
             continue
-        if LIST_START_PATTERN.match(line):
-            break
-        if STOP_LINE_PATTERN.match(line):
-            break
-        item_match = LIST_ITEM_PATTERN.match(line)
-        if item_match and not (
-            item_match.group(2) is None and CODE_LINE_PATTERN.match(item_match.group(3))
+
+        # Headers first: "Mark as follows" also matches the STOP "mark" prefix,
+        # and "1 mark for each" also matches a numbered item, so header wins.
+        # A header or an alternative-solution boundary starts a fresh rubric
+        # block, so MP numbering restarts (an alternative may reuse "MP1").
+        if _is_header(stripped) and not stripped.lower().startswith("mp"):
+            flush()
+            header_seen = True
+            last_mp_number = 0
+            if ONE_MARK_HEADER_PATTERN.search(stripped):
+                one_mark_header_seen = True
+            continue
+
+        if (
+            STOP_LINE_PATTERN.match(stripped)
+            or MAX_MARKS_PATTERN.match(stripped)
+            or META_BOUNDARY_PATTERN.match(stripped)
+            or META_PREFIX_PATTERN.match(stripped)
         ):
-            if current:
-                items.append(current.strip())
-            current = item_match.group(3).strip()
-        elif LIST_ITEM_NUMBER_ONLY_PATTERN.match(line):
-            if current:
-                items.append(current.strip())
-            current = ""
-        elif CODE_LINE_PATTERN.match(line):
-            # Example-solution code between list items is never part of a
-            # marking-point description.
-            pass
-        else:
-            if current is not None:
-                current = f"{current} {line.strip()}"
-        idx += 1
-    if current:
-        items.append(current.strip())
-    return (items, idx)
+            flush()
+            last_mp_number = 0
+            continue
+
+        mp = _mp_item(stripped)
+        if mp is not None and mp[0] > last_mp_number:
+            flush()
+            last_mp_number = mp[0]
+            current = {"text": mp[1], "style": "mp_label", "confidence": "high"}
+            continue
+
+        # A numbered-looking line that the code guard rejects (a circled mark
+        # digit or an expected-output row) is a boundary, never a continuation.
+        if mp is None and NUM_ITEM_PATTERN.match(stripped):
+            text = _numbered_item(stripped)
+            if text is not None:
+                flush()
+                current = {
+                    "text": text,
+                    "style": "numbered_list",
+                    "confidence": "high" if header_seen else "medium",
+                }
+            else:
+                flush()
+            continue
+
+        bullet = _bullet_item(raw)
+        if bullet is not None:
+            flush()
+            style = "one_mark_bullet" if one_mark_header_seen else "bullet"
+            current = {
+                "text": bullet,
+                "style": style,
+                "confidence": "high" if header_seen else "medium",
+            }
+            continue
+
+        if _is_code_line(stripped):
+            flush()
+            continue
+
+        # Otherwise a continuation of the current item's wrapped description.
+        if current is not None:
+            current["text"] = f"{current['text']} {stripped}".strip()
+
+    flush()
+    return items, header_seen, one_mark_header_seen
+
+
+def _clean_item_text(text: str) -> str:
+    """Drop stray annotation glyphs and collapse whitespace in an item.
+
+    Cambridge marking tables sprinkle guillemets/private-use glyphs to bracket
+    "linked" marks (e.g. "4 ... flip operation «" / "5 « Correct number of
+    iterations"); they are annotation, not content. Meaningful ellipsis
+    phrasing is preserved.
+    """
+
+    cleaned = re.sub("[«»‹›]", " ", text)
+    return re.sub(r"\s+", " ", cleaned).strip()
+
+
+def _detect_max_marks(lines: list[str]) -> Optional[int]:
+    for line in lines:
+        stripped = line.strip()
+        match = MAX_MARKS_PATTERN.match(stripped)
+        if match:
+            return int(match.group(1))
+        inline = MAX_MARKS_INLINE_PATTERN.search(stripped)
+        if inline:
+            return int(inline.group(1))
+    return None
 
 
 def _extract_marking_points(text: Optional[str]) -> list[str]:
-    if not text:
-        return []
-    lines = text.splitlines()
-    points: list[str] = []
-    idx = 0
-    while idx < len(lines):
-        line = lines[idx]
-        if MP_LINE_PATTERN.match(line):
-            block_points, idx = _collect_mp_block(lines, idx)
-            points.extend(block_points)
-            continue
-        if LIST_START_PATTERN.match(line):
-            block_points, idx = _collect_list_block(lines, idx)
-            points.extend(block_points)
-            continue
-        idx += 1
-    return points
+    """Legacy list-of-strings API, kept for the standalone CLI path."""
+
+    return [point["text"] for point in extract_structured_marking_points(text)["points"]]
 
 
 def extract_structured_marking_points(text: Optional[str]) -> Dict[str, Any]:
@@ -200,136 +294,58 @@ def extract_structured_marking_points(text: Optional[str]) -> Dict[str, Any]:
 
     Returns {"points": [{id, text, marks, confidence, style}], "max_marks": int|None}.
 
-    Styles handled, in priority order:
-    - explicit MP labels ("MP1" on its own line or inline) — high confidence;
-    - "mark as follows" numbered lists — high confidence;
-    - bullet lines under a "One mark per/for ..." header — high confidence;
-    - other bullet lines outside code blocks — medium confidence fallback.
+    A single line scanner recognises the interchangeable Cambridge rubric styles
+    — explicit ``MPn`` labels, numbered lists (dotted, parenthesised, or the
+    9618 bare-digit form), and bullet lists — under flexible headers such as
+    "Mark as follows", "For loop-based solutions, mark as follows:",
+    "One mark for each of the following (max 8):", and "Mark points as circled,
+    descriptions as below:". Example-solution code lines never become points,
+    and the inline-``MPn`` convention (marks shown as gaps in the code) yields no
+    spurious text points.
 
-    Example-solution code lines are never turned into points.
+    Styles do not mix within one node: MP labels win over numbered lists, which
+    win over bullets. Numbered/bullet items without any header are accepted only
+    when there are at least two of them, to avoid stray numbered code lines.
     """
     if not text:
         return {"points": [], "max_marks": None}
 
     lines = text.splitlines()
-    max_marks: Optional[int] = None
-    for line in lines:
-        match = MAX_MARKS_PATTERN.match(line.strip())
-        if match:
-            max_marks = int(match.group(1))
-            break
+    max_marks = _detect_max_marks(lines)
+    items, header_seen, _ = _scan_rubric_items(lines)
 
-    mp_points: list[Dict[str, Any]] = []
-    list_points: list[Dict[str, Any]] = []
-    bullet_points: list[Dict[str, Any]] = []
-    one_mark_header_seen = False
-
-    idx = 0
-    while idx < len(lines):
-        raw = lines[idx]
-        stripped = raw.strip()
-        if not stripped:
-            idx += 1
-            continue
-
-        if MP_LINE_PATTERN.match(stripped) and not CODE_LINE_PATTERN.match(stripped):
-            match = MP_LINE_PATTERN.match(stripped)
-            mp_numbers = _parse_mp_numbers(match.group(1))
-            desc_parts = [match.group(2).strip()] if match.group(2) else []
-            idx += 1
-            while idx < len(lines):
-                nxt = lines[idx].strip()
-                if (
-                    not nxt
-                    or MP_LINE_PATTERN.match(nxt)
-                    or LIST_START_PATTERN.match(nxt)
-                    or STOP_LINE_PATTERN.match(_clean_line(nxt))
-                    or CODE_LINE_PATTERN.match(nxt)
-                ):
-                    break
-                desc_parts.append(nxt)
-                idx += 1
-            description = " ".join(_trim_lines(desc_parts)).strip()
-            if description:
-                if not mp_numbers:
-                    mp_numbers = [len(mp_points) + 1]
-                for number in mp_numbers:
-                    mp_points.append(
-                        {
-                            "id": f"mp{number}",
-                            "text": description,
-                            "marks": 1,
-                            "confidence": "high",
-                            "style": "mp_label",
-                        }
-                    )
-            continue
-
-        if LIST_START_PATTERN.match(stripped):
-            items, idx = _collect_list_block(lines, idx)
-            for item in items:
-                if item:
-                    list_points.append(
-                        {
-                            "id": f"mp{len(list_points) + 1}",
-                            "text": item,
-                            "marks": 1,
-                            "confidence": "high",
-                            "style": "numbered_list",
-                        }
-                    )
-            continue
-
-        if ONE_MARK_HEADER_PATTERN.match(stripped):
-            one_mark_header_seen = True
-            idx += 1
-            continue
-
-        bullet_match = BULLET_LINE_PATTERN.match(raw)
-        if bullet_match and not CODE_LINE_PATTERN.match(bullet_match.group(1)):
-            item_text = bullet_match.group(1).strip()
-            # A bullet marker may sit on its own line with the item text on
-            # the following lines.
-            idx += 1
-            while idx < len(lines):
-                nxt = lines[idx]
-                nxt_stripped = nxt.strip()
-                if (
-                    not nxt_stripped
-                    or BULLET_LINE_PATTERN.match(nxt)
-                    or MP_LINE_PATTERN.match(nxt_stripped)
-                    or LIST_START_PATTERN.match(nxt_stripped)
-                    or ONE_MARK_HEADER_PATTERN.match(nxt_stripped)
-                    or STOP_LINE_PATTERN.match(_clean_line(nxt_stripped))
-                    or CODE_LINE_PATTERN.match(nxt_stripped)
-                ):
-                    break
-                item_text = f"{item_text} {nxt_stripped}".strip()
-                idx += 1
-            if item_text:
-                bullet_points.append(
-                    {
-                        "id": f"mp{len(bullet_points) + 1}",
-                        "text": item_text,
-                        "marks": 1,
-                        "confidence": "high" if one_mark_header_seen else "medium",
-                        "style": "one_mark_bullet" if one_mark_header_seen else "bullet",
-                    }
-                )
-            continue
-
-        idx += 1
+    mp_points = [item for item in items if item["style"] == "mp_label"]
+    numbered_points = [item for item in items if item["style"] == "numbered_list"]
+    bullet_points = [item for item in items if item["style"] in ("bullet", "one_mark_bullet")]
 
     if mp_points:
-        points = mp_points
-    elif list_points:
-        points = list_points
+        chosen = mp_points
+    elif numbered_points and (header_seen or len(numbered_points) >= 2):
+        chosen = numbered_points
+    elif bullet_points and (header_seen or len(bullet_points) >= 2):
+        chosen = bullet_points
     else:
-        points = bullet_points
+        chosen = []
 
-    # Re-number sequentially so IDs are stable and unique per node.
-    for position, point in enumerate(points, start=1):
-        point["id"] = f"mp{position}"
+    points: list[Dict[str, Any]] = []
+    seen: set[str] = set()
+    for item in chosen:
+        text = _clean_item_text(item["text"])
+        # Alternative-solution rubrics repeat identical mark descriptions; keep
+        # the first occurrence of each so the list stays a set of distinct marks.
+        key = text.lower()
+        if not text or key in seen:
+            continue
+        seen.add(key)
+        points.append(
+            {
+                "id": f"mp{len(points) + 1}",
+                "text": text,
+                "marks": 1,
+                "confidence": item["confidence"],
+                "style": item["style"],
+            }
+        )
 
     return {"points": points, "max_marks": max_marks}
 

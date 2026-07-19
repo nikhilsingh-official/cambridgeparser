@@ -97,6 +97,195 @@ class StructuredMarkingPointTests(unittest.TestCase):
 
         self.assertEqual(result["points"], [])
 
+    def test_mp_labels_after_mark_as_follows_header(self):
+        # "Mark as follows:" followed by MP-labels must not be swallowed by the
+        # list collector (the historic id110 bug).
+        text = (
+            "PROCEDURE AddNewCustomers()\n"
+            "ENDPROCEDURE\n"
+            "Mark as follows:\n"
+            "MP1 All variables declared with correct type\n"
+            "MP2 Open file in read mode and close\n"
+            "MP3 Conditional loop with EOF"
+        )
+
+        result = extract_structured_marking_points(text)
+
+        self.assertEqual(
+            [p["text"] for p in result["points"]],
+            [
+                "All variables declared with correct type",
+                "Open file in read mode and close",
+                "Conditional loop with EOF",
+            ],
+        )
+        self.assertTrue(all(p["style"] == "mp_label" for p in result["points"]))
+
+    def test_wrapped_mp_cross_reference_merges_and_max_line_stops(self):
+        # A wrapped "MP4 to generate ..." line (out of sequence, after MP6) is a
+        # cross-reference continuation, and a trailing "Max 8" is not a point.
+        text = (
+            "Mark as follows:\n"
+            "MP6 Extract CustomerID and convert to integer // use count from\n"
+            "MP4 to generate last CustomerID stored\n"
+            "MP7 A count controlled loop\n"
+            "Max 8"
+        )
+
+        result = extract_structured_marking_points(text)
+
+        self.assertEqual(
+            [p["text"] for p in result["points"]],
+            [
+                "Extract CustomerID and convert to integer // use count from MP4 to generate last CustomerID stored",
+                "A count controlled loop",
+            ],
+        )
+        self.assertEqual(result["max_marks"], 8)
+
+    def test_bullets_after_mark_as_follows_header(self):
+        text = (
+            "PROCEDURE ClearArray()\n"
+            "ENDPROCEDURE\n"
+            "Mark as follows:\n"
+            "• Procedure header\n"
+            "• Loop\n"
+            "• Assignment within loop"
+        )
+
+        result = extract_structured_marking_points(text)
+
+        self.assertEqual(
+            [p["text"] for p in result["points"]],
+            ["Procedure header", "Loop", "Assignment within loop"],
+        )
+
+    def test_header_with_leading_and_trailing_context_triggers_list(self):
+        text = (
+            "PROCEDURE Square()\n"
+            "ENDPROCEDURE\n"
+            "For loop-based solutions, mark as follows:\n"
+            "1 Procedure heading and ending including parameter\n"
+            "2 Loop using parameter\n"
+            "3 Construct first line"
+        )
+
+        result = extract_structured_marking_points(text)
+
+        self.assertEqual(len(result["points"]), 3)
+        self.assertTrue(all(p["style"] == "numbered_list" for p in result["points"]))
+
+    def test_one_mark_for_each_header_with_inline_max_and_numbered_list(self):
+        text = (
+            "ENDFUNCTION\n"
+            "One mark for each of the following (max 8):\n"
+            "1. Function header and end\n"
+            "2. Declaration and initialisation of local count variable\n"
+            "3. FOR loop for 40 array elements"
+        )
+
+        result = extract_structured_marking_points(text)
+
+        self.assertEqual(result["max_marks"], 8)
+        self.assertEqual(len(result["points"]), 3)
+
+    def test_inline_mp_markers_in_code_produce_no_points(self):
+        # Marks shown as gaps in the solution ("One mark per gap") — the MPn
+        # tokens are position markers, not describable rubric text.
+        text = (
+            "DECLARE EasyQ, HardQ : INTEGER\n"
+            "FOR EasyQ 0 TO 15 STEP 3\n"
+            "MP1 MP2\n"
+            "FOR HardQ 0 TO 20 STEP 5\n"
+            "MP3 MP4\n"
+            "NEXT HardQ MP5\n"
+            "NEXT EasyQ\n"
+            "Mark as follows:\n"
+            "One mark per gap (boldened)"
+        )
+
+        result = extract_structured_marking_points(text)
+
+        self.assertEqual(result["points"], [])
+
+    def test_expected_output_table_rows_are_not_points(self):
+        # A numbered "expected output" demonstration must not become marks.
+        text = (
+            "One mark for each of the following:\n"
+            "1 Correct construction of the string\n"
+            "2 Output in a loop\n"
+            "Expected output:\n"
+            "1 : OUTPUT \"1\"\n"
+            "2 : OUTPUT \"22\"\n"
+            "3 : OUTPUT \"333\""
+        )
+
+        result = extract_structured_marking_points(text)
+
+        self.assertEqual(
+            [p["text"] for p in result["points"]],
+            ["Correct construction of the string", "Output in a loop"],
+        )
+
+    def test_note_and_alternative_lines_do_not_pollute_items(self):
+        text = (
+            "Mark as follows:\n"
+            "MP1 Output final count once only\n"
+            "Note: max 8\n"
+            "Alternative solution:\n"
+            "MP1 Initialise array of 24 elements"
+        )
+
+        result = extract_structured_marking_points(text)
+
+        self.assertEqual(
+            [p["text"] for p in result["points"]],
+            ["Output final count once only", "Initialise array of 24 elements"],
+        )
+
+    def test_stray_bracket_glyphs_are_stripped(self):
+        text = (
+            "One mark for each of the following:\n"
+            "1 A nested loop including attempt at flip operation «\n"
+            "2 « Correct number of iterations"
+        )
+
+        result = extract_structured_marking_points(text)
+
+        self.assertEqual(
+            [p["text"] for p in result["points"]],
+            ["A nested loop including attempt at flip operation", "Correct number of iterations"],
+        )
+
+    def test_duplicate_alternative_solution_marks_are_deduped(self):
+        text = (
+            "Mark as follows:\n"
+            "1 Open file for read and close\n"
+            "2 Conditional loop until EOF\n"
+            "Alternative:\n"
+            "1 Open file for read and close\n"
+            "2 Output result in a loop"
+        )
+
+        result = extract_structured_marking_points(text)
+
+        self.assertEqual(
+            [p["text"] for p in result["points"]],
+            [
+                "Open file for read and close",
+                "Conditional loop until EOF",
+                "Output result in a loop",
+            ],
+        )
+
+    def test_numbered_list_without_header_needs_two_items(self):
+        # A single stray numbered line with no rubric header is not a mark.
+        single = extract_structured_marking_points("Some heading\n1 Lonely line")
+        self.assertEqual(single["points"], [])
+        # Two consecutive numbered items are trusted as a list even so.
+        pair = extract_structured_marking_points("1 First real point\n2 Second real point")
+        self.assertEqual(len(pair["points"]), 2)
+
 
 if __name__ == "__main__":
     unittest.main()
