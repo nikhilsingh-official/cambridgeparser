@@ -1,11 +1,63 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 from .markers import is_in_excluded_region, looks_like_marks_pattern
 
 Y_TOLERANCE = 5.0
+
+# Running headers/footers that survive the block-type exclusions: Cambridge
+# paper references ("9608/21/M/J/16"), copyright footers, "[Turn over", and
+# bare page numbers. All except the copyright line must sit near a page edge
+# so legitimate content (e.g. a lone number in a trace table) is never hidden.
+PAPER_REF_LINE_PATTERN = re.compile(r"^\s*\d{4}/\d{1,3}(?:/[A-Za-z]{1,2}){2}/\d{2}\s*$")
+TURN_OVER_LINE_PATTERN = re.compile(r"^\s*\[?\s*turn\s+over\s*\]?\s*$", re.IGNORECASE)
+BLANK_PAGE_LINE_PATTERN = re.compile(r"^\s*BLANK\s+PAGE\s*$")
+PAGE_NUMBER_LINE_PATTERN = re.compile(r"^\s*\d{1,2}\s*$")
+EDGE_NOISE_TOP_FRACTION = 0.12
+EDGE_NOISE_BOTTOM_FRACTION = 0.10
+
+# Back-page copyright boilerplate; everything from this line to the end of the
+# document is publisher text, never question content.
+BOILERPLATE_START_PATTERN = re.compile(
+    r"^\s*Permission to reproduce items", re.IGNORECASE
+)
+
+
+def _is_edge_noise_line(
+    line: Dict[str, Any],
+    page_bounds: Optional[list[float]],
+) -> bool:
+    text = (line.get("text") or "").strip()
+    if not text:
+        return False
+    if "UCLES" in text and "©" in text:
+        return True
+    if BLANK_PAGE_LINE_PATTERN.match(text):
+        return True
+
+    if not (
+        PAPER_REF_LINE_PATTERN.match(text)
+        or TURN_OVER_LINE_PATTERN.match(text)
+        or PAGE_NUMBER_LINE_PATTERN.match(text)
+    ):
+        return False
+
+    bbox = line.get("bbox")
+    if not page_bounds or len(page_bounds) != 4 or not bbox or len(bbox) != 4:
+        return False
+    page_top = float(page_bounds[1])
+    page_bottom = float(page_bounds[3])
+    page_height = page_bottom - page_top
+    if page_height <= 0:
+        return False
+    center_y = (float(bbox[1]) + float(bbox[3])) / 2.0
+    return (
+        center_y <= page_top + page_height * EDGE_NOISE_TOP_FRACTION
+        or center_y >= page_bottom - page_height * EDGE_NOISE_BOTTOM_FRACTION
+    )
 
 
 def _marker_key(marker: Dict[str, Any]) -> tuple[int, tuple[Any, ...]]:
@@ -169,6 +221,9 @@ def _slice_line_text_and_words(
     page_bounds: Optional[list[float]] = None,
     page_exclusions: Optional[list[Dict[str, Any]]] = None,
 ) -> tuple[str, list[Dict[str, Any]], Optional[list[float]]]:
+    if _is_edge_noise_line(line, page_bounds):
+        return "", [], None
+
     chars = line.get("chars", [])
     if not chars:
         return (line.get("text") or "").strip(), [], None
@@ -192,6 +247,10 @@ def _slice_line_text_and_words(
     for char in chars:
         text = char.get("text") or ""
         if not text:
+            continue
+        # Broken PDF font encodings emit C0 control codes for diagram glyphs;
+        # they carry no text content.
+        if all(ord(ch) < 32 and ch not in "\n\t" for ch in text):
             continue
 
         bbox = char.get("bbox")
@@ -297,6 +356,9 @@ def _content_from_bounds(
     flat_words: list[Dict[str, Any]] = []
 
     for page_idx, line_idx, line in lines:
+        if BOILERPLATE_START_PATTERN.match((line.get("text") or "").strip()):
+            break
+
         sx: Optional[float] = None
         ex: Optional[float] = None
 

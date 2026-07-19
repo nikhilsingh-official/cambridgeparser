@@ -94,6 +94,66 @@ class MarkSchemeParserTests(unittest.TestCase):
         self.assertEqual(rows[0]["answer_cell_text"], "Example\nExplanation\nData type")
         self.assertEqual(rows[0]["marks_cell_text"], "4")
 
+    def test_extract_table_rows_shared_borders_keep_answers_on_their_row(self):
+        # Cambridge mark-scheme grids share horizontal borders between rows and
+        # emit thin empty spacer cells in the question column. Cells touching a
+        # boundary (answer y1 == previous row y2) must stay with the row below;
+        # a first-touch tolerance test shifted every answer up one question.
+        table = {
+            "bbox": [0.0, 0.0, 300.0, 130.0],
+            "children": [
+                make_cell("Question", [0.0, 0.0, 50.0, 10.0]),
+                make_cell("Answer", [50.0, 0.0, 250.0, 10.0]),
+                make_cell("Marks", [250.0, 0.0, 300.0, 10.0]),
+                # thin spacer row under the header, as fitz emits for grid lines
+                make_cell("", [0.0, 10.0, 50.0, 16.0]),
+                make_cell("", [50.0, 10.0, 250.0, 16.0]),
+                make_cell("", [250.0, 10.0, 300.0, 16.0]),
+                make_cell("1(a)", [0.0, 16.0, 50.0, 60.0]),
+                make_cell("first answer", [50.0, 16.0, 250.0, 60.0]),
+                make_cell("3", [250.0, 16.0, 300.0, 60.0]),
+                make_cell("1(b)", [0.0, 60.0, 50.0, 130.0]),
+                make_cell("second answer", [50.0, 60.0, 250.0, 130.0]),
+                make_cell("2", [250.0, 60.0, 300.0, 130.0]),
+            ],
+        }
+
+        rows = _extract_table_rows(table, page_index=2, table_index=0)
+
+        by_question = {row["question_cell_text"]: row for row in rows}
+        self.assertEqual(by_question["1(a)"]["answer_cell_text"], "first answer")
+        self.assertEqual(by_question["1(a)"]["marks_cell_text"], "3")
+        self.assertEqual(by_question["1(b)"]["answer_cell_text"], "second answer")
+        self.assertEqual(by_question["1(b)"]["marks_cell_text"], "2")
+
+    def test_extract_table_rows_orphan_answer_band_becomes_continuation_row(self):
+        # Answer content with no question-column cell in its band (e.g. a
+        # continuation at the top of a table) must surface as a marker-less
+        # row instead of being dropped.
+        table = {
+            "bbox": [0.0, 0.0, 300.0, 130.0],
+            "children": [
+                make_cell("Question", [0.0, 0.0, 50.0, 10.0]),
+                make_cell("Answer", [50.0, 0.0, 250.0, 10.0]),
+                make_cell("Marks", [250.0, 0.0, 300.0, 10.0]),
+                make_cell("continued code", [50.0, 10.0, 250.0, 60.0]),
+                make_cell("5", [250.0, 10.0, 300.0, 60.0]),
+                make_cell("2(a)", [0.0, 60.0, 50.0, 130.0]),
+                make_cell("own answer", [50.0, 60.0, 250.0, 130.0]),
+                make_cell("1", [250.0, 60.0, 300.0, 130.0]),
+            ],
+        }
+
+        rows = _extract_table_rows(table, page_index=3, table_index=0)
+
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0]["question_cell_text"], "")
+        self.assertEqual(rows[0]["answer_cell_text"], "continued code")
+        self.assertEqual(rows[0]["marks_cell_text"], "5")
+        self.assertEqual(rows[1]["question_cell_text"], "2(a)")
+        self.assertEqual(rows[1]["answer_cell_text"], "own answer")
+        self.assertEqual(rows[1]["marks_cell_text"], "1")
+
     def test_extract_table_rows_without_header_is_ignored(self):
         table = {
             "bbox": [0.0, 0.0, 300.0, 80.0],

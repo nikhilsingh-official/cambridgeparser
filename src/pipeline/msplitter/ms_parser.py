@@ -416,32 +416,71 @@ def _extract_table_rows(table: Dict[str, Any], page_index: int, table_index: int
             "marks_cells": []
         })
     
-    # Step 3: Assign Answer and Marks cells to rows based on Y-overlap with question cells
-    # A cell belongs to a row if its center Y is within the row's [y1, y2] range
-    tolerance = 3.0  # Extra tolerance for cells straddling boundaries
-    
-    for answer_cell in cells_by_column[ANSWER_CELL]:
-        cell_y1 = float(answer_cell["bbox"][1])
-        cell_y2 = float(answer_cell["bbox"][3])
-        
-        # Find the row that this cell overlaps with
+    # Step 3: Assign Answer and Marks cells to rows by dominant vertical overlap.
+    # Cambridge mark-scheme grids share horizontal borders between rows, so a
+    # cell whose top equals a row's bottom belongs to the row BELOW; any
+    # touch-with-tolerance test assigns it to the row above and shifts every
+    # answer/marks value up one question.
+    def _vertical_overlap(cell: Dict[str, Any], row: Dict[str, Any]) -> float:
+        return min(float(cell["bbox"][3]), row["y2"]) - max(float(cell["bbox"][1]), row["y1"])
+
+    min_overlap = 0.5
+
+    def _assign_cells(cells: List[Dict[str, Any]], target_key: str) -> List[Dict[str, Any]]:
+        orphans: List[Dict[str, Any]] = []
+        for cell in cells:
+            best_row = None
+            best_overlap = min_overlap
+            for row in row_boundaries:
+                overlap = _vertical_overlap(cell, row)
+                if overlap > best_overlap:
+                    best_overlap = overlap
+                    best_row = row
+            if best_row is not None:
+                best_row[target_key].append(cell)
+            else:
+                orphans.append(cell)
+        return orphans
+
+    orphan_answer_cells = _assign_cells(cells_by_column[ANSWER_CELL], "answer_cells")
+    orphan_marks_cells = _assign_cells(cells_by_column[MARKS_CELL], "marks_cells")
+
+    # Content with no question-column cell in its band (e.g. continuation
+    # bands at a table edge) must stay visible: give it a marker-less row so
+    # hierarchy building can attach it to the current marker.
+    for cell in orphan_answer_cells:
+        row_boundaries.append(
+            {
+                "y1": float(cell["bbox"][1]),
+                "y2": float(cell["bbox"][3]),
+                "question_cell": {"bbox": cell["bbox"], "html": "", "id": None},
+                "answer_cells": [cell],
+                "marks_cells": [],
+            }
+        )
+    for cell in orphan_marks_cells:
+        best_row = None
+        best_overlap = min_overlap
         for row in row_boundaries:
-            # Check if cell overlaps with row's Y-range
-            if cell_y1 < row["y2"] + tolerance and cell_y2 > row["y1"] - tolerance:
-                row["answer_cells"].append(answer_cell)
-                break
-    
-    for marks_cell in cells_by_column[MARKS_CELL]:
-        cell_y1 = float(marks_cell["bbox"][1])
-        cell_y2 = float(marks_cell["bbox"][3])
-        
-        # Find the row that this cell overlaps with
-        for row in row_boundaries:
-            # Check if cell overlaps with row's Y-range
-            if cell_y1 < row["y2"] + tolerance and cell_y2 > row["y1"] - tolerance:
-                row["marks_cells"].append(marks_cell)
-                break
-    
+            overlap = _vertical_overlap(cell, row)
+            if overlap > best_overlap:
+                best_overlap = overlap
+                best_row = row
+        if best_row is not None:
+            best_row["marks_cells"].append(cell)
+        else:
+            row_boundaries.append(
+                {
+                    "y1": float(cell["bbox"][1]),
+                    "y2": float(cell["bbox"][3]),
+                    "question_cell": {"bbox": cell["bbox"], "html": "", "id": None},
+                    "answer_cells": [],
+                    "marks_cells": [cell],
+                }
+            )
+
+    row_boundaries.sort(key=lambda row: (row["y1"], row["y2"]))
+
     # Step 4: Build output rows
     extracted: List[Dict[str, Any]] = []
     for local_row_idx, row in enumerate(row_boundaries):

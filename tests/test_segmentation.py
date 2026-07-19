@@ -113,6 +113,52 @@ class SegmentationTests(unittest.TestCase):
         self.assertIn("words", content_pages[0])
         self.assertTrue(content_pages[0]["words"])
 
+    def test_edge_noise_and_boilerplate_lines_are_dropped(self):
+        data = [
+            {
+                "image_bbox": [0.0, 0.0, 100.0, 200.0],
+                "text_lines": [
+                    make_line("7", 5.0),
+                    make_line("1 prompt text", 20.0),
+                    make_line("real content 42", 100.0),
+                    make_line("9608/21/M/J/16", 185.0),
+                    make_line("© UCLES 2016", 190.0),
+                    make_line("[Turn over", 192.0),
+                    make_line("15", 195.0),
+                    make_line("BLANK PAGE", 120.0),
+                    make_line("Permission to reproduce items where third-party owned", 130.0),
+                    make_line("copyright acknowledgement follows the boilerplate", 140.0),
+                ],
+            }
+        ]
+        hierarchy = {
+            "paper_code": "paper",
+            "questions": [
+                {
+                    "question": make_marker("1", 0, 0.0, 20.0, 1, width=1.0),
+                    "primary_subparts": [],
+                }
+            ],
+        }
+        segmented = build_segmented_questions(
+            paper_code="paper",
+            hierarchy_payload=hierarchy,
+            pdf_dir=Path("."),
+            ocr_dir=Path("."),
+            context={"data": data},
+        )
+        question = segmented["questions"][0]["question"]
+        content = question["content_text"]
+        self.assertIn("prompt text", content)
+        self.assertIn("real content 42", content)
+        self.assertNotIn("9608/21/M/J/16", content)
+        self.assertNotIn("UCLES", content)
+        self.assertNotIn("Turn over", content)
+        self.assertNotIn("BLANK PAGE", content)
+        self.assertNotIn("Permission to reproduce", content)
+        self.assertNotIn("boilerplate", content)
+        self.assertNotIn("15", content.split())
+
     def test_excluded_lines_are_ignored_for_content_text_and_words(self):
         data = [
             {
