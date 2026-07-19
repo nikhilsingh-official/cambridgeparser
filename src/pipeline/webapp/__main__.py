@@ -59,10 +59,10 @@ def main() -> int:
     parser_state = str(parser_binary) if parser_binary else (
         "NOT BUILT — run: cargo build --release (in pseudocode-parser/)"
     )
-    print(f"Records:  {args.records}")
-    print(f"Parser:   {parser_state}")
-    print(f"Grading:  {grading_mode}")
-    print(f"Serving:  http://{args.host}:{args.port}/")
+    print(f"Records:  {args.records}", flush=True)
+    print(f"Parser:   {parser_state}", flush=True)
+    print(f"Grading:  {grading_mode}", flush=True)
+    print(f"Serving:  http://{args.host}:{args.port}/", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
