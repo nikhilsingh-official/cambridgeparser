@@ -33,6 +33,7 @@ from .extract_marking_points import (
     extract_structured_marking_points,
     marking_points_from_underlined_spans,
 )
+from .marking_point_overrides import override_marking_points
 
 SCHEMA_VERSION = "pseudocode-question-record/v1"
 TRAILING_MARKS_PATTERN = re.compile(r"\[\s*(\d+)\s*\]\s*$")
@@ -354,11 +355,26 @@ def build_records(
             if underlined_points:
                 marking_points = underlined_points
                 diagnostics.append("marking_points_from_underlined_spans")
+        override = None
+        if not marking_points:
+            # Last resort for a few one-off mark-scheme conventions; never runs
+            # when a real parse succeeded (see marking_point_overrides).
+            override = override_marking_points(
+                paper_code,
+                hit.get("question_marker"),
+                hit.get("primary_marker"),
+                hit.get("secondary_marker"),
+            )
+            if override:
+                marking_points = override["points"]
+                diagnostics.append("marking_points_from_override")
         if not marking_points:
             diagnostics.append("no_marking_points_extracted")
 
         qp_marks = _qp_marks_value(question_text)
         max_marks = marks_value if isinstance(marks_value, int) else None
+        if max_marks is None and override is not None:
+            max_marks = override.get("max_marks")
         if max_marks is None:
             max_marks = extraction["max_marks"]
         if max_marks is None:
