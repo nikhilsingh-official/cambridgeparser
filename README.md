@@ -53,6 +53,62 @@ python -m src.pipeline.pseudocode_tools.select_pseudocode_writing \
   --rules-file src/pipeline/analysis/diagnostics/pseudocode_custom_rules.json
 ```
 
+Build canonical question records (joins selection with `qp_output` and
+`ms_output`, extracts structured marking points, reuses screenshots):
+
+```bash
+python -m src.pipeline.pseudocode_tools.build_final_records \
+  --selected-json pseudocode_writing_hits/pseudocode_writing_selected.json \
+  --qp-dir qp_output \
+  --ms-dir ms_output \
+  --output-json pseudocode_writing_hits/pseudocode_question_records.json
+```
+
+Validate generated artifacts (no model or network calls):
+
+```bash
+python -m src.pipeline.analysis.diagnostics.validate_extraction \
+  --qp-dir qp_output \
+  --ms-dir ms_output \
+  --final-json pseudocode_writing_hits/pseudocode_question_records.json \
+  --output-json pseudocode_writing_hits/extraction_validation.json
+```
+
+## Grading Stack
+
+Build the Rust pseudocode parser (wraps the root `ast.rs`/`parser.rs`):
+
+```bash
+cd pseudocode-parser && cargo build --release && cargo test
+```
+
+The binary emits `cambridge-pseudocode-ast/v1` JSON:
+
+```bash
+pseudocode-parser/target/release/pseudocode-parser --format json --source-file answer.txt
+```
+
+`src.pipeline.grading.ast_adapter` invokes it from Python with a timeout and
+returns `parsed-answer/v1` payloads. Set `PSEUDOCODE_PARSER_BIN` to override
+binary discovery.
+
+Run the grading web app (stdlib only, no framework):
+
+```bash
+python -m src.pipeline.webapp \
+  --records pseudocode_writing_hits/pseudocode_question_records.json \
+  --port 8000
+```
+
+OpenRouter configuration (grading falls back to a deterministic dry run when
+no key is set):
+
+```bash
+export OPENROUTER_API_KEY=...                       # user-provided secret
+export OPENROUTER_MODEL=qwen/qwen2.5-coder-7b-instruct   # optional override
+export OPENROUTER_BASE_URL=https://openrouter.ai/api/v1  # optional override
+```
+
 ## Planning Docs
 
 - `docs/project_direction.md` describes the current extraction pipeline and the intended AST-backed grading direction.
