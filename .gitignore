@@ -42,3 +42,7 @@ output/
 *.tif
 *.tiff
 
+
+# Rust build artifacts
+pseudocode-parser/target/
+Cargo.lock

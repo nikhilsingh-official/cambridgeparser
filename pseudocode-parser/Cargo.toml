@@ -1,0 +1,12 @@
+[package]
+name = "pseudocode-parser"
+version = "0.1.0"
+edition = "2021"
+description = "Cambridge pseudocode parser CLI emitting AST JSON and diagnostics"
+
+[[bin]]
+name = "pseudocode-parser"
+path = "src/main.rs"
+
+[profile.release]
+debug = false
