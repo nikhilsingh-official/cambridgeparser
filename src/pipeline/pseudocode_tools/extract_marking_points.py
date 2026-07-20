@@ -49,6 +49,9 @@ META_PREFIX_PATTERN = re.compile(
     r"^(note\s*:|alternative\b|example\s+(?:solution|of)|expected\s+output|guidance\s*:)",
     re.IGNORECASE,
 )
+# A boundary that introduces a *different solution*, so its marking points form a
+# new alternative group (a "Note" or "Max" boundary does not — same solution).
+ALT_MARKER_PATTERN = re.compile(r"^\s*(alternative|example\b.*\bsolution|or)\b", re.IGNORECASE)
 LEADING_TRIM_PATTERN = re.compile(r"^[\s•\-\–\—:.)]+")
 
 # Structured extraction additions. Cambridge mark schemes mix several rubric
@@ -178,12 +181,36 @@ def _scan_rubric_items(lines: list[str]) -> tuple[list[Dict[str, Any]], bool, bo
     header_seen = False
     one_mark_header_seen = False
     last_mp_number = 0
+    group = 0
+    group_has_items = False
+    group_high_number = 0
+    pending_alt = False
 
     def flush() -> None:
         nonlocal current
         if current is not None and current["text"].strip():
             items.append(current)
         current = None
+
+    def begin_item(
+        text: str, style: str, confidence: str, number: Optional[int] = None
+    ) -> None:
+        # A new rubric block only becomes a separate alternative group once its
+        # numbering actually restarts. Mark schemes freely drop asides like
+        # "ALTERNATIVE using nested IFs:" into the middle of one rubric, and the
+        # list continues across them (MP3 after MP2), so the marker alone is not
+        # enough. Unnumbered items have no restart to observe, so the marker
+        # decides for them.
+        nonlocal current, group, group_has_items, group_high_number, pending_alt
+        if pending_alt and group_has_items and (number is None or number <= group_high_number):
+            group += 1
+            group_has_items = False
+            group_high_number = 0
+        pending_alt = False
+        current = {"text": text, "style": style, "confidence": confidence, "group": group}
+        group_has_items = True
+        if number is not None:
+            group_high_number = max(group_high_number, number)
 
     for raw in lines:
         stripped = raw.strip()
@@ -197,6 +224,7 @@ def _scan_rubric_items(lines: list[str]) -> tuple[list[Dict[str, Any]], bool, bo
         # block, so MP numbering restarts (an alternative may reuse "MP1").
         if _is_header(stripped) and not stripped.lower().startswith("mp"):
             flush()
+            pending_alt = True
             header_seen = True
             last_mp_number = 0
             if ONE_MARK_HEADER_PATTERN.search(stripped):
@@ -210,6 +238,8 @@ def _scan_rubric_items(lines: list[str]) -> tuple[list[Dict[str, Any]], bool, bo
             or META_PREFIX_PATTERN.match(stripped)
         ):
             flush()
+            if ALT_MARKER_PATTERN.match(stripped):
+                pending_alt = True
             last_mp_number = 0
             continue
 
@@ -217,7 +247,7 @@ def _scan_rubric_items(lines: list[str]) -> tuple[list[Dict[str, Any]], bool, bo
         if mp is not None and mp[0] > last_mp_number:
             flush()
             last_mp_number = mp[0]
-            current = {"text": mp[1], "style": "mp_label", "confidence": "high"}
+            begin_item(mp[1], "mp_label", "high", number=mp[0])
             continue
 
         # A numbered-looking line that the code guard rejects (a circled mark
@@ -226,11 +256,10 @@ def _scan_rubric_items(lines: list[str]) -> tuple[list[Dict[str, Any]], bool, bo
             text = _numbered_item(stripped)
             if text is not None:
                 flush()
-                current = {
-                    "text": text,
-                    "style": "numbered_list",
-                    "confidence": "high" if header_seen else "medium",
-                }
+                number = int(NUM_ITEM_PATTERN.match(stripped).group(1))
+                begin_item(
+                    text, "numbered_list", "high" if header_seen else "medium", number=number
+                )
             else:
                 flush()
             continue
@@ -239,11 +268,7 @@ def _scan_rubric_items(lines: list[str]) -> tuple[list[Dict[str, Any]], bool, bo
         if bullet is not None:
             flush()
             style = "one_mark_bullet" if one_mark_header_seen else "bullet"
-            current = {
-                "text": bullet,
-                "style": style,
-                "confidence": "high" if header_seen else "medium",
-            }
+            begin_item(bullet, style, "high" if header_seen else "medium")
             continue
 
         if _is_code_line(stripped):
@@ -306,9 +331,15 @@ def extract_structured_marking_points(text: Optional[str]) -> Dict[str, Any]:
     Styles do not mix within one node: MP labels win over numbered lists, which
     win over bullets. Numbered/bullet items without any header are accepted only
     when there are at least two of them, to avoid stray numbered code lines.
+
+    When a mark scheme lists several *alternative solutions* (each its own rubric
+    block), every point carries an ``alt_group`` index for the block it came
+    from. Points are deduplicated only *within* a group, so alternatives stay
+    separate rather than being merged into one additive list; ``alt_group_count``
+    reports how many alternative groups are present.
     """
     if not text:
-        return {"points": [], "max_marks": None}
+        return {"points": [], "max_marks": None, "alt_group_count": 0}
 
     lines = text.splitlines()
     max_marks = _detect_max_marks(lines)
@@ -328,15 +359,17 @@ def extract_structured_marking_points(text: Optional[str]) -> Dict[str, Any]:
         chosen = []
 
     points: list[Dict[str, Any]] = []
-    seen: set[str] = set()
+    seen_per_group: Dict[int, set] = {}
+    # Renumber alternative groups compactly (the chosen style may skip some).
+    group_remap: Dict[int, int] = {}
     for item in chosen:
         text = _clean_item_text(item["text"])
-        # Alternative-solution rubrics repeat identical mark descriptions; keep
-        # the first occurrence of each so the list stays a set of distinct marks.
+        raw_group = item.get("group", 0)
         key = text.lower()
-        if not text or key in seen:
+        if not text or key in seen_per_group.setdefault(raw_group, set()):
             continue
-        seen.add(key)
+        seen_per_group[raw_group].add(key)
+        alt_group = group_remap.setdefault(raw_group, len(group_remap))
         points.append(
             {
                 "id": f"mp{len(points) + 1}",
@@ -344,10 +377,15 @@ def extract_structured_marking_points(text: Optional[str]) -> Dict[str, Any]:
                 "marks": 1,
                 "confidence": item["confidence"],
                 "style": item["style"],
+                "alt_group": alt_group,
             }
         )
 
-    return {"points": points, "max_marks": max_marks}
+    return {
+        "points": points,
+        "max_marks": max_marks,
+        "alt_group_count": len(group_remap),
+    }
 
 
 # Private-use glyphs the mark-scheme font uses for pseudocode operators.
@@ -453,6 +491,7 @@ def marking_points_from_underlined_spans(
                     "marks": 1,
                     "confidence": "high",
                     "style": "underlined",
+                    "alt_group": 0,
                 }
             )
     return points

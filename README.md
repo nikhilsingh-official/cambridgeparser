@@ -179,6 +179,15 @@ python -m src.pipeline.runners.qsplitter_batch \
 - Mark-scheme parsing is table-first. A full audit on the checked-in corpus
   leaves some older 2015/2016 mark schemes with empty question lists; treat that
   as parser coverage work, not as a hidden fallback path.
+- Cambridge mark schemes often print several *alternative* solutions for one
+  question. `extract_structured_marking_points` tags each point with an
+  `alt_group` (a new group opens only when the rubric numbering restarts, so an
+  aside like "ALTERNATIVE using nested IFs:" does not split a list), and
+  deduplicates only *within* a group. The grading prompt lists the groups as
+  separate, mutually exclusive blocks — they are never merged into one additive
+  list — and `apply_max_marks_cap` clamps `total_awarded` to the question's
+  marks as a final safety net. `validate_marking_points` counts per group for
+  the same reason.
 - `ms_parser` records underlined answer spans (`answer_underlined_spans`) via
   PyMuPDF `TEXT_COLLECT_STYLES` (`char_flags & 2`). `build_final_records` turns
   them into marking points for the "one mark per underlined word / expression"

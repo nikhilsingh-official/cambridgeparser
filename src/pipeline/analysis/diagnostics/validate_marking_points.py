@@ -14,7 +14,12 @@ Each record is checked against a set of flags grouped by severity:
   medium  — likely lossy or needs review:
             undercount, multi_rubric, multi_solution
   low     — informational:
-            mp_crossref_in_text, codey_mp, duplicate_mp, no_marking_points
+            mp_crossref_in_text, codey_mp, duplicate_mp, alt_groups,
+            no_marking_points
+
+Counts are measured per alternative-solution group (``alt_group``), because
+alternatives are mutually exclusive: a 5-mark question with two 5-point
+alternatives holds 10 points but is not over-expanded.
 
 Usage:
 
@@ -119,10 +124,22 @@ def _distinct_solution_names(answer_text: str) -> List[str]:
     return names
 
 
+def _by_alt_group(points: List[Dict[str, Any]]) -> List[List[Dict[str, Any]]]:
+    groups: Dict[int, List[Dict[str, Any]]] = {}
+    for point in points:
+        key = point.get("alt_group")
+        groups.setdefault(key if isinstance(key, int) else 0, []).append(point)
+    return [groups[key] for key in sorted(groups)]
+
+
 def audit_record(record: Dict[str, Any]) -> Dict[str, Any]:
     ms = record.get("mark_scheme") or {}
     points = ms.get("marking_points") or []
     texts = [str(p.get("text") or "") for p in points]
+    # Alternative-solution rubrics are mutually exclusive, so a record is only
+    # over-expanded when a *single* alternative exceeds the mark cap.
+    alt_groups = _by_alt_group(points)
+    largest_group = max((len(g) for g in alt_groups), default=0)
     answer_text = ms.get("answer_text") or ""
     style = points[0].get("style") if points else None
     max_marks = ms.get("max_marks")
@@ -142,7 +159,7 @@ def audit_record(record: Dict[str, Any]) -> Dict[str, Any]:
         flags.append("fragment_mp")
     if style == "mp_label" and len(points) == 1 and numbered_items >= 2:
         flags.append("lone_mp_discarded_list")
-    if isinstance(cap, int) and len(points) > cap:
+    if isinstance(cap, int) and largest_group > cap:
         flags.append("over_expansion")
     # Contamination signal: the answer declares an underline/bold/highlight
     # convention, yet the extracted points are a text list — the extractor
@@ -151,7 +168,7 @@ def audit_record(record: Dict[str, Any]) -> Dict[str, Any]:
         flags.append("rubric_selection_mismatch")
 
     # ---- medium severity: lossy / review ----
-    if isinstance(cap, int) and 0 < len(points) < cap:
+    if isinstance(cap, int) and 0 < largest_group < cap:
         flags.append("undercount")
     if header_count >= 2:
         flags.append("multi_rubric")
@@ -165,9 +182,15 @@ def audit_record(record: Dict[str, Any]) -> Dict[str, Any]:
         flags.append("mp_crossref_in_text")
     if style not in ("underlined", "manual_override") and any(CODEY_PATTERN.search(t) for t in texts):
         flags.append("codey_mp")
-    lowered = [t.strip().lower() for t in texts]
-    if len(lowered) != len(set(lowered)):
-        flags.append("duplicate_mp")
+    # Repeats are only suspicious inside one rubric; alternatives legitimately
+    # restate shared criteria.
+    for group in alt_groups:
+        lowered = [str(p.get("text") or "").strip().lower() for p in group]
+        if len(lowered) != len(set(lowered)):
+            flags.append("duplicate_mp")
+            break
+    if len(alt_groups) > 1:
+        flags.append("alt_groups")
     if not points:
         flags.append("no_marking_points")
 
@@ -182,6 +205,8 @@ def audit_record(record: Dict[str, Any]) -> Dict[str, Any]:
         "marker": f"q{sk.get('question_marker')}{sk.get('primary_marker') or ''}{sk.get('secondary_marker') or ''}",
         "style": style,
         "mp_count": len(points),
+        "alt_group_count": len(alt_groups),
+        "largest_alt_group": largest_group,
         "cap": cap,
         "header_count": header_count,
         "numbered_items": numbered_items,

@@ -403,6 +403,12 @@ def build_records(
                 "max_marks": max_marks,
                 "marking_points": marking_points,
                 "marking_points_max": extraction["max_marks"],
+                # How many alternative-solution rubrics the points span. > 1
+                # means the points are mutually exclusive groups, not one
+                # additive list; the grading layer keeps the groups separate.
+                "alt_group_count": len(
+                    {point.get("alt_group", 0) for point in marking_points}
+                ),
             },
             "selection": {
                 "matched_positive": hit.get("matched_positive") or [],

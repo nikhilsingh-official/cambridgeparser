@@ -55,23 +55,117 @@ def _default_transport(url: str, headers: Dict[str, str], body: bytes, timeout: 
         return response.read().decode("utf-8")
 
 
+def group_marking_points(
+    marking_points: List[Dict[str, Any]]
+) -> List[List[Dict[str, Any]]]:
+    """Split marking points into their alternative-solution groups, in order.
+
+    Cambridge mark schemes often print several *alternative* rubrics for the same
+    question. The extractor tags each point with ``alt_group``; the groups stay
+    separate here (and in the prompt) so alternatives are never merged into one
+    additive list. Points without a tag all fall into a single group.
+    """
+    groups: Dict[int, List[Dict[str, Any]]] = {}
+    for point in marking_points:
+        key = point.get("alt_group")
+        groups.setdefault(key if isinstance(key, int) else 0, []).append(point)
+    return [groups[key] for key in sorted(groups)]
+
+
+def _group_marks(group: List[Dict[str, Any]]) -> int:
+    total = 0
+    for point in group:
+        marks = point.get("marks", 1)
+        total += marks if isinstance(marks, int) else 1
+    return total
+
+
+def resolve_max_marks(record: Dict[str, Any]) -> Optional[int]:
+    """The mark cap for a record: the mark scheme's value, else the best group.
+
+    Never the sum over *all* points — with alternative rubrics that would be
+    several times the real total.
+    """
+    mark_scheme = record.get("mark_scheme") or {}
+    for key in ("max_marks", "marks_value"):
+        value = mark_scheme.get(key)
+        if isinstance(value, int):
+            return value
+    groups = group_marking_points(mark_scheme.get("marking_points") or [])
+    return max((_group_marks(g) for g in groups), default=None)
+
+
+def apply_max_marks_cap(result: Dict[str, Any], cap: Optional[int]) -> Dict[str, Any]:
+    """Clamp ``total_awarded`` to the question's mark cap, in place.
+
+    A safety net for records whose extracted marking points over-expand (several
+    alternative rubrics, or a rubric with a "max N" note): even if the model
+    awards every point, the record cannot score above the question's marks.
+    """
+    if not isinstance(cap, int) or cap < 0:
+        return result
+    total = result.get("total_awarded")
+    if not isinstance(total, int):
+        total = sum(
+            point.get("marks_awarded", 0)
+            for point in result.get("points") or []
+            if isinstance(point.get("marks_awarded"), int)
+        )
+    result["max_marks"] = cap
+    if total > cap:
+        result["total_awarded"] = cap
+        result["cap_applied"] = {"reported_total": total, "max_marks": cap}
+        explanation = result.get("overall_explanation")
+        note = (
+            f"Total capped at the question maximum of {cap} "
+            f"(marking points supported {total})."
+        )
+        result["overall_explanation"] = f"{explanation} {note}".strip() if explanation else note
+    else:
+        result["total_awarded"] = total
+    return result
+
+
 def build_grading_messages(
     record: Dict[str, Any], parsed_answer: Dict[str, Any]
 ) -> List[Dict[str, str]]:
     """Build chat messages for point-by-point grading of one student answer."""
     mark_scheme = record.get("mark_scheme") or {}
     marking_points = mark_scheme.get("marking_points") or []
-    max_marks = mark_scheme.get("max_marks")
+    max_marks = resolve_max_marks(record)
     parse = parsed_answer.get("parse") or {}
+    groups = group_marking_points(marking_points)
 
-    if marking_points:
+    if len(groups) > 1:
+        blocks = []
+        for index, group in enumerate(groups):
+            lines = "\n".join(
+                f"- {point.get('id')}: {point.get('text')} ({point.get('marks', 1)} mark)"
+                for point in group
+            )
+            blocks.append(
+                f"ALTERNATIVE SOLUTION {index + 1} "
+                f"({_group_marks(group)} mark(s) available):\n{lines}"
+            )
+        points_lines = "\n\n".join(blocks)
+        points_instruction = (
+            f"The mark scheme lists {len(groups)} ALTERNATIVE solutions. They are "
+            "mutually exclusive: choose the single alternative that best matches "
+            "the student's approach, judge each of that alternative's marking "
+            "points independently by its id, and award nothing from the other "
+            "alternatives. Award marks only when the student's code clearly "
+            "satisfies the point. "
+            f"total_awarded must never exceed max_marks ({max_marks})."
+        )
+    elif marking_points:
         points_lines = "\n".join(
             f"- {point.get('id')}: {point.get('text')} ({point.get('marks', 1)} mark)"
             for point in marking_points
         )
         points_instruction = (
             "Judge each marking point independently by its id. Award marks only "
-            "when the student's code clearly satisfies the point."
+            "when the student's code clearly satisfies the point. "
+            f"total_awarded must never exceed max_marks ({max_marks})."
         )
     else:
         points_lines = "(no structured marking points were extracted; derive up to "
@@ -194,24 +288,25 @@ def dry_run_result(record: Dict[str, Any], parsed_answer: Dict[str, Any]) -> Dic
                 "concerns": ["dry-run mode"],
             }
         )
-    max_marks = mark_scheme.get("max_marks")
-    if not isinstance(max_marks, int):
-        max_marks = sum(int(point.get("marks", 1)) for point in marking_points)
+    max_marks = resolve_max_marks(record)
     return {
         "schema_version": RESULT_SCHEMA_VERSION,
         "ok": True,
         "dry_run": True,
         "model": "dry-run",
         "provider": "none",
-        "result": {
-            "total_awarded": total,
-            "max_marks": max_marks,
-            "points": points,
-            "overall_explanation": (
-                "DRY RUN: deterministic placeholder grading. Set OPENROUTER_API_KEY "
-                "to grade with the real model."
-            ),
-        },
+        "result": apply_max_marks_cap(
+            {
+                "total_awarded": total,
+                "max_marks": max_marks if isinstance(max_marks, int) else total,
+                "points": points,
+                "overall_explanation": (
+                    "DRY RUN: deterministic placeholder grading. Set OPENROUTER_API_KEY "
+                    "to grade with the real model."
+                ),
+            },
+            max_marks,
+        ),
         "error": None,
         "raw_response": None,
     }
@@ -305,7 +400,7 @@ def grade_answer(
             "dry_run": False,
             "model": config.model,
             "provider": "openrouter",
-            "result": payload,
+            "result": apply_max_marks_cap(payload, resolve_max_marks(record)),
             "error": None,
             "raw_response": content,
         }

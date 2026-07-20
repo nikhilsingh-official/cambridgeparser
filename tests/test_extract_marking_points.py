@@ -262,7 +262,7 @@ class StructuredMarkingPointTests(unittest.TestCase):
             ["A nested loop including attempt at flip operation", "Correct number of iterations"],
         )
 
-    def test_duplicate_alternative_solution_marks_are_deduped(self):
+    def test_alternative_solutions_form_separate_groups(self):
         text = (
             "Mark as follows:\n"
             "1 Open file for read and close\n"
@@ -274,14 +274,35 @@ class StructuredMarkingPointTests(unittest.TestCase):
 
         result = extract_structured_marking_points(text)
 
+        # The alternative keeps its own copy of the shared point: the two
+        # rubrics are mutually exclusive, so merging them would turn a 2-mark
+        # question into a 3-mark additive list.
         self.assertEqual(
-            [p["text"] for p in result["points"]],
+            [(p["alt_group"], p["text"]) for p in result["points"]],
             [
-                "Open file for read and close",
-                "Conditional loop until EOF",
-                "Output result in a loop",
+                (0, "Open file for read and close"),
+                (0, "Conditional loop until EOF"),
+                (1, "Open file for read and close"),
+                (1, "Output result in a loop"),
             ],
         )
+        self.assertEqual(result["alt_group_count"], 2)
+
+    def test_duplicates_within_one_rubric_are_deduped(self):
+        text = (
+            "Mark as follows:\n"
+            "1 Open file for read and close\n"
+            "2 Conditional loop until EOF\n"
+            "3 Open file for read and close"
+        )
+
+        result = extract_structured_marking_points(text)
+
+        self.assertEqual(
+            [p["text"] for p in result["points"]],
+            ["Open file for read and close", "Conditional loop until EOF"],
+        )
+        self.assertEqual(result["alt_group_count"], 1)
 
     def test_numbered_list_without_header_needs_two_items(self):
         # A single stray numbered line with no rubric header is not a mark.

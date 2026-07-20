@@ -124,6 +124,7 @@ def override_marking_points(
             "marks": 1,
             "confidence": "high",
             "style": "manual_override",
+            "alt_group": 0,
         }
         for index, text in enumerate(entry["points"], start=1)
     ]

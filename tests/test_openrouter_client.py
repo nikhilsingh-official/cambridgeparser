@@ -3,9 +3,11 @@ import unittest
 
 from src.pipeline.grading.openrouter_client import (
     OpenRouterConfig,
+    apply_max_marks_cap,
     build_grading_messages,
     dry_run_result,
     grade_answer,
+    resolve_max_marks,
     validate_grading_payload,
 )
 
@@ -25,6 +27,20 @@ def make_record():
             ],
         },
     }
+
+
+def alt_record():
+    """A record whose mark scheme prints two mutually exclusive 2-mark rubrics."""
+    record = make_record()
+    record["mark_scheme"]["marks_value"] = 2
+    record["mark_scheme"]["max_marks"] = 2
+    record["mark_scheme"]["marking_points"] = [
+        {"id": "mp1", "text": "Iterative loop over the array", "marks": 1, "alt_group": 0},
+        {"id": "mp2", "text": "Returns the running total", "marks": 1, "alt_group": 0},
+        {"id": "mp3", "text": "Recursive call on the tail", "marks": 1, "alt_group": 1},
+        {"id": "mp4", "text": "Base case on the empty array", "marks": 1, "alt_group": 1},
+    ]
+    return record
 
 
 def make_parsed_answer(ok=True):
@@ -159,6 +175,90 @@ class OpenRouterClientTests(unittest.TestCase):
         messages = build_grading_messages(record, make_parsed_answer())
 
         self.assertIn("auto1", messages[1]["content"])
+
+
+class AlternativeSolutionSafetyTests(unittest.TestCase):
+    def test_alternative_groups_are_listed_separately_and_never_merged(self):
+        record = alt_record()
+
+        messages = build_grading_messages(record, make_parsed_answer())
+        user = messages[1]["content"]
+        system = messages[0]["content"]
+
+        self.assertIn("ALTERNATIVE SOLUTION 1", user)
+        self.assertIn("ALTERNATIVE SOLUTION 2", user)
+        # Every point survives into the prompt, inside its own group.
+        for point_id in ("mp1", "mp2", "mp3", "mp4"):
+            self.assertIn(point_id, user)
+        self.assertIn("mutually exclusive", system)
+
+    def test_single_group_keeps_the_flat_point_list(self):
+        messages = build_grading_messages(make_record(), make_parsed_answer())
+
+        self.assertNotIn("ALTERNATIVE SOLUTION", messages[1]["content"])
+
+    def test_resolve_max_marks_uses_best_group_not_the_sum(self):
+        record = alt_record()
+        record["mark_scheme"].pop("max_marks")
+        record["mark_scheme"].pop("marks_value")
+
+        # 4 points across 2 alternatives of 2 marks each -> cap is 2, not 4.
+        self.assertEqual(resolve_max_marks(record), 2)
+
+    def test_total_is_capped_at_max_marks(self):
+        result = apply_max_marks_cap(
+            {
+                "total_awarded": 9,
+                "max_marks": 9,
+                "points": [],
+                "overall_explanation": "Everything matched.",
+            },
+            3,
+        )
+
+        self.assertEqual(result["total_awarded"], 3)
+        self.assertEqual(result["max_marks"], 3)
+        self.assertEqual(result["cap_applied"], {"reported_total": 9, "max_marks": 3})
+        self.assertIn("capped", result["overall_explanation"])
+
+    def test_total_within_cap_is_untouched(self):
+        result = apply_max_marks_cap(
+            {"total_awarded": 2, "max_marks": 6, "points": [], "overall_explanation": "ok"},
+            6,
+        )
+
+        self.assertEqual(result["total_awarded"], 2)
+        self.assertNotIn("cap_applied", result)
+        self.assertEqual(result["overall_explanation"], "ok")
+
+    def test_graded_result_is_capped(self):
+        config = OpenRouterConfig(api_key="test-key")
+        record = alt_record()
+        record["mark_scheme"]["max_marks"] = 2
+        payload = valid_model_payload()
+        payload["total_awarded"] = 4
+        payload["max_marks"] = 4
+
+        result = grade_answer(
+            record,
+            make_parsed_answer(),
+            config=config,
+            dry_run=False,
+            transport=lambda *args: json.dumps(
+                {"choices": [{"message": {"content": json.dumps(payload)}}]}
+            ),
+        )
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["result"]["total_awarded"], 2)
+
+    def test_dry_run_result_is_capped(self):
+        record = alt_record()
+        record["mark_scheme"]["max_marks"] = 1
+
+        result = dry_run_result(record, make_parsed_answer())
+
+        self.assertLessEqual(result["result"]["total_awarded"], 1)
 
 
 if __name__ == "__main__":
