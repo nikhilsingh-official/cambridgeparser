@@ -159,8 +159,15 @@ def audit_record(record: Dict[str, Any]) -> Dict[str, Any]:
         flags.append("fragment_mp")
     if style == "mp_label" and len(points) == 1 and numbered_items >= 2:
         flags.append("lone_mp_discarded_list")
+    # Some schemes deliberately list more criteria than marks ("One mark per
+    # point (Max 8):" above nine items). That cap is the scheme's own design and
+    # the grading layer enforces it, so it is not an extraction defect.
+    declared_max = ms.get("marking_points_max")
     if isinstance(cap, int) and largest_group > cap:
-        flags.append("over_expansion")
+        if isinstance(declared_max, int) and declared_max <= cap:
+            flags.append("declared_max_list")
+        else:
+            flags.append("over_expansion")
     # Contamination signal: the answer declares an underline/bold/highlight
     # convention, yet the extracted points are a text list — the extractor
     # jumped past the intended rubric to a later (often foreign) block.

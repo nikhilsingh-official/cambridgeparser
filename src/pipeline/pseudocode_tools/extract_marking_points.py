@@ -62,8 +62,12 @@ ONE_MARK_HEADER_PATTERN = re.compile(
     r"^\s*(?:one|1)\s+marks?\s+(?:per|for)\b", re.IGNORECASE
 )
 MAX_MARKS_PATTERN = re.compile(r"^\s*max(?:imum)?\.?\s*(?:of\s*)?(\d+)\s*(?:marks?)?\b", re.IGNORECASE)
-# "(max 8)" inline in a header line, e.g. "One mark for each of the following (max 8):".
-MAX_MARKS_INLINE_PATTERN = re.compile(r"\(\s*max(?:imum)?\.?\s*(\d+)", re.IGNORECASE)
+# A cap declared inside a header line: "One mark per point (Max 8):" or "1 mark
+# for each of the following up to max 5 marks:". Such schemes deliberately list
+# more criteria than there are marks, so the cap is what the grader must honour.
+MAX_MARKS_INLINE_PATTERN = re.compile(
+    r"(?:\(|\bup\s+to\s+)\s*max(?:imum)?\.?\s*(?:of\s+)?(\d+)", re.IGNORECASE
+)
 CODE_LINE_PATTERN = re.compile(
     r"^\s*(?:DECLARE|CONSTANT|FUNCTION|ENDFUNCTION|PROCEDURE|ENDPROCEDURE|IF\b|ELSE\b|ENDIF|"
     r"WHILE\b|ENDWHILE|REPEAT\b|UNTIL\b|FOR\b|NEXT\b|CASE\b|ENDCASE|INPUT\b|OUTPUT\b|RETURNS?\b|"
@@ -162,7 +166,16 @@ def _mp_item(stripped: str) -> Optional[tuple[int, str]]:
     return int(match.group(1)), remainder
 
 
-def _numbered_item(stripped: str) -> Optional[str]:
+def _numbered_item(stripped: str, in_sequence: bool = False) -> Optional[str]:
+    """The description of a numbered rubric item, or None if the line is noise.
+
+    ``in_sequence`` says the caller has a rubric header and this line's number is
+    the next one expected. That makes the line part of a list whose structure we
+    can already see, so the code guard below is skipped: rubric items routinely
+    *name* the construct they mark ("FOR loop", "CASE OF ThisMark ... ENDCASE",
+    "OPENFILE in WRITE mode and subsequent CLOSE in a loop"), which is
+    indistinguishable from code by wording alone.
+    """
     match = NUM_ITEM_PATTERN.match(stripped)
     if not match:
         return None
@@ -171,23 +184,63 @@ def _numbered_item(stripped: str) -> Optional[str]:
         return None
     # A bare "2 OUTPUT ..." with no separator is a circled mark digit on a code
     # line, or a row of an expected-output table ("1 : OUTPUT \"1\""); leading
-    # punctuation is stripped before the code check so both are rejected.
-    if separator is None and _is_code_line(re.sub(r"^[^0-9A-Za-z]+", "", text)):
+    # punctuation is stripped before the code check so both are rejected. Those
+    # digits sit in the example solution and do not form a run, so an in-sequence
+    # line after a header is never one of them.
+    if separator is None and not in_sequence and _is_code_line(re.sub(r"^[^0-9A-Za-z]+", "", text)):
         return None
     return text
 
 
-def _bullet_item(raw: str) -> Optional[str]:
+# Words that cannot end a marking point: the sentence is still going, so the
+# next line continues it rather than starting a new criterion.
+CONTINUATION_TAIL_PATTERN = re.compile(
+    r"(?:[,;:&+/(-]|\b(?:a|an|the|and|or|to|of|in|on|at|by|for|from|with|without|into"
+    r"|if|when|while|until|after|before|that|than|then|as|is|are|be|been|must|not|no"
+    r"|use|using|used|include|including|includes|both|each|all|any|either|its|their"
+    r"|this|these|those|which|where|between|within|through|during|about|over|under"
+    r"|above|below|per|up|down)\b)\s*$",
+    re.IGNORECASE,
+)
+
+
+def _starts_new_item(current_text: str, candidate: str) -> bool:
+    """Whether an unnumbered line begins a new marking point rather than wrapping.
+
+    Cambridge sometimes loses the number of the last item ("8." missing before
+    "Closing both files"), which is indistinguishable from a wrapped description
+    by position alone. Three signals separate them: a wrapped line continues a
+    sentence, so the text before it ends mid-clause (a trailing conjunction,
+    punctuation, or an unclosed bracket) or the line itself starts lowercase; and
+    a real criterion is a phrase, not the one or two stray words a wrap leaves
+    behind.
+    """
+    if not candidate[:1].isupper() or len(candidate.split()) < 3:
+        return False
+    if current_text.count("(") != current_text.count(")"):
+        return False
+    return not CONTINUATION_TAIL_PATTERN.search(current_text)
+
+
+def _bullet_item(raw: str, in_list: bool = False) -> Optional[str]:
+    """The description of a bulleted rubric item, or None if the line is noise.
+
+    ``in_list`` says a rubric header has been seen, so the bullets below it are
+    the marking list and a code-like one ("• OUTPUT statement") is still an item.
+    Without that context the guard stands, to skip bulleted example code.
+    """
     match = BULLET_LINE_PATTERN.match(raw)
     if not match:
         return None
     text = match.group(1).strip()
-    if not text or _is_code_line(text):
+    if not text or (not in_list and _is_code_line(text)):
         return None
     return text
 
 
-def _scan_rubric_items(lines: list[str]) -> tuple[list[Dict[str, Any]], bool, bool]:
+def _scan_rubric_items(
+    lines: list[str], allow_promotion: bool = False
+) -> tuple[list[Dict[str, Any]], bool, bool]:
     """Scan mark-scheme lines into ordered marking-point items.
 
     Returns (items, header_seen, one_mark_header_seen). Each item is a dict with
@@ -204,6 +257,10 @@ def _scan_rubric_items(lines: list[str]) -> tuple[list[Dict[str, Any]], bool, bo
     one_mark_header_seen = False
     last_mp_number = 0
     last_list_number = 0
+    # Whether we are *currently* inside the rubric list. Unlike header_seen this
+    # is revoked by any meta boundary: after "Expected output:" the numbered
+    # lines below are a demonstration, not a continuation of the marking list.
+    in_rubric_list = False
     group = 0
     group_has_items = False
     group_high_number = 0
@@ -249,6 +306,7 @@ def _scan_rubric_items(lines: list[str]) -> tuple[list[Dict[str, Any]], bool, bo
             flush()
             pending_alt = True
             header_seen = True
+            in_rubric_list = True
             last_mp_number = 0
             last_list_number = 0
             if ONE_MARK_HEADER_PATTERN.search(stripped):
@@ -266,6 +324,7 @@ def _scan_rubric_items(lines: list[str]) -> tuple[list[Dict[str, Any]], bool, bo
                 pending_alt = True
             last_mp_number = 0
             last_list_number = 0
+            in_rubric_list = False
             continue
 
         mp = _mp_item(stripped)
@@ -279,8 +338,10 @@ def _scan_rubric_items(lines: list[str]) -> tuple[list[Dict[str, Any]], bool, bo
         # digit or an expected-output row) is a boundary, never a continuation.
         num_match = NUM_ITEM_PATTERN.match(stripped)
         if mp is None and num_match:
-            text = _numbered_item(stripped)
             number = int(num_match.group(1))
+            text = _numbered_item(
+                stripped, in_sequence=in_rubric_list and number == last_list_number + 1
+            )
             # A real list counts upwards. A number that does not advance is a
             # wrapped description that happens to start with a digit ("...if not
             # equal write" / "3 lines to NewFile in a loop"), so it continues the
@@ -300,7 +361,7 @@ def _scan_rubric_items(lines: list[str]) -> tuple[list[Dict[str, Any]], bool, bo
             flush()
             continue
 
-        bullet = _bullet_item(raw)
+        bullet = _bullet_item(raw, in_list=in_rubric_list)
         if bullet is not None:
             flush()
             style = "one_mark_bullet" if one_mark_header_seen else "bullet"
@@ -311,9 +372,17 @@ def _scan_rubric_items(lines: list[str]) -> tuple[list[Dict[str, Any]], bool, bo
             flush()
             continue
 
-        # Otherwise a continuation of the current item's wrapped description.
+        # Otherwise a continuation of the current item's wrapped description —
+        # unless it reads as a criterion in its own right whose number the mark
+        # scheme dropped.
         if current is not None:
-            current["text"] = f"{current['text']} {stripped}".strip()
+            if allow_promotion and in_rubric_list and _starts_new_item(current["text"], stripped):
+                style = current["style"]
+                confidence = current["confidence"]
+                flush()
+                begin_item(stripped, style, confidence)
+            else:
+                current["text"] = f"{current['text']} {stripped}".strip()
 
     flush()
     return items, header_seen, one_mark_header_seen
@@ -350,7 +419,32 @@ def _extract_marking_points(text: Optional[str]) -> list[str]:
     return [point["text"] for point in extract_structured_marking_points(text)["points"]]
 
 
-def extract_structured_marking_points(text: Optional[str]) -> Dict[str, Any]:
+def _select_items(items: list[Dict[str, Any]], header_seen: bool) -> list[Dict[str, Any]]:
+    """Pick the one rubric style that carries the marks.
+
+    Styles do not mix within a node. MP labels win over a numbered list only when
+    they could plausibly be the rubric themselves — a stray cross-reference
+    ("Note: MP6: both counts must have been declared") is one mp_label against a
+    real seven-item numbered rubric and must not discard it. Numbered items and
+    bullets without a header are trusted only in pairs, to skip stray numbered
+    code lines.
+    """
+    mp_points = [item for item in items if item["style"] == "mp_label"]
+    numbered_points = [item for item in items if item["style"] == "numbered_list"]
+    bullet_points = [item for item in items if item["style"] in ("bullet", "one_mark_bullet")]
+
+    if mp_points and len(mp_points) >= len(numbered_points):
+        return mp_points
+    if numbered_points and (header_seen or len(numbered_points) >= 2):
+        return numbered_points
+    if bullet_points and (header_seen or len(bullet_points) >= 2):
+        return bullet_points
+    return []
+
+
+def extract_structured_marking_points(
+    text: Optional[str], expected_marks: Optional[int] = None
+) -> Dict[str, Any]:
     """Extract structured marking points from mark-scheme answer text.
 
     Returns {"points": [{id, text, marks, confidence, style}], "max_marks": int|None}.
@@ -380,23 +474,18 @@ def extract_structured_marking_points(text: Optional[str]) -> Dict[str, Any]:
     lines = text.splitlines()
     max_marks = _detect_max_marks(lines)
     items, header_seen, _ = _scan_rubric_items(lines)
+    chosen = _select_items(items, header_seen)
 
-    mp_points = [item for item in items if item["style"] == "mp_label"]
-    numbered_points = [item for item in items if item["style"] == "numbered_list"]
-    bullet_points = [item for item in items if item["style"] in ("bullet", "one_mark_bullet")]
-
-    # MP labels win over a numbered list only when they could plausibly be the
-    # rubric themselves. A stray cross-reference ("Note: MP6: both counts must
-    # have been declared") is one mp_label against a real seven-item numbered
-    # rubric, and must not discard it.
-    if mp_points and len(mp_points) >= len(numbered_points):
-        chosen = mp_points
-    elif numbered_points and (header_seen or len(numbered_points) >= 2):
-        chosen = numbered_points
-    elif bullet_points and (header_seen or len(bullet_points) >= 2):
-        chosen = bullet_points
-    else:
-        chosen = []
+    # Only when the rubric comes up short do we consider that an item lost its
+    # number and was absorbed as a continuation. Re-scanning with promotion on is
+    # accepted solely if it closes the gap without overshooting the marks on
+    # offer, so a complete rubric can never be split further.
+    target = expected_marks if expected_marks is not None else max_marks
+    if isinstance(target, int) and len(chosen) < target:
+        promoted, promoted_header, _ = _scan_rubric_items(lines, allow_promotion=True)
+        promoted_chosen = _select_items(promoted, promoted_header)
+        if len(chosen) < len(promoted_chosen) <= target:
+            chosen = promoted_chosen
 
     points: list[Dict[str, Any]] = []
     seen_per_group: Dict[int, set] = {}

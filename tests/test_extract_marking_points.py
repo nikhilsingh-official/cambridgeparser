@@ -563,5 +563,124 @@ class UnderlineConventionTests(unittest.TestCase):
         self.assertFalse(declares_style_convention("Mark as follows:\n1 Loop over the array"))
 
 
+class ItemSplittingTests(unittest.TestCase):
+    """Rubric items that read like code, and items whose number went missing."""
+
+    def test_in_sequence_items_naming_constructs_are_kept(self):
+        # "FOR loop" / "OUTPUT ..." are what the mark is *for*; the code guard
+        # used to drop them and silently under-credit the answer.
+        text = (
+            "One mark for each of the following:\n"
+            "1 Initialisation of Count\n"
+            "2 FOR loop\n"
+            "3 Check column 1 element and increment count\n"
+            "4 CASE OF ThisMark ... ENDCASE\n"
+            "5 OUTPUT Count together with suitable message"
+        )
+
+        result = extract_structured_marking_points(text)
+
+        self.assertEqual(len(result["points"]), 5)
+        self.assertEqual(result["points"][1]["text"], "FOR loop")
+        self.assertEqual(result["points"][4]["text"], "OUTPUT Count together with suitable message")
+
+    def test_out_of_sequence_code_digit_is_still_rejected(self):
+        # A circled mark digit in the example solution does not continue the
+        # list's numbering, so the code guard still applies to it.
+        text = (
+            "Mark as follows:\n"
+            "1 Two INPUT statements\n"
+            "INPUT StartPos 1\n"
+            "3 OUTPUT \" Input new value for position \" 3\n"
+            "2 Working loop"
+        )
+
+        result = extract_structured_marking_points(text)
+
+        self.assertEqual(
+            [p["text"] for p in result["points"]], ["Two INPUT statements", "Working loop"]
+        )
+
+    def test_code_like_bullet_under_a_header_is_an_item(self):
+        text = (
+            "One mark for:\n"
+            "• First line and ENDCASE\n"
+            "• All clauses for 1, 2 and 3\n"
+            "• 'OTHERWISE' clause\n"
+            "• OUTPUT statement"
+        )
+
+        result = extract_structured_marking_points(text)
+
+        self.assertEqual(len(result["points"]), 4)
+        self.assertEqual(result["points"][3]["text"], "OUTPUT statement")
+
+    def test_item_with_a_lost_number_is_promoted_when_undercounting(self):
+        text = (
+            "Mark as follows:\n"
+            "1. Open EmailDetails for READ\n"
+            "2. Writing a line to NewEmailDetails in a loop\n"
+            "Closing both files"
+        )
+
+        result = extract_structured_marking_points(text, expected_marks=3)
+
+        self.assertEqual(
+            [p["text"] for p in result["points"]],
+            [
+                "Open EmailDetails for READ",
+                "Writing a line to NewEmailDetails in a loop",
+                "Closing both files",
+            ],
+        )
+
+    def test_no_promotion_when_the_list_already_matches_the_marks(self):
+        # The same text, but the marks are already accounted for, so the trailing
+        # line is a wrap and must stay attached.
+        text = (
+            "Mark as follows:\n"
+            "1. Open EmailDetails for READ\n"
+            "2. Writing a line to NewEmailDetails in a loop\n"
+            "Closing both files"
+        )
+
+        result = extract_structured_marking_points(text, expected_marks=2)
+
+        self.assertEqual(len(result["points"]), 2)
+        self.assertTrue(result["points"][1]["text"].endswith("Closing both files"))
+
+    def test_genuine_wraps_are_never_promoted(self):
+        # Lowercase start, an unclosed bracket, and a trailing conjunction each
+        # mark the next line as a continuation even while undercounting.
+        text = (
+            "Mark as follows:\n"
+            "1 Avoid checking uninitialised elements // initialisation to rogue value\n"
+            "at start of algorithm\n"
+            "2 OUTPUT final message after loop (exact text not specified but must include\n"
+            "NumToChange or loop counter if correct)\n"
+            "3 Assign the value to the element and\n"
+            "Increment the index"
+        )
+
+        result = extract_structured_marking_points(text, expected_marks=8)
+
+        self.assertEqual(len(result["points"]), 3)
+        self.assertTrue(result["points"][0]["text"].endswith("at start of algorithm"))
+        self.assertTrue(result["points"][1]["text"].endswith("if correct)"))
+        self.assertTrue(result["points"][2]["text"].endswith("and Increment the index"))
+
+    def test_up_to_max_marks_header_declares_a_cap(self):
+        text = (
+            "1 mark for each of the following up to max 5 marks:\n"
+            "1 Function heading (inc parameters) and ending\n"
+            "2 Declaring local variables\n"
+            "3 Return parameter"
+        )
+
+        result = extract_structured_marking_points(text)
+
+        self.assertEqual(result["max_marks"], 5)
+
+
 if __name__ == "__main__":
     unittest.main()

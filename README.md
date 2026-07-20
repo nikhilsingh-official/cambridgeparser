@@ -188,6 +188,21 @@ python -m src.pipeline.runners.qsplitter_batch \
   list — and `apply_max_marks_cap` clamps `total_awarded` to the question's
   marks as a final safety net. `validate_marking_points` counts per group for
   the same reason.
+- The code guard that skips example-solution lines is relaxed for items that
+  continue a rubric list's numbering (and for bullets under a header), because
+  marking points routinely *name* the construct they mark — "FOR loop", "CASE OF
+  ThisMark ... ENDCASE", "OUTPUT statement". Out-of-sequence numbers still face
+  the guard, so circled mark digits printed inside the example code are rejected.
+- When a rubric comes up short of the marks on offer, `extract_structured_marking_points`
+  re-scans allowing a line whose item number went missing to be promoted from a
+  continuation to its own point ("Closing both files" after item 7 of 8). The
+  re-scan is kept only if it closes the gap without overshooting, so a complete
+  rubric is never split further. Genuine wraps are held back by a lowercase
+  start, an unclosed bracket, or a trailing conjunction.
+- Some schemes list more criteria than marks ("One mark per point (Max 8):" above
+  nine items). That cap is recorded as `marking_points_max`, enforced by the
+  grading layer, and reported by the audit as `declared_max_list` rather than as
+  an extraction defect.
 - When a scheme declares that its marks *are* the styled spans ("One mark for
   each part-statement, shown underlined and bold"), the underline recovery wins
   over any text list found in the same cell. On a few 2016 papers a mark-scheme
