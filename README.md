@@ -188,6 +188,16 @@ python -m src.pipeline.runners.qsplitter_batch \
   list — and `apply_max_marks_cap` clamps `total_awarded` to the question's
   marks as a final safety net. `validate_marking_points` counts per group for
   the same reason.
+- When a scheme declares that its marks *are* the styled spans ("One mark for
+  each part-statement, shown underlined and bold"), the underline recovery wins
+  over any text list found in the same cell. On a few 2016 papers a mark-scheme
+  row spans a page break and swallows the next question's rubric, and that
+  foreign list would otherwise be extracted as the answer's marking points.
+- `marking_point_overrides` entries normally apply only when nothing parsed. An
+  entry may set `replaces_parse` to win over a *bad* parse, for schemes whose
+  marks live in a layout the scanner cannot read (an expression table, a
+  highlight convention, bold gaps tagged with inline `MP n`). That flag silences
+  the extractor for the record permanently, so it stays rare and justified.
 - `ms_parser` records underlined answer spans (`answer_underlined_spans`) via
   PyMuPDF `TEXT_COLLECT_STYLES` (`char_flags & 2`). `build_final_records` turns
   them into marking points for the "one mark per underlined word / expression"

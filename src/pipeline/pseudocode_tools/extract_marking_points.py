@@ -14,7 +14,7 @@ from typing import Any, Dict, Iterable, Optional
 # "1) Text" and the 9618-style bare "1 Text") from circled mark digits rendered
 # inline with example code ("2 OUTPUT ..."): bare-digit items whose text looks
 # like code are noise, rejected by a code guard at the call site.
-MP_ITEM_PATTERN = re.compile(r"^\s*MP\s*(\d+)\b[.):\-\s]*(.*)$", re.IGNORECASE)
+MP_ITEM_PATTERN = re.compile(r"^\s*MP\s*(\d+)\b([.):\-\s]*)(.*)$", re.IGNORECASE)
 NUM_ITEM_PATTERN = re.compile(r"^\s*(\d+)([.)])?\s+(.*)$")
 
 # Rubric headers that introduce a marking list. "mark as follows" and the
@@ -41,12 +41,12 @@ STOP_LINE_PATTERN = re.compile(
 # extending it: notes, alternative-solution headings, example-solution labels,
 # and standalone "OR" separators between answer variants.
 META_BOUNDARY_PATTERN = re.compile(
-    r"^(note\b|n\.?b\.?\b|alternative\b|example\s+(?:solution|of)"
+    r"^(notes?\b|n\.?b\.?\b|alternative\b|example\s+(?:solution|of)"
     r"|expected\s+output|guidance\b|or)\s*:?\s*$",
     re.IGNORECASE,
 )
 META_PREFIX_PATTERN = re.compile(
-    r"^(note\s*:|alternative\b|example\s+(?:solution|of)|expected\s+output|guidance\s*:)",
+    r"^(notes?\s*:|alternative\b|example\s+(?:solution|of)|expected\s+output|guidance\s*:)",
     re.IGNORECASE,
 )
 # A boundary that introduces a *different solution*, so its marking points form a
@@ -73,6 +73,18 @@ CODE_LINE_PATTERN = re.compile(
 # pseudocode assignment arrow (real "<-" glyph or the mark-scheme font's
 # private-use glyph) and end-of-block keywords.
 CODE_HINT_PATTERN = re.compile("(?:\\u2190|\\uf0ac|:=|\\bENDFUNCTION\\b|\\bENDPROCEDURE\\b|\\bENDWHILE\\b|\\bENDFOR\\b)")
+# A routine header opening an example solution, written in mixed case ("Function
+# Status(Actual, Min, Max : INTEGER) RETURNS CHAR") where the case-sensitive
+# keyword list above does not reach. The name-then-bracket shape alone is not
+# enough — rubric items say "Function heading (inc parameters) and ending" — so a
+# typed parameter or a RETURNS clause must also be present. The keyword list must
+# stay case-sensitive for the same reason: rubric items legitimately begin "If
+# Rnum is a duplicate ..." or "For each element ...".
+_ROUTINE_HEAD = r"^\s*(?:FUNCTION|PROCEDURE)\s+[A-Za-z_]\w*\s*\("
+CODE_HEADER_PATTERN = re.compile(
+    rf"{_ROUTINE_HEAD}(?=[^)]*:)|{_ROUTINE_HEAD}[^)]*\)\s*RETURNS\b",
+    re.IGNORECASE,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -118,7 +130,11 @@ def _is_header(stripped: str) -> bool:
 
 
 def _is_code_line(stripped: str) -> bool:
-    return bool(CODE_LINE_PATTERN.match(stripped) or CODE_HINT_PATTERN.search(stripped))
+    return bool(
+        CODE_LINE_PATTERN.match(stripped)
+        or CODE_HEADER_PATTERN.match(stripped)
+        or CODE_HINT_PATTERN.search(stripped)
+    )
 
 
 def _mp_item(stripped: str) -> Optional[tuple[int, str]]:
@@ -129,12 +145,18 @@ def _mp_item(stripped: str) -> Optional[tuple[int, str]]:
     code line) is rejected: MPn must open the line and must not be immediately
     followed by another MPn token. Out-of-sequence numbers (a wrapped
     "``MP4`` to generate ..." cross-reference) are filtered by the caller.
+
+    A closing bracket straight after the number ("MP3) in a loop") closes a
+    parenthetical that began on the previous line — "(after reasonable attempt
+    at MP3)" — so it is a cross-reference, not a rubric item.
     """
 
     match = MP_ITEM_PATTERN.match(stripped)
     if not match:
         return None
-    remainder = match.group(2).strip()
+    separator, remainder = match.group(2), match.group(3).strip()
+    if ")" in separator:
+        return None
     if re.match(r"^MP\s*\d", remainder, re.IGNORECASE):
         return None
     return int(match.group(1)), remainder
@@ -181,6 +203,7 @@ def _scan_rubric_items(lines: list[str]) -> tuple[list[Dict[str, Any]], bool, bo
     header_seen = False
     one_mark_header_seen = False
     last_mp_number = 0
+    last_list_number = 0
     group = 0
     group_has_items = False
     group_high_number = 0
@@ -227,6 +250,7 @@ def _scan_rubric_items(lines: list[str]) -> tuple[list[Dict[str, Any]], bool, bo
             pending_alt = True
             header_seen = True
             last_mp_number = 0
+            last_list_number = 0
             if ONE_MARK_HEADER_PATTERN.search(stripped):
                 one_mark_header_seen = True
             continue
@@ -241,6 +265,7 @@ def _scan_rubric_items(lines: list[str]) -> tuple[list[Dict[str, Any]], bool, bo
             if ALT_MARKER_PATTERN.match(stripped):
                 pending_alt = True
             last_mp_number = 0
+            last_list_number = 0
             continue
 
         mp = _mp_item(stripped)
@@ -252,16 +277,27 @@ def _scan_rubric_items(lines: list[str]) -> tuple[list[Dict[str, Any]], bool, bo
 
         # A numbered-looking line that the code guard rejects (a circled mark
         # digit or an expected-output row) is a boundary, never a continuation.
-        if mp is None and NUM_ITEM_PATTERN.match(stripped):
+        num_match = NUM_ITEM_PATTERN.match(stripped)
+        if mp is None and num_match:
             text = _numbered_item(stripped)
-            if text is not None:
+            number = int(num_match.group(1))
+            # A real list counts upwards. A number that does not advance is a
+            # wrapped description that happens to start with a digit ("...if not
+            # equal write" / "3 lines to NewFile in a loop"), so it continues the
+            # current item. Only an alternative rubric may restart the count.
+            backwards = number <= last_list_number and not pending_alt
+            if text is not None and not backwards:
                 flush()
-                number = int(NUM_ITEM_PATTERN.match(stripped).group(1))
+                last_list_number = number
                 begin_item(
                     text, "numbered_list", "high" if header_seen else "medium", number=number
                 )
-            else:
-                flush()
+                continue
+            if text is not None and backwards:
+                if current is not None:
+                    current["text"] = f"{current['text']} {stripped}".strip()
+                continue
+            flush()
             continue
 
         bullet = _bullet_item(raw)
@@ -349,7 +385,11 @@ def extract_structured_marking_points(text: Optional[str]) -> Dict[str, Any]:
     numbered_points = [item for item in items if item["style"] == "numbered_list"]
     bullet_points = [item for item in items if item["style"] in ("bullet", "one_mark_bullet")]
 
-    if mp_points:
+    # MP labels win over a numbered list only when they could plausibly be the
+    # rubric themselves. A stray cross-reference ("Note: MP6: both counts must
+    # have been declared") is one mp_label against a real seven-item numbered
+    # rubric, and must not discard it.
+    if mp_points and len(mp_points) >= len(numbered_points):
         chosen = mp_points
     elif numbered_points and (header_seen or len(numbered_points) >= 2):
         chosen = numbered_points
@@ -395,7 +435,38 @@ _GLYPH_REPLACEMENTS = {"\uf0ac": "\u2190", "\uf0e0": "\u2192", "\uf0b3": "\u2265
 def _clean_underline_text(text: str) -> str:
     for glyph, replacement in _GLYPH_REPLACEMENTS.items():
         text = text.replace(glyph, replacement)
-    return _clean_item_text(text)
+    # A trailing "/" is half of the "//" that separates alternative answers; the
+    # underline often runs one character into it.
+    return _clean_item_text(text).rstrip("/").strip()
+
+
+# The rubric line that *declares* the convention underlines its own key word
+# ("One mark per <u>underlined</u> word / expression"), so that word arrives as a
+# span alongside the real answer spans. A marking point is always answer content,
+# never the name of the convention, so these are dropped outright.
+# A label opening the same answer restated in a real programming language. The
+# scheme marks whichever language the candidate used, so these are alternatives.
+LANGUAGE_VARIANT_PATTERN = re.compile(
+    r"^(VB|VB\.NET|Visual\s+Basic|Pascal|Delphi|Python|Java|C#|C\+\+)\s*:", re.IGNORECASE
+)
+# A scheme that declares its marks are carried by styling — underlined or bold
+# part-statements, highlighted phrases — rather than by a written list.
+STYLE_CONVENTION_PATTERN = re.compile(
+    r"(?:one|1)\s+mark\s+(?:for\s+each|per)[^\n]{0,60}"
+    r"(underlined?|bold|highlighted?|part-?statement)",
+    re.IGNORECASE,
+)
+
+
+def declares_style_convention(answer_text: Optional[str]) -> bool:
+    """Whether the scheme says its marks are the styled spans in the answer."""
+    return bool(answer_text and STYLE_CONVENTION_PATTERN.search(answer_text))
+
+
+CONVENTION_WORD_PATTERN = re.compile(
+    r"^(underlined?|highlighted?|bold(?:ed|ened)?|emboldened|circled|italic(?:s|ised)?)$",
+    re.IGNORECASE,
+)
 
 
 def _valid_span_bbox(bbox: Any) -> bool:
@@ -406,8 +477,53 @@ def _valid_span_bbox(bbox: Any) -> bool:
     )
 
 
+def _comment_only_texts(answer_text: Optional[str]) -> set:
+    """Underlined fragments that only ever appear inside a ``//`` comment line.
+
+    Mark schemes underline commented-out variants ("// NextChar =
+    UCASE(NextChar)") to show an accepted alternative phrasing. Those are not
+    separate marks, so a fragment seen exclusively on comment lines is dropped —
+    a fragment that also appears in live code is kept.
+    """
+    if not answer_text:
+        return set()
+    commented: set = set()
+    live: list[str] = []
+    for line in answer_text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("//"):
+            commented.add(_clean_underline_text(stripped.lstrip("/").strip()))
+        else:
+            live.append(stripped)
+    commented.discard("")
+    return {text for text in commented if not any(text in line for line in live)}
+
+
+def _alt_boundary_lines(answer_text: Optional[str]) -> set:
+    """Answer-line indices at which a new alternative solution begins.
+
+    Two conventions produce one: a line ending in "//" offers the *next* line as
+    an alternative form ("DECLARE Item : ARRAY [1:2000] OF Component//"), and a
+    language-variant label opens a whole restatement of the answer in another
+    language ("VB: Dim Lookup(0 to 127) As CHAR"). Neither adds marks.
+    """
+    if not answer_text:
+        return set()
+    boundaries = set()
+    for index, line in enumerate(answer_text.splitlines()):
+        stripped = line.strip()
+        if stripped.endswith("//") and not stripped.startswith("//"):
+            boundaries.add(index + 1)
+        if LANGUAGE_VARIANT_PATTERN.match(stripped):
+            boundaries.add(index)
+    return boundaries
+
+
 def marking_points_from_underlined_spans(
-    spans: Any, target_marks: Optional[int] = None, line_tolerance: float = 6.0
+    spans: Any,
+    target_marks: Optional[int] = None,
+    line_tolerance: float = 6.0,
+    answer_text: Optional[str] = None,
 ) -> list[Dict[str, Any]]:
     """Turn a node's underlined spans into marking points.
 
@@ -421,8 +537,14 @@ def marking_points_from_underlined_spans(
     remain. Without a target, spans are merged per line (one mark per line).
     """
 
+    commented = _comment_only_texts(answer_text)
     valid = [
-        s for s in spans or [] if (s.get("text") or "").strip() and _valid_span_bbox(s.get("bbox"))
+        s
+        for s in spans or []
+        if (s.get("text") or "").strip()
+        and _valid_span_bbox(s.get("bbox"))
+        and not CONVENTION_WORD_PATTERN.match((s.get("text") or "").strip())
+        and _clean_underline_text(s.get("text") or "") not in commented
     ]
     if not valid:
         return []
@@ -480,6 +602,19 @@ def marking_points_from_underlined_spans(
             order.append(root)
         grouped[root].append(ordered[i]["text"])
 
+    boundaries = _alt_boundary_lines(answer_text)
+    answer_lines = (answer_text or "").splitlines()
+
+    def alt_group_for(text: str) -> int:
+        # Locate the point in the answer, then count the alternative boundaries
+        # at or above it. Points that cannot be located stay in the first group.
+        if not boundaries:
+            return 0
+        for index, line in enumerate(answer_lines):
+            if text and text in _clean_underline_text(line):
+                return sum(1 for start in boundaries if start <= index)
+        return 0
+
     points: list[Dict[str, Any]] = []
     for root in order:
         text = _clean_underline_text(" ".join(grouped[root]))
@@ -491,7 +626,7 @@ def marking_points_from_underlined_spans(
                     "marks": 1,
                     "confidence": "high",
                     "style": "underlined",
-                    "alt_group": 0,
+                    "alt_group": alt_group_for(text),
                 }
             )
     return points

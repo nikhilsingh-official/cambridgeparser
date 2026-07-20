@@ -1,6 +1,7 @@
 import unittest
 
 from src.pipeline.pseudocode_tools.extract_marking_points import (
+    declares_style_convention,
     extract_structured_marking_points,
     marking_points_from_underlined_spans,
 )
@@ -384,6 +385,182 @@ class UnderlinedSpanMarkingPointTests(unittest.TestCase):
     def test_empty_spans_yield_no_points(self):
         self.assertEqual(marking_points_from_underlined_spans(None), [])
         self.assertEqual(marking_points_from_underlined_spans([]), [])
+
+
+class ForeignContentBoundaryTests(unittest.TestCase):
+    """A rubric list must survive the annotations Cambridge prints around it."""
+
+    def test_mp_crossreference_in_brackets_is_not_an_item(self):
+        # "(after reasonable attempt at MP3)" wraps, leaving "MP3) in a loop" on
+        # its own line. Read as an item it becomes the *only* point, discarding
+        # the real five-item list.
+        text = (
+            "1 mark for each of the following:\n"
+            "1 Loop through array elements\n"
+            "2 Convert both strings to same case\n"
+            "3 Compare array element with parameter in a loop\n"
+            "4 Set a flag (or similar) if match found (after reasonable attempt at\n"
+            "MP3) in a loop\n"
+            "5 Return TRUE or FALSE in all cases"
+        )
+
+        result = extract_structured_marking_points(text)
+
+        self.assertEqual(len(result["points"]), 5)
+        self.assertEqual(result["points"][0]["style"], "numbered_list")
+        self.assertIn("MP3", result["points"][3]["text"])
+
+    def test_lone_mp_note_does_not_discard_a_longer_numbered_list(self):
+        text = (
+            "Mark as follows:\n"
+            "1 Procedure heading and ending\n"
+            "2 Open both files\n"
+            "3 Conditional loop until EOF\n"
+            "Note:\n"
+            "MP6: Both counts must have been declared and initialised"
+        )
+
+        result = extract_structured_marking_points(text)
+
+        self.assertEqual(
+            [p["text"] for p in result["points"]],
+            ["Procedure heading and ending", "Open both files", "Conditional loop until EOF"],
+        )
+
+    def test_wrapped_line_starting_with_a_digit_continues_the_item(self):
+        text = (
+            "Mark as follows:\n"
+            "4 Read three lines from OldFile in a loop\n"
+            "5 Compare 3rd line read with Status parameter and if not equal write\n"
+            "3 lines to NewFile in a loop\n"
+            "6 Final output"
+        )
+
+        result = extract_structured_marking_points(text)
+
+        self.assertEqual(len(result["points"]), 3)
+        self.assertTrue(result["points"][1]["text"].endswith("3 lines to NewFile in a loop"))
+
+    def test_mixed_case_routine_header_ends_the_list(self):
+        text = (
+            "One mark per point:\n"
+            "1 Function heading and ending including parameters\n"
+            "2 Return Result following a reasonable attempt\n"
+            "Function Status(Actual, Min, Max : INTEGER) RETURNS CHAR\n"
+            "DECLARE Result : CHAR"
+        )
+
+        result = extract_structured_marking_points(text)
+
+        self.assertEqual(len(result["points"]), 2)
+        self.assertEqual(result["points"][1]["text"], "Return Result following a reasonable attempt")
+
+    def test_prose_about_a_function_heading_is_still_an_item(self):
+        # "Function heading (inc parameters) and ending" has the same
+        # name-then-bracket shape as a declaration but is a real marking point.
+        text = (
+            "1 mark for each of the following up to max 5 marks:\n"
+            "1 Function heading (inc parameters) and ending\n"
+            "2 Declaring local variables\n"
+            "3 Return parameter"
+        )
+
+        result = extract_structured_marking_points(text)
+
+        self.assertEqual(len(result["points"]), 3)
+        self.assertEqual(result["points"][0]["text"], "Function heading (inc parameters) and ending")
+
+    def test_plural_notes_heading_is_a_boundary(self):
+        text = (
+            "1 mark for each of the following:\n"
+            "1 Inner loop to search array\n"
+            "2 If Rnum not a duplicate then assign to array element and Increment\n"
+            "index\n"
+            "Notes:\n"
+            "Max 5 if statement to generate random number not present"
+        )
+
+        result = extract_structured_marking_points(text)
+
+        self.assertEqual(len(result["points"]), 2)
+        self.assertEqual(
+            result["points"][1]["text"],
+            "If Rnum not a duplicate then assign to array element and Increment index",
+        )
+
+
+class UnderlineConventionTests(unittest.TestCase):
+    def test_the_conventions_own_key_word_is_not_a_marking_point(self):
+        # "One mark per <u>underlined</u> word" underlines its own key word.
+        spans = [
+            uspan("LENGTH(InString)", 118, 237, 300),
+            uspan("RETURN OutString", 118, 237, 320),
+            uspan("underlined", 118, 180, 400),
+        ]
+
+        points = marking_points_from_underlined_spans(spans, target_marks=2)
+
+        self.assertEqual([p["text"] for p in points], ["LENGTH(InString)", "RETURN OutString"])
+
+    def test_underlined_text_only_inside_a_comment_is_dropped(self):
+        answer = (
+            "IF NextChar >= 'A' AND NextChar <= 'Z'\n"
+            "// NextChar = UCASE(NextChar)\n"
+            "RETURN OutString"
+        )
+        spans = [
+            uspan("NextChar >= 'A' AND NextChar <= 'Z'", 118, 300, 300),
+            uspan("NextChar = UCASE(NextChar)", 118, 300, 320),
+            uspan("RETURN OutString", 118, 237, 340),
+        ]
+
+        points = marking_points_from_underlined_spans(spans, target_marks=2, answer_text=answer)
+
+        self.assertEqual(
+            [p["text"] for p in points],
+            ["NextChar >= 'A' AND NextChar <= 'Z'", "RETURN OutString"],
+        )
+
+    def test_slash_separated_declarations_become_alternative_groups(self):
+        answer = (
+            "DECLARE Item : ARRAY [1:2000] OF Component//\n"
+            "DECLARE Item : ARRAY [2000] OF Component//\n"
+            "DECLARE Item : ARRAY [0:1999] OF Component"
+        )
+        spans = [
+            uspan("DECLARE Item : ARRAY [1:2000] OF Component/", 118, 400, 300),
+            uspan("DECLARE Item : ARRAY [2000] OF Component/", 118, 400, 320),
+            uspan("DECLARE Item : ARRAY [0:1999] OF Component", 118, 400, 340),
+        ]
+
+        points = marking_points_from_underlined_spans(spans, answer_text=answer)
+
+        self.assertEqual([p["alt_group"] for p in points], [0, 1, 2])
+        self.assertTrue(all(not p["text"].endswith("/") for p in points))
+
+    def test_language_variants_are_alternative_groups(self):
+        answer = (
+            "RETURN OutString\n"
+            "One mark for each part-statement (shown underlined and bold)\n"
+            "VB: Dim Lookup(0 to 127) As CHAR\n"
+            "Pascal: Var Lookup: Array[0..127] Of CHAR"
+        )
+        spans = [
+            uspan("RETURN OutString", 118, 237, 300),
+            uspan("Dim Lookup(0 to 127) As CHAR", 118, 300, 340),
+            uspan("Var Lookup: Array[0..127] Of CHAR", 118, 300, 360),
+        ]
+
+        points = marking_points_from_underlined_spans(spans, answer_text=answer)
+
+        self.assertEqual([p["alt_group"] for p in points], [0, 1, 2])
+
+    def test_declares_style_convention(self):
+        self.assertTrue(
+            declares_style_convention("One mark for each part-statement (shown underlined and bold)")
+        )
+        self.assertTrue(declares_style_convention("One mark per highlighted part:"))
+        self.assertFalse(declares_style_convention("Mark as follows:\n1 Loop over the array"))
 
 
 if __name__ == "__main__":

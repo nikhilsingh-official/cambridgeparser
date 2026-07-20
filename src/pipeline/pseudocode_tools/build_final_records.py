@@ -31,6 +31,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from .extract_marking_points import (
     extract_structured_marking_points,
+    declares_style_convention,
     marking_points_from_underlined_spans,
 )
 from .marking_point_overrides import override_marking_points
@@ -342,32 +343,43 @@ def build_records(
         if not answer_text:
             diagnostics.append("ms_answer_text_empty")
 
+        override = override_marking_points(
+            paper_code,
+            hit.get("question_marker"),
+            hit.get("primary_marker"),
+            hit.get("secondary_marker"),
+        )
         extraction = extract_structured_marking_points(answer_text)
         marking_points = extraction["points"]
-        if not marking_points:
-            # No text rubric: recover the "one mark per underlined ..." schemes
-            # from the underlined spans ms_parser captured, using the node's mark
-            # value to decide how finely to split them.
+        # A curated transcription for a scheme whose marks live in a layout the
+        # scanner cannot read (see marking_point_overrides) wins outright; every
+        # other override only fills a gap.
+        curated = bool(override and override["replaces_parse"])
+        if curated:
+            marking_points = override["points"]
+            diagnostics.append("marking_points_from_override_replacing_parse")
+        # The underlined spans are the rubric outright when the scheme says so
+        # ("One mark for each part-statement, shown underlined and bold"). Any
+        # text list found in the same cell then belongs to something else — on a
+        # few papers a mark-scheme row spans a page break and swallows the next
+        # question's rubric, and that list would otherwise win.
+        prefer_underlined = declares_style_convention(answer_text) and not curated
+        if not marking_points or prefer_underlined:
+            # Recover the "one mark per underlined ..." schemes from the
+            # underlined spans ms_parser captured, using the node's mark value to
+            # decide how finely to split them.
             underlined_points = marking_points_from_underlined_spans(
                 ms_node.get("answer_underlined_spans"),
                 target_marks=marks_value if isinstance(marks_value, int) else None,
+                answer_text=answer_text,
             )
             if underlined_points:
                 marking_points = underlined_points
                 diagnostics.append("marking_points_from_underlined_spans")
-        override = None
-        if not marking_points:
-            # Last resort for a few one-off mark-scheme conventions; never runs
-            # when a real parse succeeded (see marking_point_overrides).
-            override = override_marking_points(
-                paper_code,
-                hit.get("question_marker"),
-                hit.get("primary_marker"),
-                hit.get("secondary_marker"),
-            )
-            if override:
-                marking_points = override["points"]
-                diagnostics.append("marking_points_from_override")
+        if not marking_points and override:
+            # Last resort for a few one-off mark-scheme conventions.
+            marking_points = override["points"]
+            diagnostics.append("marking_points_from_override")
         if not marking_points:
             diagnostics.append("no_marking_points_extracted")
 

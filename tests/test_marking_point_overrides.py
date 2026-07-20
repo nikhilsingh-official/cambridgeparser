@@ -41,6 +41,25 @@ class MarkingPointOverrideTests(unittest.TestCase):
         for key, count in expected.items():
             self.assertEqual(len(_OVERRIDES[key]["points"]), count, key)
 
+    def test_replaces_parse_is_off_by_default_and_declared_where_used(self):
+        # The flag silences the extractor for that record, so it stays rare and
+        # every entry carrying it must also declare its mark total.
+        fallback = override_marking_points("9618_w25_qp_22", "4", "(b)", None)
+        self.assertFalse(fallback["replaces_parse"])
+
+        replacing = [key for key, entry in _OVERRIDES.items() if entry.get("replaces_parse")]
+        self.assertEqual(
+            sorted(replacing),
+            [
+                ("9618_w21_qp_22", "1", "(c)", None),
+                ("9618_w24_qp_23", "4", "(a)", None),
+                ("9618_w25_qp_23", "3", None, None),
+            ],
+        )
+        for key in replacing:
+            entry = _OVERRIDES[key]
+            self.assertEqual(len(entry["points"]), entry["max_marks"], key)
+
 
 if __name__ == "__main__":
     unittest.main()

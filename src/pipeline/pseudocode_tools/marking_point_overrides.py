@@ -4,11 +4,18 @@ Nine records in the corpus use conventions that no general parser handles
 cleanly — error/correction lists, single-line answers, "one mark per gap
 (boldened)", "one mark per highlighted phrase", numbered code-clause marks — and
 each appears on only one or two scattered papers. Rather than add fragile
-heuristics that risk the working extractor for the sake of nine records, their
+heuristics that risk the working extractor for the sake of a dozen records, their
 marking points are transcribed by hand here and applied by ``build_final_records``
-**only as a last-resort fallback**: they are used when both the text scanner and
-the underlined-span recovery return nothing, so they can never override a
+**as a last-resort fallback**: they are used when both the text scanner and
+the underlined-span recovery return nothing, so they cannot silently override a
 successful parse.
+
+A few records instead parse *badly* — the scheme's marks live in a layout the
+scanner cannot see (an expression table, a highlight convention, bold gaps
+tagged with inline "MP n" markers), so it returns a garbled point rather than
+nothing. Those entries set ``"replaces_parse": True`` to take precedence over
+the parse. Keep that flag rare and justified: it silences the extractor for that
+record forever, including any future improvement to it.
 
 Keyed by ``(qp_paper_code, question_marker, primary_marker, secondary_marker)``
 exactly as those appear in a record's ``segment_key`` (primary/secondary markers
@@ -96,6 +103,49 @@ _OVERRIDES: Dict[OverrideKey, Dict[str, Any]] = {
             "Array index HardQ + EasyQ (CheckTotal[HardQ + EasyQ])",
         ],
     },
+    # --- entries that replace a bad parse (see the module docstring) ---
+    # 9618_w21_qp_22 q1(c): a two-column "Expression | Evaluates to" table marked
+    # "one mark per row". The scanner sees the rows as one run-on numbered item,
+    # because the table's text order interleaves both columns. The four marks are
+    # the completions the question leaves blank.
+    ("9618_w21_qp_22", "1", "(c)", None): {
+        "max_marks": 4,
+        "replaces_parse": True,
+        "points": [
+            "ASC('C') evaluates to 67",
+            "2 * STR_TO_NUM(\"27\") evaluates to 54",
+            "INT(27 / 2) evaluates to 13",
+            "\"Sub\" & MID(\"Abstraction\", 4, 5) evaluates to \"Subtract\"",
+        ],
+    },
+    # 9618_w24_qp_23 q4(a): "one mark per highlighted part". The highlight is a
+    # background colour, which carries no character flag, so the underline
+    # recovery has nothing to work from and the text scan yields fragments.
+    ("9618_w24_qp_23", "4", "(a)", None): {
+        "max_marks": 4,
+        "replaces_parse": True,
+        "points": [
+            "FOR Index <- 1 TO 5",
+            "Upper <- GB[Index] + 2 (or Lower + 4)",
+            "Mark >= Lower",
+            "Mark <= Upper",
+        ],
+    },
+    # 9618_w25_qp_23 q3: the five marks are bold gaps in the Pop() solution,
+    # tagged inline as "MP 1".."MP 5". The rubric lines below the code only
+    # describe the convention ("one mark for each of remaining four bold parts"),
+    # so parsing them yields two meta points instead of the five criteria.
+    ("9618_w25_qp_23", "3", None, None): {
+        "max_marks": 5,
+        "replaces_parse": True,
+        "points": [
+            "Both assignments to PopData.Exists (FALSE and TRUE)",
+            "DECLARE ThisPop : PopData",
+            "IF SP < 1 (or SP = 0) THEN",
+            "PopData.Data <- ThisStack[SP]",
+            "SP <- SP - 1",
+        ],
+    },
 }
 # fmt: on
 
@@ -106,7 +156,13 @@ def override_marking_points(
     primary_marker: Any,
     secondary_marker: Any,
 ) -> Optional[Dict[str, Any]]:
-    """Return {"points": [...], "max_marks": int|None} for a curated record, else None."""
+    """Return the curated entry for a record, else None.
+
+    The result is ``{"points": [...], "max_marks": int|None, "replaces_parse":
+    bool}``. ``replaces_parse`` tells the caller this transcription is preferred
+    over whatever the extractor produced, rather than being a fallback for when
+    it produced nothing.
+    """
 
     key = (
         paper_code,
@@ -128,4 +184,8 @@ def override_marking_points(
         }
         for index, text in enumerate(entry["points"], start=1)
     ]
-    return {"points": points, "max_marks": entry.get("max_marks")}
+    return {
+        "points": points,
+        "max_marks": entry.get("max_marks"),
+        "replaces_parse": bool(entry.get("replaces_parse")),
+    }
