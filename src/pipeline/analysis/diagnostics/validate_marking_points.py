@@ -155,7 +155,12 @@ def audit_record(record: Dict[str, Any]) -> Dict[str, Any]:
     # ---- high severity: actively wrong / unsafe ----
     if any(META_MP_PATTERN.match(t.strip()) for t in texts):
         flags.append("meta_mp")
-    if any(_alpha_count(t) < 3 for t in texts):
+    # A terse point is only suspect when the split that produced it is
+    # unverified. Under a "one mark per underlined part" convention a mark really
+    # can be "= 5" or "[0:99, 0:1]", and hitting the scheme's own mark total
+    # exactly is the corroboration that each piece is a mark.
+    corroborated = isinstance(cap, int) and largest_group == cap
+    if not corroborated and any(_alpha_count(t) < 3 for t in texts):
         flags.append("fragment_mp")
     if style == "mp_label" and len(points) == 1 and numbered_items >= 2:
         flags.append("lone_mp_discarded_list")

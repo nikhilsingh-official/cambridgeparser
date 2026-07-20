@@ -566,6 +566,48 @@ def _valid_span_bbox(bbox: Any) -> bool:
     )
 
 
+# Where a single underlined declaration divides into separate marks, in the order
+# Cambridge splits them. A whole "one mark per underlined part" header or
+# declaration arrives as one continuous underlined run — the PDF gives no
+# sub-span structure, because the styling never changes across it — so the marks
+# have to come from the declaration's own syntax: the return clause, then each
+# parameter, then the element type of an array.
+_DECLARATION_BOUNDARIES = (
+    (0, re.compile(r"\s+(?=\bRETURNS\b)", re.IGNORECASE)),
+    (1, re.compile(r",\s*")),
+    (2, re.compile(r"\s+(?=\bOF\b)", re.IGNORECASE)),
+)
+
+
+def _split_declarations(runs: list[str], parts: int) -> list[str]:
+    """Divide underlined declaration runs into ``parts`` pieces at syntax breaks.
+
+    Splits the highest-priority boundary available, longest piece first, until
+    the target is reached or no boundary is left — so runs that cannot be divided
+    that far are returned as far as they got rather than chopped arbitrarily.
+    A header split across two lines arrives as two runs, and the extra marks may
+    live in either, so every run is a candidate.
+    """
+    pieces = list(runs)
+    while len(pieces) < parts:
+        best = None
+        for index, piece in enumerate(pieces):
+            for priority, pattern in _DECLARATION_BOUNDARIES:
+                match = pattern.search(piece)
+                if not match or not piece[match.end():].strip():
+                    continue
+                candidate = (priority, -len(piece), index, match.start(), match.end())
+                if best is None or candidate < best:
+                    best = candidate
+                break
+        if best is None:
+            break
+        _priority, _length, index, start, end = best
+        piece = pieces[index]
+        pieces[index : index + 1] = [piece[:start].strip(), piece[end:].strip()]
+    return [piece for piece in pieces if piece]
+
+
 def _comment_only_texts(answer_text: Optional[str]) -> set:
     """Underlined fragments that only ever appear inside a ``//`` comment line.
 
@@ -704,21 +746,41 @@ def marking_points_from_underlined_spans(
                 return sum(1 for start in boundaries if start <= index)
         return 0
 
-    points: list[Dict[str, Any]] = []
+    runs: list[tuple[int, str]] = []
     for root in order:
         text = _clean_underline_text(" ".join(grouped[root]))
         if text:
-            points.append(
-                {
-                    "id": f"mp{len(points) + 1}",
-                    "text": text,
-                    "marks": 1,
-                    "confidence": "high",
-                    "style": "underlined",
-                    "alt_group": alt_group_for(text),
-                }
-            )
-    return points
+            runs.append((alt_group_for(text), text))
+
+    # Merging can only ever reach the target from above. A run that still holds
+    # several marks — a whole header underlined in one go — has to be divided at
+    # its syntax breaks instead. The target counts marks per alternative, since
+    # alternatives are mutually exclusive.
+    if target is not None:
+        by_group: Dict[int, list[str]] = {}
+        for group, text in runs:
+            by_group.setdefault(group, []).append(text)
+        # Only when *no* group reaches the target is the answer genuinely
+        # under-split. A group that already has its marks means the short ones
+        # beside it are supplementary — the "VB:" / "Pascal:" restatements of a
+        # solution, worth a mark or two, not the whole question again.
+        if all(len(texts) < target for texts in by_group.values()):
+            split: list[tuple[int, str]] = []
+            for group, texts in by_group.items():
+                split.extend((group, text) for text in _split_declarations(texts, target))
+            runs = split
+
+    return [
+        {
+            "id": f"mp{index}",
+            "text": text,
+            "marks": 1,
+            "confidence": "high",
+            "style": "underlined",
+            "alt_group": group,
+        }
+        for index, (group, text) in enumerate(runs, start=1)
+    ]
 
 
 def _find_primary_node(ms_entry: Dict[str, Any], primary_marker: Any) -> Optional[Dict[str, Any]]:

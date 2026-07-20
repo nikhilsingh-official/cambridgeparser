@@ -34,8 +34,17 @@ class ValidateMarkingPointsTests(unittest.TestCase):
         meta = audit_record(record(N("Correct heading", "underlined"), max_marks=2))
         self.assertIn("meta_mp", meta["flags"])
         self.assertEqual(meta["severity"], "high")
-        frag = audit_record(record(N("5", "GB[Index]"), max_marks=2))
+        # A terse point is only suspect when the split is unverified: three
+        # points against four marks means the pieces are not corroborated.
+        frag = audit_record(record(N("5", "GB[Index]", "+ 4"), max_marks=4))
         self.assertIn("fragment_mp", frag["flags"])
+
+    def test_terse_points_matching_the_mark_total_are_not_fragments(self):
+        # "One mark per underlined part" genuinely yields marks like "= 5"; the
+        # count matching the scheme's own total corroborates the split.
+        row = audit_record(record(N("DAYINDEX(MyDOB)", "= 5", style="underlined"), max_marks=2))
+        self.assertNotIn("fragment_mp", row["flags"])
+        self.assertEqual(row["severity"], "none")
 
     def test_over_expansion_when_more_points_than_cap(self):
         row = audit_record(record(N("a1", "b2", "c3", "d4", "e5"), max_marks=3))

@@ -188,6 +188,14 @@ python -m src.pipeline.runners.qsplitter_batch \
   list — and `apply_max_marks_cap` clamps `total_awarded` to the question's
   marks as a final safety net. `validate_marking_points` counts per group for
   the same reason.
+- A "one mark per underlined part" header or declaration usually arrives as a
+  single continuous underlined run — the styling never changes across it, so the
+  PDF offers no sub-span structure — even though it carries several marks. When
+  merging cannot reach the mark total (it only ever reduces), the run is divided
+  at the declaration's own syntax breaks: the `RETURNS` clause, then each
+  parameter, then the `OF` of an array type. Splitting is skipped when any
+  alternative group already has its marks, so a supplementary `VB:`/`Pascal:`
+  restatement is not split as if it were the whole question.
 - The code guard that skips example-solution lines is relaxed for items that
   continue a rubric list's numbering (and for bullets under a header), because
   marking points routinely *name* the construct they mark — "FOR loop", "CASE OF

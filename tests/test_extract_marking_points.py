@@ -682,5 +682,91 @@ class ItemSplittingTests(unittest.TestCase):
         self.assertEqual(result["max_marks"], 5)
 
 
+class DeclarationSplittingTests(unittest.TestCase):
+    """A whole declaration underlined in one run still carries several marks."""
+
+    def test_parameter_list_splits_per_parameter(self):
+        spans = [uspan("PROCEDURE SubA (A : STRING, B : INTEGER, BYREF C : CHAR)", 97, 473, 432)]
+
+        points = marking_points_from_underlined_spans(spans, target_marks=3)
+
+        self.assertEqual(
+            [p["text"] for p in points],
+            ["PROCEDURE SubA (A : STRING", "B : INTEGER", "BYREF C : CHAR)"],
+        )
+
+    def test_returns_clause_splits_before_parameters(self):
+        spans = [uspan("Function SubB (D : STRING, E : INTEGER) RETURNS BOOLEAN", 97, 473, 432)]
+
+        points = marking_points_from_underlined_spans(spans, target_marks=3)
+
+        self.assertEqual(
+            [p["text"] for p in points],
+            ["Function SubB (D : STRING", "E : INTEGER)", "RETURNS BOOLEAN"],
+        )
+
+    def test_array_declaration_splits_before_of(self):
+        spans = [uspan("DECLARE Rental : ARRAY[1:500] OF RentalRecord", 115, 419, 322)]
+
+        points = marking_points_from_underlined_spans(spans, target_marks=2)
+
+        self.assertEqual(
+            [p["text"] for p in points],
+            ["DECLARE Rental : ARRAY[1:500]", "OF RentalRecord"],
+        )
+
+    def test_split_spreads_across_a_header_wrapped_over_two_lines(self):
+        spans = [
+            uspan("FUNCTION CardPayment (ParamA : REAL, ParamB : STRING)", 118, 475, 615),
+            uspan("BOOLEAN", 171, 224, 627),
+        ]
+
+        points = marking_points_from_underlined_spans(spans, target_marks=3)
+
+        self.assertEqual(
+            [p["text"] for p in points],
+            ["FUNCTION CardPayment (ParamA : REAL", "ParamB : STRING)", "BOOLEAN"],
+        )
+
+    def test_runs_already_matching_the_marks_are_left_alone(self):
+        spans = [
+            uspan("DECLARE Result : ARRAY", 118, 250, 300),
+            uspan("[0:99, 0:1]", 260, 330, 300),
+            uspan("OF STRING", 340, 410, 300),
+        ]
+
+        points = marking_points_from_underlined_spans(spans, target_marks=3)
+
+        # The comma inside the bounds must not be used: the runs are already the marks.
+        self.assertEqual(
+            [p["text"] for p in points],
+            ["DECLARE Result : ARRAY", "[0:99, 0:1]", "OF STRING"],
+        )
+
+    def test_supplementary_alternative_groups_are_not_force_split(self):
+        # The VB/Pascal restatements are worth a mark each, not the whole
+        # question again, so a group that already has its marks stops the split.
+        answer = (
+            "RETURN OutString\n"
+            "VB: Dim Lookup(0 to 127, 1) As CHAR"
+        )
+        spans = [
+            uspan("RETURN OutString", 118, 237, 300),
+            uspan("Dim Lookup(0 to 127, 1) As CHAR", 118, 300, 340),
+        ]
+
+        points = marking_points_from_underlined_spans(spans, target_marks=1, answer_text=answer)
+
+        self.assertEqual([p["alt_group"] for p in points], [0, 1])
+        self.assertEqual(points[1]["text"], "Dim Lookup(0 to 127, 1) As CHAR")
+
+    def test_a_run_without_syntax_breaks_is_left_whole(self):
+        spans = [uspan("Correct comparison", 118, 237, 300)]
+
+        points = marking_points_from_underlined_spans(spans, target_marks=4)
+
+        self.assertEqual([p["text"] for p in points], ["Correct comparison"])
+
+
 if __name__ == "__main__":
     unittest.main()
