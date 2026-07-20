@@ -34,7 +34,7 @@ from .extract_marking_points import (
     declares_style_convention,
     marking_points_from_underlined_spans,
 )
-from .marking_point_overrides import override_marking_points
+from .marking_point_overrides import is_verified_over_list, override_marking_points
 
 SCHEMA_VERSION = "pseudocode-question-record/v1"
 TRAILING_MARKS_PATTERN = re.compile(r"\[\s*(\d+)\s*\]\s*$")
@@ -417,6 +417,15 @@ def build_records(
                 "max_marks": max_marks,
                 "marking_points": marking_points,
                 "marking_points_max": extraction["max_marks"],
+                # Set when the scheme is known to list more criteria than marks
+                # without declaring a cap, and the extracted points have been
+                # checked by hand. The mark total is still the cap.
+                "marking_points_over_listed": is_verified_over_list(
+                    paper_code,
+                    hit.get("question_marker"),
+                    hit.get("primary_marker"),
+                    hit.get("secondary_marker"),
+                ),
                 # How many alternative-solution rubrics the points span. > 1
                 # means the points are mutually exclusive groups, not one
                 # additive list; the grading layer keeps the groups separate.

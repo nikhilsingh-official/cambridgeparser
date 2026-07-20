@@ -3,7 +3,8 @@ import unittest
 from src.pipeline.analysis.diagnostics.validate_marking_points import audit_record
 
 
-def record(points, answer_text="", max_marks=None, marks_value=None):
+def record(points, answer_text="", max_marks=None, marks_value=None,
+           marking_points_max=None, over_listed=False):
     return {
         "id": 1,
         "paper_code": "9608_x00_qp_00",
@@ -16,8 +17,20 @@ def record(points, answer_text="", max_marks=None, marks_value=None):
             "answer_text": answer_text,
             "max_marks": max_marks,
             "marks_value": marks_value,
+            "marking_points_max": marking_points_max,
+            "marking_points_over_listed": over_listed,
         },
     }
+
+
+# A well-formed rubric of five points, longer than the three marks on offer.
+_FIVE_POINTS = (
+    "Procedure heading and ending",
+    "Open the file for READ",
+    "Conditional loop until EOF",
+    "Read a line from the file in a loop",
+    "Close the file after the loop",
+)
 
 
 def N(*texts, style="numbered_list"):
@@ -83,6 +96,19 @@ class ValidateMarkingPointsTests(unittest.TestCase):
         # "One mark for TYPE and ENDTYPE statements" is a real, specific MP.
         row = audit_record(record(N("One mark for TYPE and ENDTYPE statements"), max_marks=4))
         self.assertNotIn("meta_mp", row["flags"])
+
+    def test_declared_cap_downgrades_over_expansion(self):
+        row = audit_record(record(N(*_FIVE_POINTS), max_marks=3, marking_points_max=3))
+        self.assertIn("declared_max_list", row["flags"])
+        self.assertNotIn("over_expansion", row["flags"])
+        self.assertEqual(row["severity"], "low")
+
+    def test_verified_over_list_downgrades_over_expansion(self):
+        # No cap printed in the scheme, but the list was checked by hand.
+        row = audit_record(record(N(*_FIVE_POINTS), max_marks=3, over_listed=True))
+        self.assertIn("verified_over_list", row["flags"])
+        self.assertNotIn("over_expansion", row["flags"])
+        self.assertEqual(row["severity"], "low")
 
 
 if __name__ == "__main__":

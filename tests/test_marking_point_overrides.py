@@ -2,6 +2,8 @@ import unittest
 
 from src.pipeline.pseudocode_tools.marking_point_overrides import (
     _OVERRIDES,
+    _VERIFIED_OVER_LIST,
+    is_verified_over_list,
     override_marking_points,
 )
 
@@ -59,6 +61,23 @@ class MarkingPointOverrideTests(unittest.TestCase):
         for key in replacing:
             entry = _OVERRIDES[key]
             self.assertEqual(len(entry["points"]), entry["max_marks"], key)
+
+
+class VerifiedOverListTests(unittest.TestCase):
+    """The annotation for schemes that out-list their marks without saying so."""
+
+    def test_listed_records_are_recognised(self):
+        self.assertTrue(is_verified_over_list("9608_s18_qp_21", "6", "(b)", None))
+        self.assertTrue(is_verified_over_list("9618_w23_qp_21", 6, "(a)", None))
+        self.assertFalse(is_verified_over_list("9608_s18_qp_21", "6", "(a)", None))
+        self.assertFalse(is_verified_over_list("9608_x00_qp_00", "1", None, None))
+
+    def test_annotation_never_supplies_marking_points(self):
+        # It records that a parse was checked; it must not replace the parse,
+        # or those records would stop benefiting from extractor improvements.
+        for key in _VERIFIED_OVER_LIST:
+            self.assertNotIn(key, _OVERRIDES)
+            self.assertIsNone(override_marking_points(*key))
 
 
 if __name__ == "__main__":

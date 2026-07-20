@@ -147,7 +147,50 @@ _OVERRIDES: Dict[OverrideKey, Dict[str, Any]] = {
         ],
     },
 }
+
+# Schemes that list more criteria than there are marks *without* saying so, and
+# whose extracted points have each been read against the mark scheme and found
+# correct. Cambridge usually states the cap ("Note: Max 7 marks"), which the
+# extractor records as ``marking_points_max``; these three papers simply do not.
+#
+# This is an annotation, not a cap: the mark total already caps the grading
+# layer, so the only thing recorded here is "a human checked this list". Keeping
+# it separate from ``_OVERRIDES`` leaves the parse itself untouched, so a record
+# listed here still benefits from any later extractor improvement.
+_VERIFIED_OVER_LIST: set[OverrideKey] = {
+    ("9608_s18_qp_21", "6", "(b)", None),    # 10 numbered criteria, [8] marks
+    ("9608_w17_qp_22", "5", None, None),     # 10 numbered criteria, 9 marks
+    ("9618_w23_qp_21", "6", "(a)", None),    # MP1-MP8 labelled, [7] marks
+}
 # fmt: on
+
+
+def _override_key(
+    paper_code: str,
+    question_marker: Any,
+    primary_marker: Any,
+    secondary_marker: Any,
+) -> OverrideKey:
+    return (
+        paper_code,
+        str(question_marker) if question_marker is not None else None,
+        primary_marker,
+        secondary_marker,
+    )
+
+
+def is_verified_over_list(
+    paper_code: str,
+    question_marker: Any,
+    primary_marker: Any,
+    secondary_marker: Any,
+) -> bool:
+    """True when this record's rubric is known to out-list its own mark total."""
+
+    return (
+        _override_key(paper_code, question_marker, primary_marker, secondary_marker)
+        in _VERIFIED_OVER_LIST
+    )
 
 
 def override_marking_points(
@@ -164,12 +207,7 @@ def override_marking_points(
     it produced nothing.
     """
 
-    key = (
-        paper_code,
-        str(question_marker) if question_marker is not None else None,
-        primary_marker,
-        secondary_marker,
-    )
+    key = _override_key(paper_code, question_marker, primary_marker, secondary_marker)
     entry = _OVERRIDES.get(key)
     if entry is None:
         return None

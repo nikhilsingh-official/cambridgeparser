@@ -15,7 +15,12 @@ Each record is checked against a set of flags grouped by severity:
             undercount, multi_rubric, multi_solution
   low     — informational:
             mp_crossref_in_text, codey_mp, duplicate_mp, alt_groups,
-            no_marking_points
+            declared_max_list, verified_over_list, no_marking_points
+
+A rubric holding more criteria than marks is only ``over_expansion`` when
+nothing accounts for the excess. A cap printed in the scheme ("Note: Max 7
+marks") makes it ``declared_max_list``; a hand-checked list on a scheme that
+prints no cap makes it ``verified_over_list``.
 
 Counts are measured per alternative-solution group (``alt_group``), because
 alternatives are mutually exclusive: a 5-mark question with two 5-point
@@ -171,6 +176,10 @@ def audit_record(record: Dict[str, Any]) -> Dict[str, Any]:
     if isinstance(cap, int) and largest_group > cap:
         if isinstance(declared_max, int) and declared_max <= cap:
             flags.append("declared_max_list")
+        elif ms.get("marking_points_over_listed"):
+            # No cap in the text, but the list has been read against the mark
+            # scheme by hand and found correct (see _VERIFIED_OVER_LIST).
+            flags.append("verified_over_list")
         else:
             flags.append("over_expansion")
     # Contamination signal: the answer declares an underline/bold/highlight

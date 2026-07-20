@@ -68,6 +68,24 @@ MAX_MARKS_PATTERN = re.compile(r"^\s*max(?:imum)?\.?\s*(?:of\s*)?(\d+)\s*(?:mark
 MAX_MARKS_INLINE_PATTERN = re.compile(
     r"(?:\(|\bup\s+to\s+)\s*max(?:imum)?\.?\s*(?:of\s+)?(\d+)", re.IGNORECASE
 )
+# The same cap written without a bracket or "up to": "Note: Max 7 marks" on a
+# line of its own after the list, or "Mark as follows Max 6 marks:" above it.
+# A bare "Max n" is only trusted on a line that is *about* the marking — inside
+# a marking point "Max" is ordinary prose ("compare with Max 255").
+MAX_MARKS_BARE_PATTERN = re.compile(
+    r"\bmax(?:imum)?\.?\s*(?:of\s+)?(\d+)\b", re.IGNORECASE
+)
+MAX_MARKS_CONTEXT_PATTERN = re.compile(
+    r"^\s*(?:notes?\b|n\.?b\.?\b)|\bmark(?:ed|ing)?\s+as\s+follows\b"
+    r"|^\s*(?:one|1)\s+marks?\s+(?:per|for)\b",
+    re.IGNORECASE,
+)
+# "Note: Max 7 if CharCount not used to store count" caps a *penalty*, not the
+# list: it applies only when the student's answer has that fault, so it must
+# never be read as the number of marking points on offer.
+CONDITIONAL_MAX_PATTERN = re.compile(
+    r"^\s*(?:marks?\b\s*)?(?:if|unless|when|where|provided|for)\b", re.IGNORECASE
+)
 CODE_LINE_PATTERN = re.compile(
     r"^\s*(?:DECLARE|CONSTANT|FUNCTION|ENDFUNCTION|PROCEDURE|ENDPROCEDURE|IF\b|ELSE\b|ENDIF|"
     r"WHILE\b|ENDWHILE|REPEAT\b|UNTIL\b|FOR\b|NEXT\b|CASE\b|ENDCASE|INPUT\b|OUTPUT\b|RETURNS?\b|"
@@ -410,6 +428,10 @@ def _detect_max_marks(lines: list[str]) -> Optional[int]:
         inline = MAX_MARKS_INLINE_PATTERN.search(stripped)
         if inline:
             return int(inline.group(1))
+        if MAX_MARKS_CONTEXT_PATTERN.search(stripped):
+            bare = MAX_MARKS_BARE_PATTERN.search(stripped)
+            if bare and not CONDITIONAL_MAX_PATTERN.match(stripped[bare.end() :]):
+                return int(bare.group(1))
     return None
 
 

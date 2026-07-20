@@ -768,5 +768,51 @@ class DeclarationSplittingTests(unittest.TestCase):
         self.assertEqual([p["text"] for p in points], ["Correct comparison"])
 
 
+class DeclaredMaxTests(unittest.TestCase):
+    """Caps written without a bracket or "up to".
+
+    Cambridge routinely lists more criteria than marks and states the cap in
+    prose, either above the list or on a trailing note. The cap is the scheme's
+    own design, so recording it keeps the list from reading as over-expansion.
+    """
+
+    def _max(self, text):
+        return extract_structured_marking_points(text)["max_marks"]
+
+    def test_trailing_note_declares_the_cap(self):
+        text = (
+            "1 mark for each of the following:\n"
+            "1 Function heading, including return type and function end\n"
+            "2 Loop counting spaces until word found\n"
+            "3 Return Index following a reasonable attempt\n"
+            "Note: Max 7 marks"
+        )
+        self.assertEqual(self._max(text), 7)
+
+    def test_cap_without_the_word_marks(self):
+        self.assertEqual(self._max("Mark as follows:\n1 Open the file\nNote: max 8"), 8)
+
+    def test_cap_inside_the_mark_as_follows_header(self):
+        text = "Mark as follows Max 6 marks:\n1 Procedure heading and ending\n2 Input ThisNum"
+        self.assertEqual(self._max(text), 6)
+        self.assertEqual(self._max("Mark as follows Max 7:\n1 Convert parameter to a number"), 7)
+
+    def test_conditional_penalty_is_not_a_cap(self):
+        # "Max 7 if X" withholds a mark for a specific fault; it does not say
+        # the list is capped at seven.
+        text = (
+            "1 mark for each of the following:\n"
+            "1 Function heading\n"
+            "2 Count the characters\n"
+            "Note: Max 7 if CharCount not used to store count"
+        )
+        self.assertIsNone(self._max(text))
+        self.assertIsNone(self._max("Note: Max 4 if function declaration incorrect"))
+
+    def test_max_inside_a_marking_point_is_not_a_cap(self):
+        text = "Mark as follows:\n1 Compare new value with Max 255 and limit\n2 Return a BOOLEAN"
+        self.assertIsNone(self._max(text))
+
+
 if __name__ == "__main__":
     unittest.main()

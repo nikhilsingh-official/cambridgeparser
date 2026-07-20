@@ -210,7 +210,16 @@ python -m src.pipeline.runners.qsplitter_batch \
 - Some schemes list more criteria than marks ("One mark per point (Max 8):" above
   nine items). That cap is recorded as `marking_points_max`, enforced by the
   grading layer, and reported by the audit as `declared_max_list` rather than as
-  an extraction defect.
+  an extraction defect. The cap is also written without a bracket — "Note: Max 7
+  marks" on a trailing line, or "Mark as follows Max 6 marks:" above the list —
+  and a bare "Max n" is only read as a cap on a line that is *about* the marking,
+  never inside a marking point ("compare with Max 255"). "Note: Max 7 if
+  CharCount not used" is a conditional penalty, not a cap, so it is ignored.
+- Three papers over-list without declaring any cap at all (10 criteria for [8]
+  marks, MP1-MP8 for [7]). Their points were read against the mark scheme by hand
+  and are correct, so they are named in `_VERIFIED_OVER_LIST` and audited as
+  `verified_over_list`. That set is an *annotation*, not an override: it supplies
+  no marking points, so those records still track the extractor as it improves.
 - When a scheme declares that its marks *are* the styled spans ("One mark for
   each part-statement, shown underlined and bold"), the underline recovery wins
   over any text list found in the same cell. On a few 2016 papers a mark-scheme
