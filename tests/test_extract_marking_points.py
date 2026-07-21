@@ -91,6 +91,21 @@ class StructuredMarkingPointTests(unittest.TestCase):
         self.assertEqual(len(result["points"]), 2)
         self.assertTrue(all(p["confidence"] == "high" for p in result["points"]))
 
+    def test_mark_point_guidance_note_is_a_boundary(self):
+        # "Mark points 7 and 8 must not be nested" is marking guidance, not a
+        # continuation of the last point (the id44 bug). It must not be appended.
+        text = (
+            "1 mark for each:\n"
+            "7 Checking Today() = 3 and increasing DRate by 20%\n"
+            "8 Return parameter // GetDiscountRate ← DRate\n"
+            "Mark points 7 and 8 must not be nested"
+        )
+
+        result = extract_structured_marking_points(text)
+
+        self.assertEqual(len(result["points"]), 2)
+        self.assertNotIn("must not be nested", result["points"][-1]["text"])
+
     def test_code_only_answer_produces_no_points(self):
         text = (
             "FUNCTION MakeString(Count : INTEGER) RETURNS STRING\n"

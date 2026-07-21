@@ -210,6 +210,11 @@ python -m src.pipeline.runners.qsplitter_batch \
   q6(b) papers 21/23) are transcribed in `marking_point_overrides` with
   `replaces_parse` rather than reconstructed by a heuristic that guesses which
   wraps are really lost items.
+- Marking guidance that references points by number ("Mark points 7 and 8 must
+  not be nested") is a note about how the listed marks combine, not a criterion,
+  so a line beginning "Mark point(s) <n>" closes the current point rather than
+  extending it. The digit distinguishes it from the "Mark points as circled"
+  rubric header, which never leads with a number.
 - Some schemes list more criteria than marks ("One mark per point (Max 8):" above
   nine items). That cap is recorded as `marking_points_max`, enforced by the
   grading layer, and reported by the audit as `declared_max_list` rather than as

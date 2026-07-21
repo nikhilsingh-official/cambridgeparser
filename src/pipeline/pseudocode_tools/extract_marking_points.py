@@ -49,6 +49,11 @@ META_PREFIX_PATTERN = re.compile(
     r"^(notes?\s*:|alternative\b|example\s+(?:solution|of)|expected\s+output|guidance\s*:)",
     re.IGNORECASE,
 )
+# Marking guidance that references points by number ("Mark points 7 and 8 must
+# not be nested") is a note about how the listed marks combine, not a criterion.
+# A digit right after "point(s)" separates it from the "Mark points as circled"
+# rubric header, which never leads with a number.
+MARK_POINT_NOTE_PATTERN = re.compile(r"^\s*mark\s+points?\s+\d", re.IGNORECASE)
 # A boundary that introduces a *different solution*, so its marking points form a
 # new alternative group (a "Note" or "Max" boundary does not — same solution).
 ALT_MARKER_PATTERN = re.compile(r"^\s*(alternative|example\b.*\bsolution|or)\b", re.IGNORECASE)
@@ -306,6 +311,7 @@ def _scan_rubric_items(
             or MAX_MARKS_PATTERN.match(stripped)
             or META_BOUNDARY_PATTERN.match(stripped)
             or META_PREFIX_PATTERN.match(stripped)
+            or MARK_POINT_NOTE_PATTERN.match(stripped)
         ):
             flush()
             if ALT_MARKER_PATTERN.match(stripped):
