@@ -53,7 +53,11 @@ class MarkingPointOverrideTests(unittest.TestCase):
         self.assertEqual(
             sorted(replacing),
             [
+                ("9608_w17_qp_21", "5", "(a)", None),
+                ("9608_w17_qp_23", "5", "(a)", None),
+                ("9618_w21_qp_21", "6", "(b)", None),
                 ("9618_w21_qp_22", "1", "(c)", None),
+                ("9618_w21_qp_23", "6", "(b)", None),
                 ("9618_w24_qp_23", "4", "(a)", None),
                 ("9618_w25_qp_23", "3", None, None),
             ],
@@ -61,6 +65,19 @@ class MarkingPointOverrideTests(unittest.TestCase):
         for key in replacing:
             entry = _OVERRIDES[key]
             self.assertEqual(len(entry["points"]), entry["max_marks"], key)
+
+    def test_unnumbered_tail_overrides_carry_the_full_list(self):
+        # The four "points 1-7 then an unnumbered eighth" schemes are transcribed
+        # in full, replacing the seven-point parse the extractor now produces.
+        for key in (
+            ("9608_w17_qp_21", "5", "(a)", None),
+            ("9608_w17_qp_23", "5", "(a)", None),
+            ("9618_w21_qp_21", "6", "(b)", None),
+            ("9618_w21_qp_23", "6", "(b)", None),
+        ):
+            result = override_marking_points(*key)
+            self.assertTrue(result["replaces_parse"], key)
+            self.assertEqual(len(result["points"]), 8, key)
 
 
 class VerifiedOverListTests(unittest.TestCase):

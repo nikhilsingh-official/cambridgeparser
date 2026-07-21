@@ -12,10 +12,15 @@ successful parse.
 
 A few records instead parse *badly* — the scheme's marks live in a layout the
 scanner cannot see (an expression table, a highlight convention, bold gaps
-tagged with inline "MP n" markers), so it returns a garbled point rather than
-nothing. Those entries set ``"replaces_parse": True`` to take precedence over
-the parse. Keep that flag rare and justified: it silences the extractor for that
-record forever, including any future improvement to it.
+tagged with inline "MP n" markers), or the mark scheme itself omits a list
+number so the final point is absorbed as a wrap (Cambridge prints points 1-7
+then an unnumbered eighth). In both the extractor returns a wrong point count
+rather than nothing, so those entries set ``"replaces_parse": True`` to take
+precedence over the parse. The unnumbered-tail cases are a genuine mark-scheme
+formatting error, not something a parser should reconstruct by guessing which
+wraps are really lost items — that guesswork was removed in favour of these
+transcriptions. Keep the flag rare and justified: it silences the extractor for
+that record forever, including any future improvement to it.
 
 Keyed by ``(qp_paper_code, question_marker, primary_marker, secondary_marker)``
 exactly as those appear in a record's ``segment_key`` (primary/secondary markers
@@ -144,6 +149,73 @@ _OVERRIDES: Dict[OverrideKey, Dict[str, Any]] = {
             "IF SP < 1 (or SP = 0) THEN",
             "PopData.Data <- ThisStack[SP]",
             "SP <- SP - 1",
+        ],
+    },
+    # 9608_w17 q5(a) (papers 21 and 23, identical rubric): the scheme numbers
+    # points 1-7 then prints the eighth, "Closing both files", flush-left with no
+    # "8." — verified against the rendered PDF and the OCR, so the number is not
+    # in the source at all. The text scan reads seven points and absorbs the
+    # eighth as a wrap; there is nothing on the page for a parser to key on, so
+    # the completed list is transcribed here rather than guessed heuristically.
+    ("9608_w17_qp_21", "5", "(a)", None): {
+        "max_marks": 8,
+        "replaces_parse": True,
+        "points": [
+            "Variable declaration of STRING for OldFileLine (or equivalent)",
+            "Open EmailDetails for READ",
+            "Open NewEmailDetails for WRITE",
+            "Correct loop checking for EOF(EmailDetails)",
+            "Reading a line from EmailDetails in a loop",
+            "Correct concatenation in a loop",
+            "Writing a line to NewEmailDetails in a loop",
+            "Closing both files",
+        ],
+    },
+    ("9608_w17_qp_23", "5", "(a)", None): {
+        "max_marks": 8,
+        "replaces_parse": True,
+        "points": [
+            "Variable declaration of STRING for OldFileLine (or equivalent)",
+            "Open EmailDetails for READ",
+            "Open NewEmailDetails for WRITE",
+            "Correct loop checking for EOF(EmailDetails)",
+            "Reading a line from EmailDetails in a loop",
+            "Correct concatenation in a loop",
+            "Writing a line to NewEmailDetails in a loop",
+            "Closing both files",
+        ],
+    },
+    # 9618_w21 q6(b) (papers 21 and 23, identical rubric): the same defect. Points
+    # 1-7 are numbered; the eighth, "Loop(s) terminate when element with value = 1
+    # found", is printed flush-left and unnumbered (confirmed against the PDF).
+    # The line below it, "Max 7 marks if function heading ... is incorrect", is a
+    # conditional penalty, not a marking point, and is deliberately omitted.
+    ("9618_w21_qp_21", "6", "(b)", None): {
+        "max_marks": 8,
+        "replaces_parse": True,
+        "points": [
+            "Interpreting StartCol parameter to determine direction of search",
+            "An attempt at searching both up and down",
+            "Conditional Loop / Count-controlled loop with use of ThisCol index",
+            "Using correct values for StartCol, EndCol and Step",
+            "Reference a Screen element and compare with 1 in a loop",
+            "If equal save column or immediately Return column in a loop",
+            "Return column number or −1",
+            "Loop(s) terminate when element with value = 1 found",
+        ],
+    },
+    ("9618_w21_qp_23", "6", "(b)", None): {
+        "max_marks": 8,
+        "replaces_parse": True,
+        "points": [
+            "Interpreting StartCol parameter to determine direction of search",
+            "An attempt at searching both up and down",
+            "Conditional Loop / Count-controlled loop with use of ThisCol index",
+            "Using correct values for StartCol, EndCol and Step",
+            "Reference a Screen element and compare with 1 in a loop",
+            "If equal save column or immediately Return column in a loop",
+            "Return column number or −1",
+            "Loop(s) terminate when element with value = 1 found",
         ],
     },
 }

@@ -201,12 +201,15 @@ python -m src.pipeline.runners.qsplitter_batch \
   marking points routinely *name* the construct they mark — "FOR loop", "CASE OF
   ThisMark ... ENDCASE", "OUTPUT statement". Out-of-sequence numbers still face
   the guard, so circled mark digits printed inside the example code are rejected.
-- When a rubric comes up short of the marks on offer, `extract_structured_marking_points`
-  re-scans allowing a line whose item number went missing to be promoted from a
-  continuation to its own point ("Closing both files" after item 7 of 8). The
-  re-scan is kept only if it closes the gap without overshooting, so a complete
-  rubric is never split further. Genuine wraps are held back by a lowercase
-  start, an unclosed bracket, or a trailing conjunction.
+- A few mark schemes number points 1-7 then print the eighth flush-left with no
+  "8." (verified against the rendered PDF and the OCR — the number is absent from
+  the source, not dropped in extraction). That flush-left line is indistinguishable
+  from a wrapped description by position, so the extractor attaches it and comes
+  up one point short. This is a mark-scheme formatting error, not a parsing
+  problem, so the four affected records (`9608_w17` q5(a) papers 21/23, `9618_w21`
+  q6(b) papers 21/23) are transcribed in `marking_point_overrides` with
+  `replaces_parse` rather than reconstructed by a heuristic that guesses which
+  wraps are really lost items.
 - Some schemes list more criteria than marks ("One mark per point (Max 8):" above
   nine items). That cap is recorded as `marking_points_max`, enforced by the
   grading layer, and reported by the audit as `declared_max_list` rather than as

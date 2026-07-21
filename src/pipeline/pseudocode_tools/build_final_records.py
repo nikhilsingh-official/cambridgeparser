@@ -349,9 +349,7 @@ def build_records(
             hit.get("primary_marker"),
             hit.get("secondary_marker"),
         )
-        extraction = extract_structured_marking_points(
-            answer_text, expected_marks=marks_value if isinstance(marks_value, int) else None
-        )
+        extraction = extract_structured_marking_points(answer_text)
         marking_points = extraction["points"]
         # A curated transcription for a scheme whose marks live in a layout the
         # scanner cannot read (see marking_point_overrides) wins outright; every

@@ -564,7 +564,7 @@ class UnderlineConventionTests(unittest.TestCase):
 
 
 class ItemSplittingTests(unittest.TestCase):
-    """Rubric items that read like code, and items whose number went missing."""
+    """Rubric items that read like code, and unnumbered trailing lines."""
 
     def test_in_sequence_items_naming_constructs_are_kept(self):
         # "FOR loop" / "OUTPUT ..." are what the mark is *for*; the code guard
@@ -615,7 +615,12 @@ class ItemSplittingTests(unittest.TestCase):
         self.assertEqual(len(result["points"]), 4)
         self.assertEqual(result["points"][3]["text"], "OUTPUT statement")
 
-    def test_item_with_a_lost_number_is_promoted_when_undercounting(self):
+    def test_unnumbered_final_point_stays_a_wrap(self):
+        # Cambridge sometimes prints points 1..7 then an eighth with no number.
+        # The scanner cannot tell that flush-left line from a wrapped
+        # description, so it attaches it; these genuine mark-scheme formatting
+        # errors are corrected by transcription in marking_point_overrides, not
+        # by the extractor guessing which wraps are lost items.
         text = (
             "Mark as follows:\n"
             "1. Open EmailDetails for READ\n"
@@ -623,51 +628,10 @@ class ItemSplittingTests(unittest.TestCase):
             "Closing both files"
         )
 
-        result = extract_structured_marking_points(text, expected_marks=3)
-
-        self.assertEqual(
-            [p["text"] for p in result["points"]],
-            [
-                "Open EmailDetails for READ",
-                "Writing a line to NewEmailDetails in a loop",
-                "Closing both files",
-            ],
-        )
-
-    def test_no_promotion_when_the_list_already_matches_the_marks(self):
-        # The same text, but the marks are already accounted for, so the trailing
-        # line is a wrap and must stay attached.
-        text = (
-            "Mark as follows:\n"
-            "1. Open EmailDetails for READ\n"
-            "2. Writing a line to NewEmailDetails in a loop\n"
-            "Closing both files"
-        )
-
-        result = extract_structured_marking_points(text, expected_marks=2)
+        result = extract_structured_marking_points(text)
 
         self.assertEqual(len(result["points"]), 2)
         self.assertTrue(result["points"][1]["text"].endswith("Closing both files"))
-
-    def test_genuine_wraps_are_never_promoted(self):
-        # Lowercase start, an unclosed bracket, and a trailing conjunction each
-        # mark the next line as a continuation even while undercounting.
-        text = (
-            "Mark as follows:\n"
-            "1 Avoid checking uninitialised elements // initialisation to rogue value\n"
-            "at start of algorithm\n"
-            "2 OUTPUT final message after loop (exact text not specified but must include\n"
-            "NumToChange or loop counter if correct)\n"
-            "3 Assign the value to the element and\n"
-            "Increment the index"
-        )
-
-        result = extract_structured_marking_points(text, expected_marks=8)
-
-        self.assertEqual(len(result["points"]), 3)
-        self.assertTrue(result["points"][0]["text"].endswith("at start of algorithm"))
-        self.assertTrue(result["points"][1]["text"].endswith("if correct)"))
-        self.assertTrue(result["points"][2]["text"].endswith("and Increment the index"))
 
     def test_up_to_max_marks_header_declares_a_cap(self):
         text = (

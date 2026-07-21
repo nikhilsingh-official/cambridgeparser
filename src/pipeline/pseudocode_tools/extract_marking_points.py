@@ -210,36 +210,6 @@ def _numbered_item(stripped: str, in_sequence: bool = False) -> Optional[str]:
     return text
 
 
-# Words that cannot end a marking point: the sentence is still going, so the
-# next line continues it rather than starting a new criterion.
-CONTINUATION_TAIL_PATTERN = re.compile(
-    r"(?:[,;:&+/(-]|\b(?:a|an|the|and|or|to|of|in|on|at|by|for|from|with|without|into"
-    r"|if|when|while|until|after|before|that|than|then|as|is|are|be|been|must|not|no"
-    r"|use|using|used|include|including|includes|both|each|all|any|either|its|their"
-    r"|this|these|those|which|where|between|within|through|during|about|over|under"
-    r"|above|below|per|up|down)\b)\s*$",
-    re.IGNORECASE,
-)
-
-
-def _starts_new_item(current_text: str, candidate: str) -> bool:
-    """Whether an unnumbered line begins a new marking point rather than wrapping.
-
-    Cambridge sometimes loses the number of the last item ("8." missing before
-    "Closing both files"), which is indistinguishable from a wrapped description
-    by position alone. Three signals separate them: a wrapped line continues a
-    sentence, so the text before it ends mid-clause (a trailing conjunction,
-    punctuation, or an unclosed bracket) or the line itself starts lowercase; and
-    a real criterion is a phrase, not the one or two stray words a wrap leaves
-    behind.
-    """
-    if not candidate[:1].isupper() or len(candidate.split()) < 3:
-        return False
-    if current_text.count("(") != current_text.count(")"):
-        return False
-    return not CONTINUATION_TAIL_PATTERN.search(current_text)
-
-
 def _bullet_item(raw: str, in_list: bool = False) -> Optional[str]:
     """The description of a bulleted rubric item, or None if the line is noise.
 
@@ -257,7 +227,7 @@ def _bullet_item(raw: str, in_list: bool = False) -> Optional[str]:
 
 
 def _scan_rubric_items(
-    lines: list[str], allow_promotion: bool = False
+    lines: list[str],
 ) -> tuple[list[Dict[str, Any]], bool, bool]:
     """Scan mark-scheme lines into ordered marking-point items.
 
@@ -390,17 +360,9 @@ def _scan_rubric_items(
             flush()
             continue
 
-        # Otherwise a continuation of the current item's wrapped description —
-        # unless it reads as a criterion in its own right whose number the mark
-        # scheme dropped.
+        # Otherwise a continuation of the current item's wrapped description.
         if current is not None:
-            if allow_promotion and in_rubric_list and _starts_new_item(current["text"], stripped):
-                style = current["style"]
-                confidence = current["confidence"]
-                flush()
-                begin_item(stripped, style, confidence)
-            else:
-                current["text"] = f"{current['text']} {stripped}".strip()
+            current["text"] = f"{current['text']} {stripped}".strip()
 
     flush()
     return items, header_seen, one_mark_header_seen
@@ -465,7 +427,7 @@ def _select_items(items: list[Dict[str, Any]], header_seen: bool) -> list[Dict[s
 
 
 def extract_structured_marking_points(
-    text: Optional[str], expected_marks: Optional[int] = None
+    text: Optional[str],
 ) -> Dict[str, Any]:
     """Extract structured marking points from mark-scheme answer text.
 
@@ -497,17 +459,6 @@ def extract_structured_marking_points(
     max_marks = _detect_max_marks(lines)
     items, header_seen, _ = _scan_rubric_items(lines)
     chosen = _select_items(items, header_seen)
-
-    # Only when the rubric comes up short do we consider that an item lost its
-    # number and was absorbed as a continuation. Re-scanning with promotion on is
-    # accepted solely if it closes the gap without overshooting the marks on
-    # offer, so a complete rubric can never be split further.
-    target = expected_marks if expected_marks is not None else max_marks
-    if isinstance(target, int) and len(chosen) < target:
-        promoted, promoted_header, _ = _scan_rubric_items(lines, allow_promotion=True)
-        promoted_chosen = _select_items(promoted, promoted_header)
-        if len(chosen) < len(promoted_chosen) <= target:
-            chosen = promoted_chosen
 
     points: list[Dict[str, Any]] = []
     seen_per_group: Dict[int, set] = {}
