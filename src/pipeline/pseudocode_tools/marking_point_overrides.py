@@ -223,7 +223,7 @@ _OVERRIDES: Dict[OverrideKey, Dict[str, Any]] = {
 # Schemes that list more criteria than there are marks *without* saying so, and
 # whose extracted points have each been read against the mark scheme and found
 # correct. Cambridge usually states the cap ("Note: Max 7 marks"), which the
-# extractor records as ``marking_points_max``; these three papers simply do not.
+# extractor records as ``marking_points_max``; these papers simply do not.
 #
 # This is an annotation, not a cap: the mark total already caps the grading
 # layer, so the only thing recorded here is "a human checked this list". Keeping
@@ -233,6 +233,11 @@ _VERIFIED_OVER_LIST: set[OverrideKey] = {
     ("9608_s18_qp_21", "6", "(b)", None),    # 10 numbered criteria, [8] marks
     ("9608_w17_qp_22", "5", None, None),     # 10 numbered criteria, 9 marks
     ("9618_w23_qp_21", "6", "(a)", None),    # MP1-MP8 labelled, [7] marks
+    # "Mark points as circled": 7 numbered descriptions for [6] marks, where the
+    # 7th is conditional ("... only if mark point 1 not given"), so 6 is the real
+    # ceiling. Both 2016 papers share the identical scheme.
+    ("9608_s16_qp_21", "2", "(b)", None),
+    ("9608_s16_qp_22", "2", "(b)", None),
 }
 # fmt: on
 

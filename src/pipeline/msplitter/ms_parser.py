@@ -1127,10 +1127,28 @@ def _build_questions_from_rows(
     for row in extracted_rows:
         question_cell_text = (row.get("question_cell_text") or "").strip()
         parsed = parse_question_marker(question_cell_text) if question_cell_text else None
+        has_content = bool(
+            (row.get("answer_cell_text") or "").strip()
+            or (row.get("marks_cell_text") or "").strip()
+        )
         continuation = False
         if parsed:
             current_marker = parsed
-        elif current_marker and ((row.get("answer_cell_text") or "").strip() or (row.get("marks_cell_text") or "").strip()):
+        elif question_cell_text:
+            # A non-empty question cell that is not a full "<n>(x)" marker may be a
+            # relative subpart marker ("(b)", "(ii)") that inherits the question
+            # number from the current context. Some mark schemes (e.g. the 2016
+            # 9608 papers) print continuation subparts this way; without resolving
+            # them the row is wrongly merged into the *previous* subpart's cell,
+            # leaking (b)/(c) content and its underlines into (a).
+            relative, _ = _parse_marker_with_context(question_cell_text, current_marker)
+            if relative:
+                parsed = relative
+                current_marker = relative
+            elif current_marker and has_content:
+                parsed = current_marker
+                continuation = True
+        elif current_marker and has_content:
             parsed = current_marker
             continuation = True
 

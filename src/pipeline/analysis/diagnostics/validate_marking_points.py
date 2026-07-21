@@ -59,9 +59,13 @@ META_MP_PATTERN = re.compile(
     r"|.*\bremaining\s+\w+\s+(?:bold\s+)?parts?\b)",
     re.IGNORECASE,
 )
-# A convention where the marks are underlined/highlighted/bold spans, not text.
+# A convention where the marks *are* the styled spans (underline/highlight/bold),
+# so extracting a text list instead means the extractor grabbed a foreign block.
+# "Mark points as circled" is deliberately excluded: circled digits annotate the
+# example code and index a numbered "descriptions as below" list, so that text
+# list *is* the intended rubric, not a mis-selection.
 STYLE_CONVENTION_PATTERN = re.compile(
-    r"underlined|highlighted|part-?statement|bold\s+part|per\s+bold|as\s+circled",
+    r"underlined|highlighted|part-?statement|bold\s+part|per\s+bold",
     re.IGNORECASE,
 )
 TEXT_DERIVED_STYLES = {"numbered_list", "mp_label", "bullet", "one_mark_bullet"}

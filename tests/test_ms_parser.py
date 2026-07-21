@@ -2,6 +2,7 @@ import unittest
 
 from src.pipeline.msplitter.ms_parser import (
     _append_row_to_node,
+    _build_questions_from_rows,
     _extract_table_rows,
     _get_or_create_question_tree,
     _parse_marker_with_context,
@@ -234,6 +235,40 @@ class MarkSchemeParserTests(unittest.TestCase):
         marker, remainder = _parse_marker_with_context("(c) primary answer", marker)
         self.assertEqual(marker["normalized_key"], "q3|(c)")
         self.assertEqual(remainder, "primary answer")
+
+    def test_relative_marker_rows_split_into_their_own_subparts(self):
+        # A row whose question cell is a bare relative marker ("(b) (i)", "(ii)")
+        # must resolve against the current question number, not merge into the
+        # previous subpart's cell (the 9608_s16 (b)/(c)-leaks-into-(a) bug).
+        def bare_row(question, answer):
+            return {
+                "page_index": 4,
+                "table_index": 0,
+                "row_index": 0,
+                "question_cell_text": question,
+                "answer_cell_text": answer,
+                "marks_cell_text": "",
+                "answer_cell_bbox": None,
+                "marks_cell_bbox": None,
+            }
+
+        rows = [
+            bare_row("3 (a)", "answer for a"),
+            bare_row("(b) (i)", "answer for b i"),
+            bare_row("(ii)", "answer for b ii"),
+        ]
+
+        questions_map, unresolved = _build_questions_from_rows(rows, None, {})
+
+        self.assertEqual(unresolved, [])
+        primaries = questions_map["3"]["primary_subparts"]
+        keys = {p["primary"]["parsed_marker"]["normalized_key"] for p in primaries}
+        self.assertIn("q3|(a)", keys)
+        self.assertTrue(any(k.startswith("q3|(b)") for k in keys))
+        a_node = next(p["primary"] for p in primaries
+                      if p["primary"]["parsed_marker"]["normalized_key"] == "q3|(a)")
+        self.assertEqual(a_node["answer_text"], "answer for a")
+        self.assertNotIn("answer for b", a_node["answer_text"])
 
     def test_region_text_rebuilds_lines_and_word_gaps(self):
         chars = (

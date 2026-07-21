@@ -179,6 +179,12 @@ python -m src.pipeline.runners.qsplitter_batch \
 - Mark-scheme parsing is table-first. A full audit on the checked-in corpus
   leaves some older 2015/2016 mark schemes with empty question lists; treat that
   as parser coverage work, not as a hidden fallback path.
+- A row whose question cell is a *relative* subpart marker ("(b)", "(ii)") rather
+  than a full "3(b)" is resolved against the current question number before it is
+  treated as a continuation of the previous cell. Some papers (the 2016 9608
+  schemes) print continuation subparts this way; without this the (b)/(c) content
+  — and its underlines — leaks into (a)'s cell. Only an empty question cell now
+  counts as a genuine page-break continuation.
 - Cambridge mark schemes often print several *alternative* solutions for one
   question. `extract_structured_marking_points` tags each point with an
   `alt_group` (a new group opens only when the rubric numbering restarts, so an
@@ -223,11 +229,16 @@ python -m src.pipeline.runners.qsplitter_batch \
   and a bare "Max n" is only read as a cap on a line that is *about* the marking,
   never inside a marking point ("compare with Max 255"). "Note: Max 7 if
   CharCount not used" is a conditional penalty, not a cap, so it is ignored.
-- Three papers over-list without declaring any cap at all (10 criteria for [8]
-  marks, MP1-MP8 for [7]). Their points were read against the mark scheme by hand
-  and are correct, so they are named in `_VERIFIED_OVER_LIST` and audited as
-  `verified_over_list`. That set is an *annotation*, not an override: it supplies
-  no marking points, so those records still track the extractor as it improves.
+- A handful of papers over-list without declaring any cap at all (10 criteria for
+  [8] marks, MP1-MP8 for [7], or a "Mark points as circled" scheme with 7
+  descriptions for [6] where the 7th is conditional on the 1st). Their points were
+  read against the mark scheme by hand and are correct, so they are named in
+  `_VERIFIED_OVER_LIST` and audited as `verified_over_list`. That set is an
+  *annotation*, not an override: it supplies no marking points, so those records
+  still track the extractor as it improves. Note that "Mark points as circled,
+  descriptions as below" is not a styled-span convention — the circled digits
+  annotate the example code and index the numbered descriptions, which are the
+  real rubric — so it does not trigger `rubric_selection_mismatch`.
 - When a scheme declares that its marks *are* the styled spans ("One mark for
   each part-statement, shown underlined and bold"), the underline recovery wins
   over any text list found in the same cell. On a few 2016 papers a mark-scheme
