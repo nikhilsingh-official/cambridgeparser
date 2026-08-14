@@ -48,13 +48,9 @@ const selectedLayout = computed(() => (
   state.selectedId == null ? null : state.layouts[String(state.selectedId)] || null
 ))
 
-// 'image' is the trusted default; 'position' shows the reconstructed token view.
-const viewMode = ref('image')
-
 // Fill-in-the-blank questions are answered by typing into the question's blanks
 // rather than the code editor, so the editor and its Run button are hidden and
-// the answer is assembled from these values on submit. In image mode the blanks
-// are a separate fields panel; in position mode they are inline in the question.
+// the answer is assembled from the separate fields panel on submit.
 const isFillBlank = computed(() => isFillBlankQuestion(
   selectedRecord.value,
   selectedLayout.value?.question,
@@ -62,8 +58,7 @@ const isFillBlank = computed(() => isFillBlankQuestion(
 const fillValues = reactive({})
 
 const showEditor = computed(() => !isFillBlank.value)
-const showBlankFields = computed(() => isFillBlank.value && viewMode.value === 'image')
-const singleColumn = computed(() => isFillBlank.value && viewMode.value === 'position')
+const showBlankFields = computed(() => isFillBlank.value)
 
 // The blanks for the fields panel: each blank in reading order with the text of
 // the line it sits on as its context. Derived from the question layout tokens so
@@ -248,16 +243,10 @@ watch(
         <div v-if="state.error" class="error-box">{{ state.error }}</div>
         <div v-else-if="state.loading" class="notice">Loading records...</div>
 
-        <div class="work-grid" :class="{ 'single-column': singleColumn }">
+        <div class="work-grid">
           <QuestionPanel
             :record="selectedRecord"
             :layout="selectedLayout"
-            :view-mode="viewMode"
-            :fill-mode="isFillBlank"
-            :blanks="fillValues"
-            :grading="results.submitting"
-            @update:view-mode="viewMode = $event"
-            @submit="submitAnswer"
           />
           <EditorPanel
             v-if="showEditor"

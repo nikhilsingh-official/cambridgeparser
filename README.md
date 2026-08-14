@@ -29,8 +29,10 @@ committed under `src/website/frontend/public`. It deliberately does not run the
 corpus-dependent resource generator or Rust compiler, because their source
 inputs and toolchains are not present in a clean Vercel checkout. After changing
 those inputs, run `npm run build:website` locally and commit the updated public
-artifacts before deploying. Generated question images are optional; when they
-are not deployed, the frontend falls back to its positioned-text question view.
+artifacts before deploying. The generated question PNGs are intentional website
+assets and are tracked so a clean Vercel checkout can display them. Each image
+has a transparent, positioned text layer above it for selection and copying;
+the reconstructed text is never offered as a separate visible question view.
 
 Vercel deploys the static frontend only. `/api/grade` remains the separately
 deployed Firebase Function described in `functions/README.md`; configure a proxy

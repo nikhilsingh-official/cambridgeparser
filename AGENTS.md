@@ -38,4 +38,4 @@ This checkout has no readable Git history, so no local convention can be inferre
 
 ## Security & Configuration Tips
 
-Do not commit private OCR exports, credentials, or large generated batches unless they are intentional fixtures. Prefer small JSON fixtures over whole PDF-derived output trees for tests.
+Do not commit private OCR exports, credentials, or large generated batches unless they are intentional fixtures or reviewed production assets required under `src/website/frontend/public`. Prefer small JSON fixtures over whole PDF-derived output trees for tests.

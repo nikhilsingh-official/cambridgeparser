@@ -4,9 +4,9 @@ import {
   imageIsAvailable,
   rememberUnavailableImage,
 } from '@/services/imageAvailability'
-import { cleanContextText, markerLabel, marksFor } from '@/services/records'
+import { markerLabel, marksFor } from '@/services/records'
 import { recordTags } from '@/services/tags'
-import PositionedQuestion from '@/components/PositionedQuestion.vue'
+import SelectableQuestionImage from '@/components/SelectableQuestionImage.vue'
 import TagChips from '@/components/TagChips.vue'
 
 const props = defineProps({
@@ -20,29 +20,7 @@ const props = defineProps({
     type: Object,
     default: null,
   },
-  // 'image' (default, trusted) or 'position' (reconstructed-from-text tokens).
-  viewMode: {
-    type: String,
-    default: 'image',
-  },
-  // Fill-in-the-blank mode. In *position* mode the blanks are inline and this
-  // panel owns Submit; in *image* mode the blanks live in BlankFieldsPanel.
-  fillMode: {
-    type: Boolean,
-    default: false,
-  },
-  // Shared blank-value store, read back by the IDE to assemble the submission.
-  blanks: {
-    type: Object,
-    default: null,
-  },
-  grading: {
-    type: Boolean,
-    default: false,
-  },
 })
-
-const emit = defineEmits(['submit', 'update:viewMode'])
 
 // The mark scheme stays hidden until the answer is submitted (see ResultsPanel);
 // here we only offer the *question* context, which is safe to read while working.
@@ -56,41 +34,22 @@ const showTags = ref(false)
 const tags = computed(() => recordTags(props.record))
 const unavailableImages = ref(new Set())
 
-const RESOURCES_BASE = `${import.meta.env.BASE_URL}resources/`
-
 const questionLayout = computed(() => props.layout?.question || null)
 const contextLayout = computed(() => props.layout?.context || null)
 const questionImage = computed(() => props.layout?.image || null)
 const contextImage = computed(() => props.layout?.context_image || null)
-const contextText = computed(() => cleanContextText(props.record))
-const hasContext = computed(
-  () => Boolean(contextLayout.value) || Boolean(contextImage.value) || Boolean(contextText.value),
-)
-
-function imageUrl(image) {
-  return `${RESOURCES_BASE}${image.src}`
-}
+const hasContext = computed(() => Boolean(contextImage.value))
 
 function markImageUnavailable(image) {
   rememberUnavailableImage(unavailableImages.value, image)
 }
 
-// Image is the default, but fall back to the positional view if no image was
-// rendered or deployed for this record so the panel is never blank.
 const useQuestionImage = computed(
-  () => props.viewMode === 'image'
-    && imageIsAvailable(questionImage.value, unavailableImages.value),
+  () => imageIsAvailable(questionImage.value, unavailableImages.value),
 )
 const useContextImage = computed(
-  () => props.viewMode === 'image'
-    && imageIsAvailable(contextImage.value, unavailableImages.value),
+  () => imageIsAvailable(contextImage.value, unavailableImages.value),
 )
-
-// Inline editable blanks only in position mode; in image mode the inputs are in
-// the separate fields panel, so the question renders read-only there.
-const questionInteractive = computed(() => props.fillMode && props.viewMode === 'position')
-// This panel owns Submit only when the blanks are inline (position mode).
-const ownsSubmit = computed(() => props.fillMode && props.viewMode === 'position')
 </script>
 
 <template>
@@ -99,18 +58,6 @@ const ownsSubmit = computed(() => props.fillMode && props.viewMode === 'position
       <div class="panel-title-row">
         <h1>Question</h1>
         <div class="question-head-actions">
-          <div class="view-toggle" role="group" aria-label="Question view">
-            <button
-              type="button"
-              :class="{ active: viewMode === 'image' }"
-              @click="emit('update:viewMode', 'image')"
-            >Image</button>
-            <button
-              type="button"
-              :class="{ active: viewMode === 'position' }"
-              @click="emit('update:viewMode', 'position')"
-            >Position</button>
-          </div>
           <button
             v-if="hasContext"
             class="toggle-button"
@@ -131,15 +78,6 @@ const ownsSubmit = computed(() => props.fillMode && props.viewMode === 'position
             {{ showTags ? 'Hide tags' : 'Tags' }}
           </button>
           <span class="count-pill">{{ marksFor(record) }} marks</span>
-          <button
-            v-if="ownsSubmit"
-            class="submit-button"
-            type="button"
-            :disabled="grading"
-            @click="emit('submit')"
-          >
-            {{ grading ? 'Grading…' : 'Submit' }}
-          </button>
         </div>
       </div>
 
@@ -150,37 +88,24 @@ const ownsSubmit = computed(() => props.fillMode && props.viewMode === 'position
       <div class="qview">
         <section v-if="showContext" class="question-context" aria-label="Question context">
           <h2>Context</h2>
-          <img
+          <SelectableQuestionImage
             v-if="useContextImage"
-            class="question-image"
-            :src="imageUrl(contextImage)"
+            :layout="contextLayout"
+            :image="contextImage"
             alt="Question context"
             @error="markImageUnavailable(contextImage)"
-          >
-          <PositionedQuestion
-            v-else-if="contextLayout"
-            :record="record"
-            :layout="contextLayout"
-            :interactive="false"
           />
-          <p v-else-if="!contextText" class="notice">No additional context for this question.</p>
-          <pre v-else class="context-text">{{ contextText }}</pre>
+          <p v-else class="notice">Question context image unavailable.</p>
         </section>
 
-        <img
+        <SelectableQuestionImage
           v-if="useQuestionImage"
-          class="question-image"
-          :src="imageUrl(questionImage)"
+          :layout="questionLayout"
+          :image="questionImage"
           alt="Question"
           @error="markImageUnavailable(questionImage)"
-        >
-        <PositionedQuestion
-          v-else
-          :record="record"
-          :layout="questionLayout"
-          :interactive="questionInteractive"
-          :blanks="blanks"
         />
+        <p v-else class="notice">Question image unavailable.</p>
       </div>
     </template>
 

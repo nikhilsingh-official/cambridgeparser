@@ -1,10 +1,9 @@
 <script setup>
-// Right-hand panel for fill-in-the-blank questions in *image* mode. Because a
+// Right-hand panel for fill-in-the-blank questions. Because a
 // flat question image can't host inline inputs, each blank gets its own row: a
 // description (the text of the line the blank sits on — its "context") and an
 // input. Values are written into the shared `blanks` store keyed by the blank's
-// id, so the IDE assembles the completed pseudocode exactly as it does for the
-// inline (position-mode) blanks.
+// id so the IDE can assemble the completed pseudocode for grading.
 
 defineProps({
   fields: {

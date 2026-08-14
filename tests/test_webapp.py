@@ -14,6 +14,48 @@ STATIC_ROOT = REPO_ROOT / "src" / "website" / "static"
 
 
 class StaticVueWebsiteTests(unittest.TestCase):
+    def test_public_question_images_are_tracked_for_deployment(self):
+        layouts_path = (
+            FRONTEND_ROOT / "public" / "resources" / "question_layouts.json"
+        )
+        layouts = json.loads(layouts_path.read_text()).get("layouts") or {}
+        referenced = {
+            FRONTEND_ROOT / "public" / "resources" / descriptor["src"]
+            for layout in layouts.values()
+            for descriptor in (layout.get("image"), layout.get("context_image"))
+            if descriptor
+        }
+        tracked_result = subprocess.run(
+            ["git", "ls-files", "-z", "--", "src/website/frontend/public/resources/images"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+        )
+        tracked = {
+            REPO_ROOT / path.decode()
+            for path in tracked_result.stdout.split(b"\0")
+            if path
+        }
+
+        self.assertTrue(referenced)
+        self.assertEqual(referenced - tracked, set())
+
+    def test_question_panel_only_exposes_a_selectable_image_surface(self):
+        panel = (FRONTEND_ROOT / "src" / "components" / "QuestionPanel.vue").read_text()
+        ide = (FRONTEND_ROOT / "src" / "views" / "IdeView.vue").read_text()
+        surface_path = (
+            FRONTEND_ROOT / "src" / "components" / "SelectableQuestionImage.vue"
+        )
+
+        self.assertTrue(surface_path.is_file())
+        surface = surface_path.read_text()
+        self.assertIn("SelectableQuestionImage", panel)
+        self.assertIn("SelectableTextOverlay", surface)
+        self.assertIn("text-overlay", surface)
+        self.assertNotIn("viewMode", panel)
+        self.assertNotIn("viewMode", ide)
+        self.assertNotIn(">Position</button>", panel)
+
     def test_static_resource_build_removes_stale_question_images(self):
         from src.website.build_static_resources import _prune_stale_layout_images
 
@@ -40,7 +82,7 @@ class StaticVueWebsiteTests(unittest.TestCase):
             FRONTEND_ROOT / "src" / "views" / "LandingView.vue",
             FRONTEND_ROOT / "src" / "views" / "ProblemsView.vue",
             FRONTEND_ROOT / "src" / "components" / "CodeEditor.vue",
-            FRONTEND_ROOT / "src" / "components" / "PositionedQuestion.vue",
+            FRONTEND_ROOT / "src" / "components" / "SelectableTextOverlay.vue",
             FRONTEND_ROOT / "src" / "services" / "staticParser.js",
         ]
         missing = [str(path) for path in expected if not path.is_file()]
@@ -66,7 +108,7 @@ class StaticVueWebsiteTests(unittest.TestCase):
             "src/views/IdeView.vue",
             "src/views/LearnView.vue",
             "src/components/CodeEditor.vue",
-            "src/components/PositionedQuestion.vue",
+            "src/components/SelectableTextOverlay.vue",
             "src/components/ProblemExplorer.vue",
             "src/components/TerminalPanel.vue",
         ]:

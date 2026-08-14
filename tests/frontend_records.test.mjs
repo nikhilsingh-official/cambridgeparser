@@ -5,7 +5,20 @@ import test from 'node:test'
 import {
   assembleFillSource,
   isFillBlankQuestion,
+  overlayTokenText,
 } from '../src/website/frontend/src/services/records.js'
+
+test('overlay tokens copy with spaces within lines and newlines between them', () => {
+  const tokens = [
+    { text: 'A', x: 6, y: 6, w: 8, h: 20 },
+    { text: 'procedure', x: 18, y: 6, w: 50, h: 20 },
+    { text: 'OUTPUT', x: 30, y: 30, w: 55, h: 20 },
+  ]
+
+  assert.equal(overlayTokenText(tokens, 0), 'A ')
+  assert.equal(overlayTokenText(tokens, 1), 'procedure\n      ')
+  assert.equal(overlayTokenText(tokens, 2), 'OUTPUT\n')
+})
 
 const layoutWithBlank = {
   pages: [{ page_index: 1, width: 600, tokens: [{ kind: 'blank', x: 20, y: 20, w: 200 }] }],
@@ -16,6 +29,14 @@ const records = JSON.parse(readFileSync(new URL('pseudocode_question_records.jso
 const layouts = JSON.parse(readFileSync(new URL('question_layouts.json', resourceRoot)))
 const record = (id) => records.records.find((candidate) => candidate.id === id)
 const questionLayout = (id) => layouts.layouts[String(id)].question
+
+test('overlay copy groups record 23 bullets with text by geometry', () => {
+  const tokens = questionLayout(23).pages[0].tokens
+  const bulletIndex = tokens.findIndex((token) => token.text === '•')
+
+  assert.notEqual(bulletIndex, -1)
+  assert.match(overlayTokenText(tokens, bulletIndex), /^• +$/)
+})
 
 test('context from an earlier sub-question does not enable fill mode', () => {
   const record = {

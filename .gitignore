@@ -44,6 +44,8 @@ resources/generated/*
 *.jpeg
 *.tif
 *.tiff
+!src/website/frontend/public/resources/images/
+!src/website/frontend/public/resources/images/*.png
 
 
 # Rust build artifacts

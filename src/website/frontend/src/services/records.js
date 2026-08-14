@@ -116,6 +116,33 @@ export function layoutLines(layout) {
   return lines
 }
 
+export function overlayTokenText(tokens, index) {
+  const token = tokens[index]
+  const next = tokens[index + 1]
+  if (!next) return `${token.text || ''}\n`
+
+  const tokenHeight = Number(token.h) || 0
+  const nextHeight = Number(next.h) || 0
+  const sameVisualLine = Math.abs((Number(next.y) || 0) - (Number(token.y) || 0))
+    <= Math.max(2, Math.min(tokenHeight, nextHeight) * 0.35)
+  const averageHeight = Math.max(10, (tokenHeight + nextHeight) / 2)
+  const spaceWidth = Math.max(
+    3,
+    averageHeight * (token.mono || next.mono ? 0.32 : 0.2),
+  )
+
+  let separator
+  if (sameVisualLine) {
+    const gap = (Number(next.x) || 0) - (Number(token.x) || 0) - (Number(token.w) || 0)
+    separator = ' '.repeat(Math.max(1, Math.round(Math.max(0, gap) / spaceWidth)))
+  } else {
+    const left = Math.min(...tokens.map((candidate) => Number(candidate.x) || 0))
+    const indent = Math.max(0, (Number(next.x) || 0) - left)
+    separator = `\n${' '.repeat(Math.round(indent / spaceWidth))}`
+  }
+  return `${token.text || ''}${separator}`
+}
+
 export function fillBlankFields(layout) {
   const fields = []
   for (const line of layoutLines(layout)) {
