@@ -1,6 +1,6 @@
 import unittest
 
-from src.pipeline.webapp.question_layout import (
+from src.website.question_layout import (
     BLANK_RUN,
     _split_token,
     build_question_layout,

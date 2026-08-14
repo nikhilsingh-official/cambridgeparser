@@ -3,8 +3,9 @@
 Turns the manual marking-point audit into an automated, repeatable report so we
 have a scope baseline before any behaviour change and a regression gate after
 each fix. It inspects only
-``pseudocode_writing_hits/pseudocode_question_records.json`` — it never touches
-the parser, ms_output, or the records themselves.
+``resources/generated/pseudocode_writing_hits/pseudocode_question_records.json``
+— it never touches the parser, generated mark-scheme output, or the records
+themselves.
 
 Each record is checked against a set of flags grouped by severity:
 
@@ -29,8 +30,8 @@ alternatives holds 10 points but is not over-expanded.
 Usage:
 
     python -m src.pipeline.analysis.diagnostics.validate_marking_points \
-        --records pseudocode_writing_hits/pseudocode_question_records.json \
-        --output-json pseudocode_writing_hits/marking_point_validation.json
+        --records resources/generated/pseudocode_writing_hits/pseudocode_question_records.json \
+        --output-json resources/generated/pseudocode_writing_hits/marking_point_validation.json
 """
 
 from __future__ import annotations
@@ -40,6 +41,8 @@ import json
 import re
 from pathlib import Path
 from typing import Any, Dict, List
+
+from src.resources.paths import PSEUDOCODE_QUESTION_RECORDS_JSON
 
 from ...pseudocode_tools.extract_marking_points import (
     HEADER_PATTERNS,
@@ -88,7 +91,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--records",
         type=Path,
-        default=Path("pseudocode_writing_hits/pseudocode_question_records.json"),
+        default=PSEUDOCODE_QUESTION_RECORDS_JSON,
     )
     parser.add_argument("--output-json", type=Path, default=None)
     parser.add_argument(

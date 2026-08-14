@@ -1,0 +1,36 @@
+{
+  "name": "pseudocode-solving",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:frontend": "node --test tests/frontend_*.test.mjs",
+    "build:website:resources": "python -m src.website.build_static_resources --records pseudocode_writing_hits/pseudocode_question_records.json --qp-dir qp_output --marker-root normalize/normalized_marker_output",
+    "build:website:wasm": "bash src/website/build_wasm_parser.sh",
+    "dev:website": "npm run build:website:wasm && npm run build:website:resources && vite --config src/website/frontend/vite.config.js",
+    "build:website": "npm run build:website:wasm && npm run build:website:resources && vite build --config src/website/frontend/vite.config.js",
+    "preview:website": "vite preview --config src/website/frontend/vite.config.js",
+    "dev:website:emulator": "VITE_USE_FIREBASE_EMULATORS=true npm run dev:website",
+    "build:website:emulator": "VITE_USE_FIREBASE_EMULATORS=true npm run build:website",
+    "emulate": "npm run build:website:emulator && python3 functions/sync_pipeline.py && firebase emulators:start"
+  },
+  "dependencies": {
+    "@codemirror/autocomplete": "^6.18.7",
+    "@codemirror/commands": "^6.8.1",
+    "@codemirror/language": "^6.11.3",
+    "@codemirror/search": "^6.5.11",
+    "@codemirror/state": "^6.5.2",
+    "@codemirror/view": "^6.38.1",
+    "@fontsource-variable/ibm-plex-sans": "^5.3.0",
+    "@fontsource/ibm-plex-mono": "^5.3.0",
+    "@lezer/highlight": "^1.2.1",
+    "codemirror": "^6.0.2",
+    "firebase": "^12.16.0",
+    "vue": "^3.5.40",
+    "vue-router": "^5.2.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.8",
+    "esbuild": "^0.28.1",
+    "vite": "^8.1.5"
+  }
+}

@@ -1,6 +1,6 @@
 # Code Flow Manual Review Guide
 
-This document is written for a manual review of code that was heavily AI-assisted. It describes how data moves through the repository, what each source file owns, and what the important functions/classes do. It focuses on maintained source code under `src/`, the Rust parser wrapper, and root parser files. Generated corpus trees such as `qp_output/`, `ms_output/`, `pseudocode_writing_hits/`, `legacy/`, `normalize/`, and OCR/PDF resources are described by role rather than enumerated file-by-file.
+This document is written for a manual review of code that was heavily AI-assisted. It describes how data moves through the repository, what each source file owns, and what the important functions/classes do. It focuses on maintained source code under `src/`, the Rust parser wrapper, and root parser files. Source PDFs/OCR live under `resources/`; parser-created corpus trees live under `resources/generated/` and are described by role rather than enumerated file-by-file.
 
 ## End-To-End Flow
 
@@ -23,32 +23,32 @@ The main production commands are:
 
 ```bash
 python -m src.pipeline.msplitter.normalize_marker_output --all \
-  --marker-output-dir legacy/marker_output \
+  --marker-output-dir resources/generated/marker_output \
   --ocr-dir resources/ocr/surya_output \
-  --normalized-output-dir normalize/normalized_marker_output
+  --normalized-output-dir resources/generated/normalized_marker_output
 
 python -m src.pipeline.runners.qsplitter_batch \
   --pdf-dir resources/pdfs/cs_papers \
   --ocr-dir resources/ocr/surya_output \
-  --marker-dir normalize/normalized_marker_output \
-  --output-dir qp_output
+  --marker-dir resources/generated/normalized_marker_output \
+  --output-dir resources/generated/qp_output
 
 python -m src.pipeline.msplitter.ms_parser \
   --pdf-dir resources/pdfs/cs_papers \
-  --marker-dir normalize/normalized_marker_output \
-  --output-dir ms_output
+  --marker-dir resources/generated/normalized_marker_output \
+  --output-dir resources/generated/ms_output
 
 python -m src.pipeline.pseudocode_tools.select_pseudocode_writing \
-  --segments qp_output \
-  --output-dir pseudocode_writing_hits \
+  --segments resources/generated/qp_output \
+  --output-dir resources/generated/pseudocode_writing_hits \
   --rules-file src/pipeline/analysis/diagnostics/pseudocode_custom_rules.json
 
 python -m src.pipeline.pseudocode_tools.build_final_records \
-  --selected-json pseudocode_writing_hits/pseudocode_writing_selected.json \
-  --qp-dir qp_output \
-  --ms-dir ms_output \
-  --screenshots-dir pseudocode_writing_hits/pseudocode_question_screenshots \
-  --output-json pseudocode_writing_hits/pseudocode_question_records.json
+  --selected-json resources/generated/pseudocode_writing_hits/pseudocode_writing_selected.json \
+  --qp-dir resources/generated/qp_output \
+  --ms-dir resources/generated/ms_output \
+  --screenshots-dir resources/generated/pseudocode_writing_hits/pseudocode_question_screenshots \
+  --output-json resources/generated/pseudocode_writing_hits/pseudocode_question_records.json
 ```
 
 ## Data Contracts
@@ -56,11 +56,11 @@ python -m src.pipeline.pseudocode_tools.build_final_records \
 The code mostly passes JSON dictionaries rather than dataclasses. Review should pay special attention to field names and coordinate spaces.
 
 - OCR input: `resources/ocr/surya_output/<paper>/results.json`, keyed by paper code, where each page has `image_bbox` and `text_lines`.
-- Marker input: `normalize/normalized_marker_output/<paper>/<paper>.json`, whose page/block `bbox` values have been scaled into the same image coordinate system as OCR.
-- Question-paper output: `qp_output/<paper>/hierarchy.json` and `segmented_questions.json`.
-- Mark-scheme output: `ms_output/<ms_paper>/mark_scheme.json` and `hierarchy.json`.
+- Marker input: `resources/generated/normalized_marker_output/<paper>/<paper>.json`, whose page/block `bbox` values have been scaled into the same image coordinate system as OCR.
+- Question-paper output: `resources/generated/qp_output/<paper>/hierarchy.json` and `segmented_questions.json`.
+- Mark-scheme output: `resources/generated/ms_output/<ms_paper>/mark_scheme.json` and `hierarchy.json`.
 - Selection output: `pseudocode_writing_selected.json`, `review`, `rejected`, `superseded`, and rule report JSON files.
-- Canonical final output: `pseudocode-question-record/v1` in `pseudocode_writing_hits/pseudocode_question_records.json`.
+- Canonical final output: `pseudocode-question-record/v1` in `resources/generated/pseudocode_writing_hits/pseudocode_question_records.json`.
 - Student parse output: `parsed-answer/v1` from `src.pipeline.grading.ast_adapter`.
 - Grading output: `grading-result/v1` from `src.pipeline.grading.openrouter_client`.
 
@@ -85,8 +85,17 @@ Coordinate assumption: most Python extraction/review code expects the normalized
 - `prompt.md`: prompt/reference material; not read by the main pipeline.
 - `docs/`: design and roadmap docs. This file belongs here.
 - `src/`: Python pipeline package.
+- `src/resources/`: shared filesystem defaults for source and generated resources.
+- `src/website/`: website frontend for generated pseudocode-question resources.
+- `resources/generated/`: ignored parser-created artifacts consumed by the website.
 - `pseudocode-parser/`: Cargo crate that wraps the root Rust parser with lexer, CLI, JSON output, and tests.
 - `tests/`: Python `unittest` coverage for parser/selection/grading/webapp helpers.
+
+## Resource Helpers: `src/resources`
+
+- `paths.py`: canonical defaults for source inputs and generated artifacts.
+- `question_segments.py`: public helpers for locating QP question and subpart
+  nodes inside generated `segmented_questions.json` payloads.
 
 ## Question-Paper Splitter: `src/pipeline/parser/qsplitter`
 
@@ -308,8 +317,6 @@ Joins selected hits with authoritative QP/MS data and extracts marking points.
 - `_load_json(path)` / `_write_json(path, payload)`: JSON helpers.
 - `_norm_marker(value)`: lowercases and strips surrounding parentheses for matching.
 - `ms_paper_code_for(paper_code)`: maps `_qp_` to `_ms_`.
-- `_find_qp_question(qp_payload, question_marker)`: finds a QP question entry.
-- `_find_qp_node(question_entry, segment_kind, primary_marker, secondary_marker)`: finds the exact QP segment node.
 - `_find_ms_question(ms_payload, question_marker)`: finds the matching MS question by parsed question number.
 - `_find_ms_node(ms_question, segment_kind, primary_marker, secondary_marker)`: finds the exact MS node.
 - `_aggregate_question_answer(ms_question)`: question-level fallback that aggregates subpart MS answers/marks when the question node itself is empty.
@@ -494,7 +501,7 @@ OpenRouter/Qwen grading client.
 - `_print_report(payload)`: prints a compact results table.
 - `main()`: CLI runner with optional full JSON output.
 
-## Web Review App: `src/pipeline/webapp`
+## Web Review App: `src/website`
 
 The web app is stdlib `http.server`, not a framework. It displays records, screenshots/layouts, marking points, answer input, parse JSON, and grading JSON.
 

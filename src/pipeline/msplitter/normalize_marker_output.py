@@ -3,10 +3,13 @@ import json
 from copy import deepcopy
 from pathlib import Path
 
+from src.resources.paths import (
+    MARKER_OUTPUT_DIR,
+    NORMALIZED_MARKER_OUTPUT_DIR,
+    SOURCE_OCR_DIR,
+)
 
-MARKER_OUTPUT_DIR = Path("marker_output")
-SURYA_OCR_OUTPUT_DIR = Path("resources/ocr")
-NORMALIZED_MARKER_OUTPUT_DIR = Path("normalized_marker_output")
+SURYA_OCR_OUTPUT_DIR = SOURCE_OCR_DIR
 
 
 def load_json(path):

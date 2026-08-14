@@ -3,8 +3,10 @@
 Environment configuration (no secrets in code):
 
     OPENROUTER_API_KEY   user-provided key; absent -> dry-run only
-    OPENROUTER_MODEL     default: qwen/qwen2.5-coder-7b-instruct
-    OPENROUTER_BASE_URL  default: https://openrouter.ai/api/v1
+    OPENROUTER_MODEL          default: google/gemini-2.5-flash (needs structured outputs)
+    OPENROUTER_PROVIDER_ONLY  optional comma-separated provider tags/names
+    OPENROUTER_PROVIDER_SORT  optional OpenRouter provider sort, e.g. price
+    OPENROUTER_BASE_URL       default: https://openrouter.ai/api/v1
 
 The client always returns a ``grading-result/v1`` dict. Dry-run mode
 fabricates a deterministic result so the web UI works without network access;
@@ -21,12 +23,66 @@ import urllib.request
 from typing import Any, Callable, Dict, List, Optional
 
 RESULT_SCHEMA_VERSION = "grading-result/v1"
-DEFAULT_MODEL = "qwen/qwen2.5-coder-7b-instruct"
+# Grading needs *guaranteed* JSON, so the default must support strict
+# structured-output (json_schema), not a code model with weak schema adherence.
+# gemini-2.5-flash is Google's reasoning/coding model ($0.30/$2.50 per 1M,
+# ~$0.003 per grade) and grades more accurately than the ultra-cheap tier.
+# Cheaper alternates with the same JSON guarantee: google/gemini-2.5-flash-lite,
+# openai/gpt-4.1-nano, openai/gpt-4o-mini. Override with OPENROUTER_MODEL (use
+# only models that support structured outputs, or the strict schema is rejected).
+DEFAULT_MODEL = "google/gemini-2.5-flash"
 DEFAULT_BASE_URL = "https://openrouter.ai/api/v1"
 DEFAULT_TIMEOUT_SECONDS = 120
 MAX_ATTEMPTS = 2
 
 VALID_CONFIDENCE = {"high", "medium", "low"}
+
+# Strict JSON schema for the grading result. OpenRouter enforces this on models
+# that support structured outputs, so the model cannot return prose or a
+# malformed object. It mirrors validate_grading_payload() exactly.
+GRADING_RESPONSE_FORMAT = {
+    "type": "json_schema",
+    "json_schema": {
+        "name": "grading_result",
+        "strict": True,
+        "schema": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "total_awarded": {"type": "integer"},
+                "max_marks": {"type": "integer"},
+                "points": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "properties": {
+                            "marking_point_id": {"type": "string"},
+                            "awarded": {"type": "boolean"},
+                            "marks_awarded": {"type": "integer"},
+                            "confidence": {
+                                "type": "string",
+                                "enum": ["high", "medium", "low"],
+                            },
+                            "evidence": {"type": "string"},
+                            "concerns": {"type": "array", "items": {"type": "string"}},
+                        },
+                        "required": [
+                            "marking_point_id",
+                            "awarded",
+                            "marks_awarded",
+                            "confidence",
+                            "evidence",
+                            "concerns",
+                        ],
+                    },
+                },
+                "overall_explanation": {"type": "string"},
+            },
+            "required": ["total_awarded", "max_marks", "points", "overall_explanation"],
+        },
+    },
+}
 
 Transport = Callable[[str, Dict[str, str], bytes, int], str]
 
@@ -36,10 +92,20 @@ class OpenRouterConfig:
         self,
         api_key: Optional[str] = None,
         model: Optional[str] = None,
+        provider_only: Optional[List[str]] = None,
+        provider_sort: Optional[str] = None,
         base_url: Optional[str] = None,
     ) -> None:
         self.api_key = api_key if api_key is not None else os.environ.get("OPENROUTER_API_KEY")
         self.model = model or os.environ.get("OPENROUTER_MODEL") or DEFAULT_MODEL
+        self.provider_only = provider_only if provider_only is not None else _env_list(
+            "OPENROUTER_PROVIDER_ONLY"
+        )
+        self.provider_sort = (
+            provider_sort
+            if provider_sort is not None
+            else os.environ.get("OPENROUTER_PROVIDER_SORT")
+        )
         self.base_url = (
             base_url or os.environ.get("OPENROUTER_BASE_URL") or DEFAULT_BASE_URL
         ).rstrip("/")
@@ -47,6 +113,14 @@ class OpenRouterConfig:
     @property
     def has_api_key(self) -> bool:
         return bool(self.api_key)
+
+
+def _env_list(name: str) -> Optional[List[str]]:
+    value = os.environ.get(name)
+    if not value:
+        return None
+    items = [item.strip() for item in value.split(",") if item.strip()]
+    return items or None
 
 
 def _default_transport(url: str, headers: Dict[str, str], body: bytes, timeout: int) -> str:
@@ -78,6 +152,41 @@ def _group_marks(group: List[Dict[str, Any]]) -> int:
         marks = point.get("marks", 1)
         total += marks if isinstance(marks, int) else 1
     return total
+
+
+def _compact_exam_text(text: str) -> str:
+    """Remove PDF answer-line noise while preserving examiner-relevant wording."""
+    if not text:
+        return ""
+
+    compacted: List[str] = []
+    previous_answer_space = False
+    for raw_line in text.splitlines():
+        line = re.sub(r"\.{10,}", "[answer space]", raw_line).strip()
+        line = re.sub(r"\s+", " ", line)
+        if not line or re.fullmatch(r"[, ]+", line):
+            previous_answer_space = False
+            continue
+        if line == "[answer space]":
+            if previous_answer_space:
+                continue
+            previous_answer_space = True
+        else:
+            previous_answer_space = False
+        compacted.append(line)
+    return "\n".join(compacted).strip()
+
+
+def _compact_marking_point(point: Dict[str, Any]) -> Dict[str, Any]:
+    compact = {
+        "id": str(point.get("id") or ""),
+        "text": str(point.get("text") or ""),
+        "marks": point.get("marks", 1) if isinstance(point.get("marks", 1), int) else 1,
+    }
+    alt_group = point.get("alt_group")
+    if isinstance(alt_group, int):
+        compact["alt_group"] = alt_group
+    return compact
 
 
 def resolve_max_marks(record: Dict[str, Any]) -> Optional[int]:
@@ -176,16 +285,22 @@ def build_grading_messages(
         )
 
     payload = {
-        "question_text": record.get("question_text") or "",
-        "question_context_text": record.get("question_context_text") or "",
-        "mark_scheme_answer_text": mark_scheme.get("answer_text") or "",
+        "answer_kind": parsed_answer.get("answer_kind") or "pseudocode",
+        "question_text": _compact_exam_text(record.get("question_text") or ""),
+        "question_context_text": _compact_exam_text(record.get("question_context_text") or ""),
+        "mark_scheme_answer_text": _compact_exam_text(mark_scheme.get("answer_text") or ""),
         "max_marks": max_marks,
-        "marking_points": marking_points,
         "student_source_text": parsed_answer.get("source_text") or "",
         "student_ast": parse.get("ast") or {},
         "parser_ok": parse.get("ok"),
-        "parser_diagnostics": parse.get("diagnostics") or [],
     }
+    diagnostics = parse.get("diagnostics") or []
+    if diagnostics:
+        payload["parser_diagnostics"] = diagnostics
+    if marking_points:
+        payload["marking_point_ids"] = [
+            _compact_marking_point(point) for point in marking_points
+        ]
 
     system = (
         "You are an experienced Cambridge International Computer Science examiner "
@@ -199,9 +314,15 @@ def build_grading_messages(
         '"evidence": "<quote or description from the student answer>", "concerns": '
         '["<optional strings>"]}], "overall_explanation": "<short paragraph>"}'
     )
+    if payload["answer_kind"] == "fill_blank_sheet":
+        system += (
+            " The student answer is an ordered fill-in-the-blank answer sheet, "
+            "not a complete program; match each Blank N answer to its surrounding "
+            "line context and do not penalize it for lacking a parseable AST."
+        )
     user = (
         "GRADING PACKET (JSON):\n"
-        + json.dumps(payload, indent=2)
+        + json.dumps(payload, separators=(",", ":"))
         + "\n\nMARKING POINTS:\n"
         + points_lines
         + "\n\nReturn the strict JSON grading result now."
@@ -272,10 +393,11 @@ def dry_run_result(record: Dict[str, Any], parsed_answer: Dict[str, Any]) -> Dic
     mark_scheme = record.get("mark_scheme") or {}
     marking_points = mark_scheme.get("marking_points") or []
     parse_ok = bool(((parsed_answer.get("parse") or {}).get("ok")))
+    gradable_answer = parse_ok or parsed_answer.get("answer_kind") == "fill_blank_sheet"
     points = []
     total = 0
     for index, point in enumerate(marking_points):
-        awarded = parse_ok and index % 2 == 0
+        awarded = gradable_answer and index % 2 == 0
         marks = int(point.get("marks", 1)) if awarded else 0
         total += marks
         points.append(
@@ -342,14 +464,18 @@ def grade_answer(
         }
 
     messages = build_grading_messages(record, parsed_answer)
-    body = json.dumps(
-        {
-            "model": config.model,
-            "messages": messages,
-            "temperature": 0,
-            "response_format": {"type": "json_object"},
-        }
-    ).encode("utf-8")
+    request_payload: Dict[str, Any] = {
+        "model": config.model,
+        "messages": messages,
+        "temperature": 0,
+        "response_format": GRADING_RESPONSE_FORMAT,
+        "provider": {"require_parameters": True},
+    }
+    if config.provider_only:
+        request_payload["provider"]["only"] = config.provider_only
+    if config.provider_sort:
+        request_payload["provider"]["sort"] = config.provider_sort
+    body = json.dumps(request_payload).encode("utf-8")
     headers = {
         "Authorization": f"Bearer {config.api_key}",
         "Content-Type": "application/json",

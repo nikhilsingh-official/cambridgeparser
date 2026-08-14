@@ -1,0 +1,27 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid",
+
+        "profile": {
+          ".validate": "newData.hasChildren(['createdAt'])"
+        },
+
+        "progress": {
+          "$recordId": {
+            "status": {
+              ".validate": "newData.isString() && (newData.val() === 'not_started' || newData.val() === 'attempted' || newData.val() === 'solved')"
+            },
+            "bestScore": { ".validate": "newData.isNumber()" },
+            "maxMarks": { ".validate": "newData.isNumber()" }
+          }
+        }
+      }
+    }
+  }
+}

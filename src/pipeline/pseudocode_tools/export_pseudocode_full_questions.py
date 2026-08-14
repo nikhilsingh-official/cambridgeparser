@@ -12,6 +12,11 @@ import fitz
 
 from src.pipeline.analysis.diagnostics.debug_renderer import render_pdf_page
 from src.pipeline.parser import qsplitter
+from src.resources.paths import (
+    PSEUDOCODE_WRITING_DIR,
+    PSEUDOCODE_WRITING_SELECTED_JSON,
+    QP_OUTPUT_DIR,
+)
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -20,13 +25,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--selected-file",
         type=Path,
-        default=Path("output/pseudocode_writing_final/pseudocode_writing_selected.json"),
+        default=PSEUDOCODE_WRITING_SELECTED_JSON,
         help="Path to pseudocode_writing_selected.json",
     )
     parser.add_argument(
         "--segments-dir",
         type=Path,
-        default=Path("output/qsplitter_segments"),
+        default=QP_OUTPUT_DIR,
         help="Directory containing per-paper segmented_questions.json files.",
     )
     parser.add_argument(
@@ -50,7 +55,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("output/pseudocode_writing_paper2_full_questions"),
+        default=PSEUDOCODE_WRITING_DIR / "paper2_full_questions",
         help="Directory to write images and hit metadata.",
     )
     return parser.parse_args()

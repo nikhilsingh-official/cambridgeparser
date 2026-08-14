@@ -13,6 +13,8 @@ import re
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Pattern
 
+from src.resources.paths import PSEUDOCODE_WRITING_DIR
+
 
 DEFAULT_POSITIVE_RULES = [
     r"\bwrite\s+(?:an?\s+)?pseudocode\b",
@@ -62,7 +64,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("output/pseudocode_writing"),
+        default=PSEUDOCODE_WRITING_DIR,
         help="Directory to write selection outputs.",
     )
     parser.add_argument(

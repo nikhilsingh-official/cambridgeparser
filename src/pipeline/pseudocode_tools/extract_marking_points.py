@@ -8,6 +8,11 @@ import re
 from pathlib import Path
 from typing import Any, Dict, Iterable, Optional
 
+from src.resources.paths import (
+    PSEUDOCODE_MARKING_POINTS_JSON,
+    PSEUDOCODE_WRITING_CONTEXT_JSON,
+)
+
 
 # One marking-point item, in any of the styles Cambridge mixes. The separator
 # group in NUM_ITEM_PATTERN distinguishes real numbered items ("1. Text" /
@@ -121,13 +126,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--input-json",
         type=Path,
-        default=Path("pseudocode_writing_hits/pseudocode_writing_final_qp_ms_context.json"),
+        default=PSEUDOCODE_WRITING_CONTEXT_JSON,
         help="Final pseudocode-writing JSON containing ms_entry data.",
     )
     parser.add_argument(
         "--output-json",
         type=Path,
-        default=Path("pseudocode_writing_hits/pseudocode_writing_final_qp_ms_marking_points.json"),
+        default=PSEUDOCODE_MARKING_POINTS_JSON,
         help="Output JSON with marking_points added to each record.",
     )
     return parser.parse_args()

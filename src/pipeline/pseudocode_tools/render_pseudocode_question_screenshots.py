@@ -11,6 +11,12 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 import fitz
 from PIL import Image, ImageDraw, ImageFont
 
+from src.resources.paths import (
+    PSEUDOCODE_QUESTION_SCREENSHOTS_DIR,
+    PSEUDOCODE_WRITING_CONTEXT_JSON,
+    SOURCE_PDF_DIR,
+)
+
 
 HEADER_HEIGHT = 24
 SECTION_GAP = 8
@@ -29,19 +35,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--input-json",
         type=Path,
-        default=Path("pseudocode_writing_hits/pseudocode_writing_final_qp_ms_context.json"),
+        default=PSEUDOCODE_WRITING_CONTEXT_JSON,
         help="Final pseudocode-writing JSON containing retained records.",
     )
     parser.add_argument(
         "--pdf-dir",
         type=Path,
-        default=Path("resources/pdfs/cs_papers"),
+        default=SOURCE_PDF_DIR,
         help="Directory containing question-paper PDFs.",
     )
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("pseudocode_writing_hits/pseudocode_question_screenshots"),
+        default=PSEUDOCODE_QUESTION_SCREENSHOTS_DIR,
         help="Directory where screenshots will be written.",
     )
     parser.add_argument("--zoom", type=float, default=2.0, help="PDF render zoom.")

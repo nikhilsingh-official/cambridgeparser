@@ -1,6 +1,6 @@
 import unittest
 
-from src.pipeline.webapp.marker_regions import (
+from src.website.marker_regions import (
     MarkerRegionStore,
     extract_regions,
 )

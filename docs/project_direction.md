@@ -30,7 +30,7 @@ The repository expects these corpus inputs:
 
 - `resources/pdfs/cs_papers/`: Cambridge question-paper and mark-scheme PDFs.
 - `resources/ocr/surya_output/`: OCR output in per-paper `results.json` folders.
-- `legacy/marker_output/` or `normalize/normalized_marker_output/`: Marker layout output before or after coordinate normalization.
+- `resources/generated/marker_output/` or `resources/generated/normalized_marker_output/`: Marker layout output before or after coordinate normalization.
 
 The code deliberately requires explicit input directories. It does not hide missing files behind root-level module shortcuts or loose fallbacks.
 
@@ -95,7 +95,7 @@ Important modules:
 - `render_pseudocode_question_screenshots.py`: Renders selected segments and full question context from stored bboxes.
 - `extract_marking_points.py`: Extracts MP-style marking points from matched mark-scheme answer text.
 
-The generated `pseudocode_writing_hits/pseudocode_writing_final_qp_ms_marking_points.json` currently contains a useful joined artifact:
+The generated `resources/generated/pseudocode_writing_hits/pseudocode_writing_final_qp_ms_marking_points.json` currently contains a useful joined artifact:
 
 - 270 retained records.
 - 50 question papers.
@@ -295,4 +295,3 @@ Track exact-match per marking point, total-mark error, parse failure rate, and e
 5. Define and test grading packet JSON.
 6. Add an OpenRouter client behind a dry-run/testable interface.
 7. Build a reviewed evaluation set before enabling bulk grading.
-

@@ -15,14 +15,19 @@ when OCR lines contain `<math>...</math>` markers.
 
 ## Main Workflows
 
+Source inputs live under `resources/pdfs/` and `resources/ocr/`. Parser-created
+artifacts live under `resources/generated/` so the website frontend can consume
+them without depending on parser package internals. Shared defaults are defined
+in `src.resources.paths`.
+
 Normalize Marker coordinates:
 
 ```bash
 python -m src.pipeline.msplitter.normalize_marker_output \
   --all \
-  --marker-output-dir legacy/marker_output \
+  --marker-output-dir resources/generated/marker_output \
   --ocr-dir resources/ocr/surya_output \
-  --normalized-output-dir normalize/normalized_marker_output
+  --normalized-output-dir resources/generated/normalized_marker_output
 ```
 
 Build question-paper hierarchy and segmented text:
@@ -31,8 +36,8 @@ Build question-paper hierarchy and segmented text:
 python -m src.pipeline.runners.qsplitter_batch \
   --pdf-dir resources/pdfs/cs_papers \
   --ocr-dir resources/ocr/surya_output \
-  --marker-dir normalize/normalized_marker_output \
-  --output-dir qp_output
+  --marker-dir resources/generated/normalized_marker_output \
+  --output-dir resources/generated/qp_output
 ```
 
 Parse mark schemes:
@@ -40,38 +45,38 @@ Parse mark schemes:
 ```bash
 python -m src.pipeline.msplitter.ms_parser \
   --pdf-dir resources/pdfs/cs_papers \
-  --marker-dir normalize/normalized_marker_output \
-  --output-dir ms_output
+  --marker-dir resources/generated/normalized_marker_output \
+  --output-dir resources/generated/ms_output
 ```
 
 Select pseudocode-writing prompts:
 
 ```bash
 python -m src.pipeline.pseudocode_tools.select_pseudocode_writing \
-  --segments qp_output \
-  --output-dir pseudocode_writing_hits \
+  --segments resources/generated/qp_output \
+  --output-dir resources/generated/pseudocode_writing_hits \
   --rules-file src/pipeline/analysis/diagnostics/pseudocode_custom_rules.json
 ```
 
-Build canonical question records (joins selection with `qp_output` and
+Build canonical question records (joins selection with generated `qp_output` and
 `ms_output`, extracts structured marking points, reuses screenshots):
 
 ```bash
 python -m src.pipeline.pseudocode_tools.build_final_records \
-  --selected-json pseudocode_writing_hits/pseudocode_writing_selected.json \
-  --qp-dir qp_output \
-  --ms-dir ms_output \
-  --output-json pseudocode_writing_hits/pseudocode_question_records.json
+  --selected-json resources/generated/pseudocode_writing_hits/pseudocode_writing_selected.json \
+  --qp-dir resources/generated/qp_output \
+  --ms-dir resources/generated/ms_output \
+  --output-json resources/generated/pseudocode_writing_hits/pseudocode_question_records.json
 ```
 
 Validate generated artifacts (no model or network calls):
 
 ```bash
 python -m src.pipeline.analysis.diagnostics.validate_extraction \
-  --qp-dir qp_output \
-  --ms-dir ms_output \
-  --final-json pseudocode_writing_hits/pseudocode_question_records.json \
-  --output-json pseudocode_writing_hits/extraction_validation.json
+  --qp-dir resources/generated/qp_output \
+  --ms-dir resources/generated/ms_output \
+  --final-json resources/generated/pseudocode_writing_hits/pseudocode_question_records.json \
+  --output-json resources/generated/pseudocode_writing_hits/extraction_validation.json
 ```
 
 Audit marking-point quality (read-only; a severity-ranked scope baseline and
@@ -79,9 +84,60 @@ regression gate for grading-safety of the extracted marking points):
 
 ```bash
 python -m src.pipeline.analysis.diagnostics.validate_marking_points \
-  --records pseudocode_writing_hits/pseudocode_question_records.json \
-  --output-json pseudocode_writing_hits/marking_point_validation.json
+  --records resources/generated/pseudocode_writing_hits/pseudocode_question_records.json \
+  --output-json resources/generated/pseudocode_writing_hits/marking_point_validation.json
 ```
+
+### Syllabus tags
+
+Every record carries a `syllabus_tags` list of 4-5 entries describing what the
+question asks the candidate to implement (`bubble-sort`, `text-files`,
+`records`, ...). Tags come from a controlled vocabulary in
+`src/pipeline/pseudocode_tools/syllabus_tags.py`, where each entry is bound to a
+numbered subsection of `Computer Science Syllabus.pdf` (9618, for exams from
+2027). The per-question assignments were made by hand from the question, its
+context, and the mark scheme, and live in
+`src/pipeline/pseudocode_tools/question_tag_assignments.py`, keyed by
+`segment_key` so record renumbering cannot desynchronise them.
+
+`build_final_records` expands each slug into `{slug, label, syllabus_ref,
+description}` on the record and reports coverage in the run summary
+(`records_with_syllabus_tags`, `syllabus_tag_counts`). A segment with no entry
+gets an empty list plus a `no_syllabus_tags` diagnostic rather than a guess.
+
+To retag a question, edit its tuple in `question_tag_assignments.py` and rerun
+`build_final_records`; `tags_for_segment` validates against the vocabulary and
+the 4-5 tag rule on the way out, so a typo fails the build instead of shipping.
+`python -m unittest tests.test_syllabus_tags` checks the vocabulary, the
+assignments, and the generated records.
+
+### Tag and filter UI
+
+`src/website/frontend/src/services/tags.js` owns all filtering as pure
+functions (facet counts, query parsing, URL encoding); both list surfaces call
+it, so search behaviour cannot drift between them. `TagChips.vue` renders one
+chip style in three modes — static label, deep link, filter toggle — and
+`FilterPanel.vue` combines the search box, an Any/All match switch, and tag
+facets grouped by syllabus section.
+
+- **Problems table** (`/problems`): panel open, filter state mirrored into the
+  URL as `?q=&tags=&match=`, so a filtered view is linkable and Back steps
+  through filters.
+- **IDE explorer**: same panel with `variant="compact"` — facets collapsed
+  behind a `<details>` and capped at 14rem so they never push the problem list
+  off screen. Each row shows its first two tags.
+- **Question panel**: tags sit behind a toggle beside *Show context*. A tag
+  names the technique under assessment, so it stays opt-in on an unattempted
+  problem for the same reason the mark scheme does.
+
+Multiple tags default to **Any**; with 4-5 tags per question, defaulting to All
+empties the table on the user's second click. Facet counts are computed against
+the *search*, not the tag selection, so they stay steady while sibling tags are
+toggled. Search requires every whitespace-separated term to match, `"quoted
+phrases"` are kept whole, and tag labels are part of the haystack.
+
+`python -m unittest tests.test_tag_ui` covers the wiring and runs the filter
+module itself under node against the real corpus (skipped when node is absent).
 
 ## Grading Stack
 
@@ -104,8 +160,8 @@ binary discovery.
 Run the grading web app (stdlib only, no framework):
 
 ```bash
-python -m src.pipeline.webapp \
-  --records pseudocode_writing_hits/pseudocode_question_records.json \
+python -m src.website \
+  --records resources/generated/pseudocode_writing_hits/pseudocode_question_records.json \
   --port 8000
 ```
 
@@ -116,18 +172,17 @@ figure/diagram/table regions are shown as crisp crops taken straight from the
 PDF (`--pdf-dir`) rather than garbled text, and dotted/underscored blanks become
 interactive input fields whose contents can be copied into the answer box. The
 layout draws on `--qp-dir` (segmented questions) and `--marker-root` (normalized
-Marker regions); see `src/pipeline/webapp/question_layout.py` and
-`marker_regions.py`.
+Marker regions); see `src/website/question_layout.py` and `marker_regions.py`.
 
 Evaluate grading quality against hand-authored answers (15 questions across
 fill-in / short / long types, each with high/medium/low candidates and the marks
 a human examiner would award). Dry-run without a key only exercises the harness;
-set `OPENROUTER_API_KEY` to measure how closely Qwen tracks the predicted marks:
+set `OPENROUTER_API_KEY` to measure how closely a model tracks the predicted marks:
 
 ```bash
 python -m src.pipeline.grading.eval \
-  --records pseudocode_writing_hits/pseudocode_question_records.json \
-  --output-json pseudocode_writing_hits/grading_eval_results.json
+  --records resources/generated/pseudocode_writing_hits/pseudocode_question_records.json \
+  --output-json resources/generated/pseudocode_writing_hits/grading_eval_results.json
 ```
 
 OpenRouter configuration (grading falls back to a deterministic dry run when
@@ -135,7 +190,9 @@ no key is set):
 
 ```bash
 export OPENROUTER_API_KEY=...                       # user-provided secret
-export OPENROUTER_MODEL=qwen/qwen2.5-coder-7b-instruct   # optional override
+export OPENROUTER_MODEL=google/gemini-2.5-flash   # optional override (this is the default; needs structured-output support)
+export OPENROUTER_PROVIDER_ONLY=mistral            # optional provider pin; comma-separate multiple values
+export OPENROUTER_PROVIDER_SORT=price              # optional provider routing hint
 export OPENROUTER_BASE_URL=https://openrouter.ai/api/v1  # optional override
 ```
 
@@ -158,7 +215,7 @@ For corpus-level checks, run into a temporary output directory first:
 python -m src.pipeline.runners.qsplitter_batch \
   --pdf-dir resources/pdfs/cs_papers \
   --ocr-dir resources/ocr/surya_output \
-  --marker-dir normalize/normalized_marker_output \
+  --marker-dir resources/generated/normalized_marker_output \
   --output-dir /tmp/pseudocode_solving_prod_audit/qp_output
 ```
 
@@ -167,6 +224,10 @@ python -m src.pipeline.runners.qsplitter_batch \
 - `src.pipeline.parser.qsplitter` keeps compatibility modules for `geometry`,
   `io`, `markers`, and `type_definitions`; the shared implementations live in
   `src.pipeline.msplitter`.
+- `src.resources.paths` owns the canonical filesystem defaults for source inputs
+  and generated artifacts. Pipeline modules create artifacts there; website code
+  reads them from there.
+- `src.website` owns the grading/review web app.
 - `src/pipeline/parser/qsplitter/extract_question_text.py` and
   `src/pipeline/pseudocode_tools/classify_pseudocode.py` are legacy standalone
   helpers. The current production path uses `segmented_questions.json` plus
@@ -249,6 +310,15 @@ python -m src.pipeline.runners.qsplitter_batch \
   marks live in a layout the scanner cannot read (an expression table, a
   highlight convention, bold gaps tagged with inline `MP n`). That flag silences
   the extractor for the record permanently, so it stays rare and justified.
+- `ms_parser` rebuilds row text from a deduplicated character set (Cambridge
+  emulates bold by drawing glyphs twice, so clip extraction interleaves both
+  layers). Genuine inter-word space glyphs are *kept* through that dedup rather
+  than dropped and re-guessed from horizontal gaps: on fonts whose space is
+  narrower than the gap threshold (the 9618_w25 schemes) guessing collapsed
+  words together ("Count-controlledloop withBREAK"). Duplicate spaces left by
+  the double-draw are folded back to one. `_region_text_from_chars` still
+  synthesises a separator across an unusually wide gap (a spurious table column)
+  when neither side already carries a space.
 - `ms_parser` records underlined answer spans (`answer_underlined_spans`) via
   PyMuPDF `TEXT_COLLECT_STYLES` (`char_flags & 2`). `build_final_records` turns
   them into marking points for the "one mark per underlined word / expression"

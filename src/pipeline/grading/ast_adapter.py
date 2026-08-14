@@ -70,6 +70,7 @@ def parse_answer(
         "binary": str(resolved_binary) if resolved_binary else None,
         "exit_code": None,
         "duration_ms": None,
+        "stdout": "",
         "stderr": "",
         "error": None,
     }
@@ -111,6 +112,7 @@ def parse_answer(
 
     runner["duration_ms"] = round((time.monotonic() - started) * 1000.0, 3)
     runner["exit_code"] = completed.returncode
+    runner["stdout"] = completed.stdout or ""
     runner["stderr"] = (completed.stderr or "")[-2000:]
 
     if completed.returncode != 0:
@@ -144,6 +146,11 @@ def parse_answer(
         "ast_version": payload.get("ast_version") or AST_VERSION,
         "ast": {"statements": payload.get("statements") or []},
         "diagnostics": payload.get("diagnostics") or [],
+        "compiler_output": {
+            "stdout": payload.get("stdout") or "",
+            "stderr": payload.get("stderr") or "",
+            "raw": payload,
+        },
     }
     return {
         "schema_version": SCHEMA_VERSION,

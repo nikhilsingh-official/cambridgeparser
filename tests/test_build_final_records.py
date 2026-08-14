@@ -1,4 +1,5 @@
 import json
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -121,6 +122,25 @@ class BuildFinalRecordsTests(unittest.TestCase):
     def build(self, hits):
         return build_records(hits, qp_dir=self.qp_dir, ms_dir=self.ms_dir)
 
+    def clone_paper(self, source_code, target_code):
+        source_qp = self.qp_dir / source_code
+        target_qp = self.qp_dir / target_code
+        shutil.copytree(source_qp, target_qp)
+        qp_path = target_qp / "segmented_questions.json"
+        qp_payload = json.loads(qp_path.read_text())
+        qp_payload["paper_code"] = target_code
+        qp_path.write_text(json.dumps(qp_payload))
+
+        source_ms_code = ms_paper_code_for(source_code)
+        target_ms_code = ms_paper_code_for(target_code)
+        source_ms = self.ms_dir / source_ms_code
+        target_ms = self.ms_dir / target_ms_code
+        shutil.copytree(source_ms, target_ms)
+        ms_path = target_ms / "mark_scheme.json"
+        ms_payload = json.loads(ms_path.read_text())
+        ms_payload["paper_code"] = target_ms_code
+        ms_path.write_text(json.dumps(ms_payload))
+
     def test_ms_paper_code_mapping(self):
         self.assertEqual(ms_paper_code_for("9618_s23_qp_21"), "9618_s23_ms_21")
         self.assertEqual(ms_paper_code_for("9608_w15_qp_23"), "9608_w15_ms_23")
@@ -189,6 +209,56 @@ class BuildFinalRecordsTests(unittest.TestCase):
         )
 
         self.assertEqual([r["id"] for r in payload["records"]], [1, 2])
+
+    def test_identical_questions_from_parallel_papers_are_merged(self):
+        self.clone_paper("9618_s23_qp_21", "9618_s23_qp_23")
+
+        payload = self.build(
+            [
+                make_hit("9618_s23_qp_21", "4", "question"),
+                make_hit("9618_s23_qp_23", "4", "question"),
+            ]
+        )
+
+        self.assertEqual(payload["summary"]["record_count"], 1)
+        self.assertEqual(payload["summary"]["deduplicated_count"], 1)
+        self.assertEqual(payload["summary"]["source_record_count"], 2)
+        self.assertEqual([record["id"] for record in payload["records"]], [1])
+        duplicate_sources = payload["records"][0]["provenance"]["duplicate_sources"]
+        self.assertEqual(len(duplicate_sources), 1)
+        self.assertEqual(duplicate_sources[0]["paper_code"], "9618_s23_qp_23")
+
+    def test_deduplication_does_not_renumber_later_records(self):
+        self.clone_paper("9618_s23_qp_21", "9618_s23_qp_23")
+
+        payload = self.build(
+            [
+                make_hit("9618_s23_qp_21", "4", "question"),
+                make_hit("9618_s23_qp_23", "4", "question"),
+                make_hit("9618_s23_qp_21", "2", "primary", primary="(a)"),
+            ]
+        )
+
+        self.assertEqual([record["id"] for record in payload["records"]], [1, 3])
+
+    def test_same_prompt_and_answer_in_different_contexts_are_not_merged(self):
+        self.clone_paper("9618_s23_qp_21", "9618_s23_qp_23")
+        target_path = self.qp_dir / "9618_s23_qp_23" / "segmented_questions.json"
+        target_payload = json.loads(target_path.read_text())
+        target_payload["questions"][0]["question"]["content_text"] = (
+            "A different scenario with unrelated input data [6]"
+        )
+        target_path.write_text(json.dumps(target_payload))
+
+        payload = self.build(
+            [
+                make_hit("9618_s23_qp_21", "2", "primary", primary="(a)"),
+                make_hit("9618_s23_qp_23", "2", "primary", primary="(a)"),
+            ]
+        )
+
+        self.assertEqual(payload["summary"]["record_count"], 2)
+        self.assertEqual(payload["summary"]["deduplicated_count"], 0)
 
 
 if __name__ == "__main__":

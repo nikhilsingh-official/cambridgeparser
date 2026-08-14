@@ -10,6 +10,12 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import fitz
 
+from src.resources.paths import (
+    MS_OUTPUT_DIR,
+    NORMALIZED_MARKER_OUTPUT_DIR,
+    SOURCE_PDF_DIR,
+)
+
 from .io import load_json, write_json
 
 QUESTION_CELL = "question"
@@ -141,19 +147,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--pdf-dir",
         type=Path,
-        default=Path("resources/pdfs/cs_papers"),
+        default=SOURCE_PDF_DIR,
         help="Directory containing mark scheme PDFs.",
     )
     parser.add_argument(
         "--marker-dir",
         type=Path,
-        default=Path("resources/ocr/normalized_marker_output"),
+        default=NORMALIZED_MARKER_OUTPUT_DIR,
         help="Directory containing normalized marker output.",
     )
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("output/mark_scheme_segments"),
+        default=MS_OUTPUT_DIR,
         help="Directory where parsed mark scheme outputs are written.",
     )
     parser.add_argument(
@@ -353,7 +359,13 @@ def _page_visible_chars(page: fitz.Page) -> List[Dict[str, Any]]:
             for span in line.get("spans", []):
                 for char in span.get("chars", []):
                     text = char.get("c") or ""
-                    if not text or text.isspace():
+                    # Keep genuine inter-word spaces: the source text layer draws
+                    # them as real glyphs, and discarding them forces the reader
+                    # below to *guess* word boundaries from horizontal gaps, which
+                    # collapses words on fonts whose space is narrower than the gap
+                    # threshold ("Count-controlledloop withBREAK"). Tabs/newlines
+                    # carry no width and are dropped.
+                    if not text or (text.isspace() and text != " "):
                         continue
                     bbox = char.get("bbox")
                     if not bbox or len(bbox) != 4:
@@ -437,14 +449,24 @@ def _region_text_from_chars(
         line_height = max(char["height"] for char in line)
         gap_threshold = max(0.75, line_height * 0.22)
         for char in line:
-            if previous_end is not None and char["bbox"][0] - previous_end > gap_threshold:
+            c = char["c"]
+            gapped = (
+                previous_end is not None
+                and char["bbox"][0] - previous_end > gap_threshold
+            )
+            # A real space glyph already separates the words; only synthesise a
+            # separator across an unusually wide gap (e.g. a spurious table
+            # column) when neither side already carries one.
+            if gapped and c != " " and (not pieces or pieces[-1] != " "):
                 pieces.append(" ")
-            pieces.append(char["c"])
+            pieces.append(c)
             previous_end = max(
                 previous_end if previous_end is not None else char["bbox"][2],
                 char["bbox"][2],
             )
-        rendered_lines.append("".join(pieces).strip())
+        # Duplicate space glyphs survive the bold double-draw dedup; fold any run
+        # back to a single separator.
+        rendered_lines.append(re.sub(r" {2,}", " ", "".join(pieces)).strip())
     return "\n".join(line for line in rendered_lines if line)
 
 

@@ -13,6 +13,8 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from src.resources.paths import NORMALIZED_MARKER_OUTPUT_DIR
+
 # Marker block types that must be rendered as cropped images, never as text.
 # Their contained text is deliberately excluded from the reconstructed layer.
 FIGURE_BLOCK_TYPES = frozenset(
@@ -33,7 +35,7 @@ CODE_BLOCK_TYPES = frozenset({"Code"})
 # Region types we keep from the Marker tree (everything else is ignored).
 KEPT_BLOCK_TYPES = FIGURE_BLOCK_TYPES | CODE_BLOCK_TYPES
 
-DEFAULT_MARKER_ROOT = Path("normalize/normalized_marker_output")
+DEFAULT_MARKER_ROOT = NORMALIZED_MARKER_OUTPUT_DIR
 
 # Header/footer bands (image-space y) hold logos, page numbers and barcodes that
 # Marker also tags as Picture; they are never part of a question's figures.

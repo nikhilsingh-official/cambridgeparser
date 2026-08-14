@@ -4,8 +4,8 @@ This replaces the ad hoc join steps that previously produced the final
 pseudocode-writing JSON. It consumes:
 
 - selected pseudocode-writing hits (select_pseudocode_writing.py output);
-- qp_output/<paper>/segmented_questions.json;
-- ms_output/<ms_paper>/mark_scheme.json;
+- resources/generated/qp_output/<paper>/segmented_questions.json;
+- resources/generated/ms_output/<ms_paper>/mark_scheme.json;
 - previously rendered screenshots when present (matched by marker slug).
 
 and writes one canonical record file with schema
@@ -14,30 +14,119 @@ and writes one canonical record file with schema
 Usage:
 
     python -m src.pipeline.pseudocode_tools.build_final_records \
-        --selected-json pseudocode_writing_hits/pseudocode_writing_selected.json \
-        --qp-dir qp_output \
-        --ms-dir ms_output \
-        --screenshots-dir pseudocode_writing_hits/pseudocode_question_screenshots \
-        --output-json pseudocode_writing_hits/pseudocode_question_records.json
+        --selected-json resources/generated/pseudocode_writing_hits/pseudocode_writing_selected.json \
+        --qp-dir resources/generated/qp_output \
+        --ms-dir resources/generated/ms_output \
+        --screenshots-dir resources/generated/pseudocode_writing_hits/pseudocode_question_screenshots \
+        --output-json resources/generated/pseudocode_writing_hits/pseudocode_question_records.json
 """
 
 from __future__ import annotations
 
 import argparse
+from difflib import SequenceMatcher
 import json
 import re
+import unicodedata
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from src.resources.paths import (
+    MS_OUTPUT_DIR,
+    PSEUDOCODE_QUESTION_RECORDS_JSON,
+    PSEUDOCODE_QUESTION_SCREENSHOTS_DIR,
+    PSEUDOCODE_WRITING_SELECTED_JSON,
+    QP_OUTPUT_DIR,
+)
+from src.resources.question_segments import (
+    find_qp_node,
+    find_qp_question,
+    normalize_marker,
+)
 from .extract_marking_points import (
     extract_structured_marking_points,
     declares_style_convention,
     marking_points_from_underlined_spans,
 )
 from .marking_point_overrides import is_verified_over_list, override_marking_points
+from .question_tag_assignments import tags_for_segment
+from .syllabus_tags import describe
 
 SCHEMA_VERSION = "pseudocode-question-record/v1"
 TRAILING_MARKS_PATTERN = re.compile(r"\[\s*(\d+)\s*\]\s*$")
+
+
+def _normalized_content(value: Any) -> str:
+    """Normalize harmless text differences without hiding substantive OCR changes."""
+
+    text = unicodedata.normalize("NFKC", str(value or "")).casefold()
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _record_fingerprint(record: Dict[str, Any]) -> Tuple[str, str, Any]:
+    """Identify the same assessed question repeated in parallel papers.
+
+    Question text alone can be generic (for example, "Complete the pseudocode"),
+    so the trusted mark-scheme answer and mark total are part of the identity.
+    """
+
+    mark_scheme = record.get("mark_scheme") or {}
+    return (
+        _normalized_content(record.get("question_text")),
+        _normalized_content(mark_scheme.get("answer_text")),
+        mark_scheme.get("max_marks"),
+    )
+
+
+def _contexts_are_equivalent(first: Dict[str, Any], second: Dict[str, Any]) -> bool:
+    """Accept tiny OCR omissions, but never merge different question scenarios."""
+
+    first_context = re.sub(
+        r"\W+", " ", _normalized_content(first.get("question_context_text"))
+    ).strip()
+    second_context = re.sub(
+        r"\W+", " ", _normalized_content(second.get("question_context_text"))
+    ).strip()
+    if not first_context or not second_context:
+        return first_context == second_context
+    if first_context == second_context:
+        return True
+    return (
+        SequenceMatcher(
+            None, first_context, second_context, autojunk=False
+        ).ratio()
+        >= 0.98
+    )
+
+
+def _duplicate_source(record: Dict[str, Any]) -> Dict[str, Any]:
+    provenance = record.get("provenance") or {}
+    return {
+        "paper_code": record.get("paper_code"),
+        "ms_paper_code": record.get("ms_paper_code"),
+        "segment_key": record.get("segment_key"),
+        "qp_pages": provenance.get("qp_pages") or [],
+        "context_pages": provenance.get("context_pages") or [],
+        "ms_pages": provenance.get("ms_pages") or [],
+        "screenshots": provenance.get("screenshots") or {},
+    }
+
+
+def _merge_duplicate_record(canonical: Dict[str, Any], duplicate: Dict[str, Any]) -> None:
+    """Keep one question while retaining every source-paper reference."""
+
+    canonical["provenance"].setdefault("duplicate_sources", []).append(
+        _duplicate_source(duplicate)
+    )
+    if "duplicate_question_sources_merged" not in canonical["diagnostics"]:
+        canonical["diagnostics"].append("duplicate_question_sources_merged")
+
+    existing_tags = {tag["slug"] for tag in canonical.get("syllabus_tags") or []}
+    canonical["syllabus_tags"].extend(
+        tag
+        for tag in duplicate.get("syllabus_tags") or []
+        if tag["slug"] not in existing_tags
+    )
 
 
 def parse_args() -> argparse.Namespace:
@@ -47,19 +136,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--selected-json",
         type=Path,
-        default=Path("pseudocode_writing_hits/pseudocode_writing_selected.json"),
+        default=PSEUDOCODE_WRITING_SELECTED_JSON,
     )
-    parser.add_argument("--qp-dir", type=Path, default=Path("qp_output"))
-    parser.add_argument("--ms-dir", type=Path, default=Path("ms_output"))
+    parser.add_argument("--qp-dir", type=Path, default=QP_OUTPUT_DIR)
+    parser.add_argument("--ms-dir", type=Path, default=MS_OUTPUT_DIR)
     parser.add_argument(
         "--screenshots-dir",
         type=Path,
-        default=Path("pseudocode_writing_hits/pseudocode_question_screenshots"),
+        default=PSEUDOCODE_QUESTION_SCREENSHOTS_DIR,
     )
     parser.add_argument(
         "--output-json",
         type=Path,
-        default=Path("pseudocode_writing_hits/pseudocode_question_records.json"),
+        default=PSEUDOCODE_QUESTION_RECORDS_JSON,
     )
     return parser.parse_args()
 
@@ -77,47 +166,11 @@ def _write_json(path: Path, payload: Any) -> None:
 
 
 def _norm_marker(value: Any) -> str:
-    text = str(value or "").strip().lower()
-    if text.startswith("(") and text.endswith(")") and len(text) > 2:
-        text = text[1:-1]
-    return text
+    return normalize_marker(value)
 
 
 def ms_paper_code_for(paper_code: str) -> str:
     return paper_code.replace("_qp_", "_ms_")
-
-
-def _find_qp_question(qp_payload: Dict[str, Any], question_marker: str) -> Optional[Dict[str, Any]]:
-    target = _norm_marker(question_marker)
-    for question in qp_payload.get("questions", []):
-        node = question.get("question") or {}
-        if _norm_marker(node.get("text")) == target:
-            return question
-    return None
-
-
-def _find_qp_node(
-    question_entry: Dict[str, Any],
-    segment_kind: str,
-    primary_marker: Any,
-    secondary_marker: Any,
-) -> Optional[Dict[str, Any]]:
-    if segment_kind == "question":
-        return question_entry.get("question")
-    primary_target = _norm_marker(primary_marker)
-    for primary in question_entry.get("primary_subparts", []):
-        p_node = primary.get("primary") or {}
-        if _norm_marker(p_node.get("text")) != primary_target:
-            continue
-        if segment_kind == "primary":
-            return p_node
-        secondary_target = _norm_marker(secondary_marker)
-        for secondary in primary.get("secondary_subparts", []):
-            s_node = secondary.get("secondary") or {}
-            if _norm_marker(s_node.get("text")) == secondary_target:
-                return s_node
-        return None
-    return None
 
 
 def _find_ms_question(ms_payload: Dict[str, Any], question_marker: str) -> Optional[Dict[str, Any]]:
@@ -265,6 +318,12 @@ def build_records(
 
     records: List[Dict[str, Any]] = []
     discarded: List[Dict[str, Any]] = []
+    records_by_fingerprint: Dict[
+        Tuple[str, str, Any], List[Dict[str, Any]]
+    ] = {}
+    source_paper_codes = set()
+    source_record_count = 0
+    deduplicated_count = 0
     next_id = 1
 
     for hit in selected_hits:
@@ -290,11 +349,11 @@ def build_records(
         if qp_payload is None:
             discard("qp_segmented_questions_missing")
             continue
-        question_entry = _find_qp_question(qp_payload, hit.get("question_marker"))
+        question_entry = find_qp_question(qp_payload, hit.get("question_marker"))
         if question_entry is None:
             discard("qp_question_not_found")
             continue
-        qp_node = _find_qp_node(
+        qp_node = find_qp_node(
             question_entry,
             segment_kind,
             hit.get("primary_marker"),
@@ -393,6 +452,19 @@ def build_records(
             max_marks = qp_marks
 
         slug = _marker_slug(hit)
+        # Syllabus tags are curated per segment, so a record with no entry gets
+        # an empty list rather than a guess. The expanded label/reference is
+        # carried alongside the slugs so the website can render a tag without
+        # shipping the vocabulary separately.
+        tag_slugs = tags_for_segment(
+            paper_code,
+            hit.get("question_marker"),
+            hit.get("primary_marker"),
+            hit.get("secondary_marker"),
+        )
+        if not tag_slugs:
+            diagnostics.append("no_syllabus_tags")
+
         record = {
             "schema_version": SCHEMA_VERSION,
             "id": next_id,
@@ -407,6 +479,7 @@ def build_records(
             "question_text": question_text,
             "question_context_text": context_text,
             "qp_marks_value": qp_marks,
+            "syllabus_tags": [describe(slug) for slug in tag_slugs],
             "mark_scheme": {
                 "ms_level": segment_kind,
                 "answer_text": answer_text,
@@ -450,14 +523,38 @@ def build_records(
             },
             "diagnostics": diagnostics,
         }
+
+        source_record_count += 1
+        source_paper_codes.add(paper_code)
+        fingerprint = _record_fingerprint(record)
+        duplicate_of = next(
+            (
+                candidate
+                for candidate in records_by_fingerprint.get(fingerprint, [])
+                if _contexts_are_equivalent(candidate, record)
+            ),
+            None,
+        )
+        if fingerprint[0] and fingerprint[1] and duplicate_of is not None:
+            _merge_duplicate_record(duplicate_of, record)
+            deduplicated_count += 1
+            # IDs are source-order identities used in URLs and fixtures. Keep
+            # the removed duplicate's slot empty instead of renumbering every
+            # later question.
+            next_id += 1
+            continue
+
         records.append(record)
+        records_by_fingerprint.setdefault(fingerprint, []).append(record)
         next_id += 1
 
     summary = {
         "schema_version": SCHEMA_VERSION,
         "record_count": len(records),
+        "source_record_count": source_record_count,
+        "deduplicated_count": deduplicated_count,
         "discarded_count": len(discarded),
-        "paper_count": len({record["paper_code"] for record in records}),
+        "paper_count": len(source_paper_codes),
         "segment_kind_counts": _count_by(records, lambda r: r["segment_key"]["segment_kind"]),
         "records_with_marking_points": sum(
             1 for r in records if r["mark_scheme"]["marking_points"]
@@ -470,6 +567,8 @@ def build_records(
             for r in records
             if r["provenance"]["screenshots"]["selected_segment"]
         ),
+        "records_with_syllabus_tags": sum(1 for r in records if r["syllabus_tags"]),
+        "syllabus_tag_counts": _count_tags(records),
         "discard_reasons": _count_by(discarded, lambda d: d["reason"]),
     }
     return {"summary": summary, "records": records, "discarded": discarded}
@@ -481,6 +580,20 @@ def _count_by(items: List[Dict[str, Any]], key_fn) -> Dict[str, int]:
         key = str(key_fn(item))
         counts[key] = counts.get(key, 0) + 1
     return dict(sorted(counts.items()))
+
+
+def _count_tags(records: List[Dict[str, Any]]) -> Dict[str, int]:
+    """How many records carry each syllabus tag, most-used first.
+
+    Doubles as a coverage check: a tag that never appears is either a gap in the
+    corpus or a sign the vocabulary entry is too narrow to be useful.
+    """
+
+    counts: Dict[str, int] = {}
+    for record in records:
+        for tag in record["syllabus_tags"]:
+            counts[tag["slug"]] = counts.get(tag["slug"], 0) + 1
+    return dict(sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])))
 
 
 def main() -> int:

@@ -99,6 +99,15 @@ class OpenRouterClientTests(unittest.TestCase):
 
         self.assertEqual(first, second)
 
+    def test_fill_blank_sheet_is_gradable_without_parser_ast(self):
+        answer = make_parsed_answer(ok=False)
+        answer["answer_kind"] = "fill_blank_sheet"
+        answer["source_text"] = "Blank 1 (IF [blank] THEN): SP = 30"
+
+        result = dry_run_result(make_record(), answer)
+
+        self.assertGreater(result["result"]["total_awarded"], 0)
+
     def test_valid_model_response_is_accepted(self):
         config = OpenRouterConfig(api_key="test-key", model="test-model")
         transport = fake_transport_returning(json.dumps(valid_model_payload()))
@@ -167,6 +176,23 @@ class OpenRouterClientTests(unittest.TestCase):
         self.assertIn("MakeString", user)
         self.assertIn("mp1", user)
         self.assertIn("student_ast", user)
+
+    def test_messages_compact_exam_answer_lines(self):
+        record = make_record()
+        record["question_text"] = (
+            "Write pseudocode.\n"
+            "........................................................................\n"
+            "........................................................................\n"
+            ",\t,\n"
+            "Continue here."
+        )
+
+        user = build_grading_messages(record, make_parsed_answer())[1]["content"]
+
+        self.assertIn("[answer space]", user)
+        self.assertEqual(user.count("[answer space]"), 1)
+        self.assertNotIn("................................", user)
+        self.assertNotIn(",\t,", user)
 
     def test_messages_without_marking_points_ask_for_derived_points(self):
         record = make_record()
@@ -251,6 +277,39 @@ class AlternativeSolutionSafetyTests(unittest.TestCase):
 
         self.assertTrue(result["ok"])
         self.assertEqual(result["result"]["total_awarded"], 2)
+
+    def test_provider_routing_is_sent_to_openrouter(self):
+        config = OpenRouterConfig(
+            api_key="test-key",
+            model="qwen/qwen3-coder-30b-a3b-instruct",
+            provider_only=["novita/fp8"],
+            provider_sort="price",
+        )
+        bodies = []
+
+        def transport(url, headers, body, timeout):
+            bodies.append(json.loads(body.decode("utf-8")))
+            return json.dumps(
+                {"choices": [{"message": {"content": json.dumps(valid_model_payload())}}]}
+            )
+
+        result = grade_answer(
+            make_record(),
+            make_parsed_answer(),
+            config=config,
+            dry_run=False,
+            transport=transport,
+        )
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(
+            bodies[0]["provider"],
+            {
+                "require_parameters": True,
+                "only": ["novita/fp8"],
+                "sort": "price",
+            },
+        )
 
     def test_dry_run_result_is_capped(self):
         record = alt_record()

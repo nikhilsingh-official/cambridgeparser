@@ -290,6 +290,35 @@ class MarkSchemeParserTests(unittest.TestCase):
 
         self.assertEqual(text, "OUTPUT")
 
+    def test_region_text_preserves_real_space_glyph_below_gap_threshold(self):
+        # A genuine space glyph must keep words apart even when the gap to the
+        # next glyph is too narrow for the gap heuristic to fire. The 9618_w25
+        # mark schemes render spaces this way; discarding them collapsed
+        # "Count-controlled loop" into "Count-controlledloop".
+        chars = (
+            chars_for_word("Count", 10.0, 10.0)
+            + [make_char(" ", 30.0, 10.0, 31.0, 18.0)]
+            + chars_for_word("loop", 31.0, 10.0)
+        )
+
+        text = _region_text_from_chars(chars, [0.0, 0.0, 200.0, 30.0])
+
+        self.assertEqual(text, "Count loop")
+
+    def test_region_text_folds_duplicate_space_glyphs(self):
+        # Bold double-draw can leave two space glyphs at nearly the same spot;
+        # they must fold to a single separator rather than a double space.
+        chars = (
+            chars_for_word("IF", 10.0, 10.0)
+            + [make_char(" ", 18.0, 10.0, 19.0, 18.0)]
+            + [make_char(" ", 18.4, 10.0, 19.4, 18.0)]
+            + chars_for_word("THEN", 20.0, 10.0)
+        )
+
+        text = _region_text_from_chars(chars, [0.0, 0.0, 200.0, 30.0])
+
+        self.assertEqual(text, "IF THEN")
+
     def test_region_text_outside_bbox_is_excluded(self):
         chars = chars_for_word("VISIBLE", 10.0, 10.0) + chars_for_word(
             "HIDDEN", 10.0, 100.0

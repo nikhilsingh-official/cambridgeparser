@@ -8,17 +8,19 @@ This repository is a Python pipeline for parsing Computer Science past-paper PDF
 - `src/pipeline/msplitter/` contains mark-scheme parsing, marker extraction, JSON IO, and normalization scripts.
 - `src/pipeline/analysis/diagnostics/` contains diagnostics CLIs and pseudocode refinement rules.
 - `src/pipeline/pseudocode_tools/`, `src/pipeline/runners/`, and `src/pipeline/scripts/` contain batch and export utilities.
+- `src/resources/` contains shared path defaults for source inputs and parser-created generated artifacts.
+- `src/website/` contains the website frontend for browsing and grading generated resources.
 - `tests/` and `src/pipeline/msplitter/tests/` contain `unittest` test modules.
-- `resources/pdfs/cs_papers/` stores source PDFs. `qp_output/`, `ms_output/`, `pseudocode_writing_hits/`, and `legacy/` are generated or historical data.
+- `resources/pdfs/cs_papers/` stores source PDFs. `resources/generated/` is the default home for parser-created artifacts such as `qp_output/`, `ms_output/`, normalized Marker output, and `pseudocode_writing_hits/`. Root-level `qp_output/`, `ms_output/`, `pseudocode_writing_hits/`, `normalize/`, and `legacy/` are legacy generated or historical data.
 
-Use package paths under `src.pipeline` for imports and CLIs. Do not add root-level symlinks back as module shortcuts.
+Use package paths under `src.pipeline` for parser imports and CLIs, `src.resources.paths` for filesystem defaults, and `src.website` for frontend imports and CLIs. Do not add root-level symlinks back as module shortcuts.
 
 ## Build, Test, and Development Commands
 
 - `python -m unittest discover -s tests -p 'test_*.py'` runs the main test suite.
 - `python -m unittest src.pipeline.msplitter.tests.test_markers` runs the msplitter package test currently outside `tests/`.
-- `python -m src.pipeline.parser.qsplitter --paper 9618_w25_qp_12 --pdf-dir resources/pdfs/cs_papers --ocr-dir <ocr_dir> --marker-dir <marker_dir> --output-dir qp_output` processes one paper.
-- `python -m src.pipeline.parser.qsplitter --all --pdf-dir resources/pdfs/cs_papers --ocr-dir <ocr_dir> --marker-dir <marker_dir> --output-dir qp_output` processes all available marker inputs.
+- `python -m src.pipeline.parser.qsplitter --paper 9618_w25_qp_12 --pdf-dir resources/pdfs/cs_papers --ocr-dir <ocr_dir> --marker-dir <marker_dir> --output-dir resources/generated/qp_output` processes one paper.
+- `python -m src.pipeline.parser.qsplitter --all --pdf-dir resources/pdfs/cs_papers --ocr-dir <ocr_dir> --marker-dir <marker_dir> --output-dir resources/generated/qp_output` processes all available marker inputs.
 
 No packaging file or dependency lockfile is present. Document new runtime dependencies when adding them; current code imports `fitz`/PyMuPDF and optionally Pillow for debug rendering.
 

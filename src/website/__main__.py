@@ -2,8 +2,8 @@
 
 Usage:
 
-    python -m src.pipeline.webapp \
-        --records pseudocode_writing_hits/pseudocode_question_records.json \
+    python -m src.website \
+        --records resources/generated/pseudocode_writing_hits/pseudocode_question_records.json \
         --port 8000
 """
 
@@ -13,8 +13,14 @@ import argparse
 from pathlib import Path
 
 from .app import make_server
-from ..grading.ast_adapter import find_parser_binary
-from ..grading.openrouter_client import OpenRouterConfig
+from src.pipeline.grading.ast_adapter import find_parser_binary
+from src.pipeline.grading.openrouter_client import OpenRouterConfig
+from src.resources.paths import (
+    NORMALIZED_MARKER_OUTPUT_DIR,
+    PSEUDOCODE_QUESTION_RECORDS_JSON,
+    QP_OUTPUT_DIR,
+    SOURCE_PDF_DIR,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -22,7 +28,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--records",
         type=Path,
-        default=Path("pseudocode_writing_hits/pseudocode_question_records.json"),
+        default=PSEUDOCODE_QUESTION_RECORDS_JSON,
         help="Canonical pseudocode-question-record/v1 JSON from build_final_records.",
     )
     parser.add_argument("--host", default="127.0.0.1")
@@ -36,19 +42,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--qp-dir",
         type=Path,
-        default=Path("qp_output"),
+        default=QP_OUTPUT_DIR,
         help="Directory of per-paper segmented_questions.json (for layout reconstruction).",
     )
     parser.add_argument(
         "--marker-root",
         type=Path,
-        default=Path("normalize/normalized_marker_output"),
+        default=NORMALIZED_MARKER_OUTPUT_DIR,
         help="Directory of normalized Marker layout outputs (for figure/table regions).",
     )
     parser.add_argument(
         "--pdf-dir",
         type=Path,
-        default=Path("resources/pdfs/cs_papers"),
+        default=SOURCE_PDF_DIR,
         help="Directory of source question-paper PDFs (for figure crops).",
     )
     return parser.parse_args()

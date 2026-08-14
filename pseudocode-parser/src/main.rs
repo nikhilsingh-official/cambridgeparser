@@ -11,20 +11,10 @@
 #![allow(non_snake_case)]
 #![allow(dead_code)]
 
-pub mod errortype;
-#[path = "Inter/mod.rs"]
-pub mod Inter;
-#[path = "Lexer/mod.rs"]
-pub mod Lexer;
-#[path = "Parser/mod.rs"]
-pub mod Parser;
-mod json_out;
-
 use std::io::Read;
 use std::process::ExitCode;
 
-use crate::Lexer::lexer::tokenize;
-use crate::Parser::parser::Parser as PseudocodeParser;
+use pseudocode_parser::parse_to_json;
 
 struct CliArgs {
     format: String,
@@ -106,22 +96,6 @@ fn main() -> ExitCode {
         }
     };
 
-    let tokens = match tokenize(&source) {
-        Ok(tokens) => tokens,
-        Err(error) => {
-            println!("{}", json_out::result_json(false, &[], &[error]));
-            return ExitCode::SUCCESS;
-        }
-    };
-
-    let mut parser = PseudocodeParser::new(tokens, source);
-    match parser.parse_statements() {
-        Ok(statements) => {
-            println!("{}", json_out::result_json(true, &statements, &[]));
-        }
-        Err(error) => {
-            println!("{}", json_out::result_json(false, &[], &[error]));
-        }
-    }
+    println!("{}", parse_to_json(&source));
     ExitCode::SUCCESS
 }

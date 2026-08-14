@@ -18,7 +18,7 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from ..pseudocode_tools.build_final_records import _find_qp_node, _find_qp_question
+from src.resources.question_segments import find_qp_node, find_qp_question
 
 # A blank is a run of dotted-leader / underscore fill characters. Cambridge uses
 # dotted leaders almost everywhere and underscores occasionally; four or more in
@@ -35,10 +35,10 @@ def find_segment_node(
 ) -> Optional[Dict[str, Any]]:
     """Locate the qsplitter node for a record's segment_key."""
 
-    question_entry = _find_qp_question(qp_payload, segment_key.get("question_marker"))
+    question_entry = find_qp_question(qp_payload, segment_key.get("question_marker"))
     if question_entry is None:
         return None
-    return _find_qp_node(
+    return find_qp_node(
         question_entry,
         segment_key.get("segment_kind") or "question",
         segment_key.get("primary_marker"),

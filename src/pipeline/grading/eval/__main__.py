@@ -1,11 +1,11 @@
 """Grade the hand-authored candidate answers and compare to predicted marks.
 
     python -m src.pipeline.grading.eval \
-        --records pseudocode_writing_hits/pseudocode_question_records.json
+        --records resources/generated/pseudocode_writing_hits/pseudocode_question_records.json
 
 Without OPENROUTER_API_KEY the grader runs in dry-run mode (a deterministic
 placeholder), which only exercises the harness; set the key to measure how well
-Qwen's awarded marks track the human-predicted marks in ``cases.py``.
+the model's awarded marks track the human-predicted marks in ``cases.py``.
 """
 
 from __future__ import annotations
@@ -14,6 +14,8 @@ import argparse
 import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+
+from src.resources.paths import PSEUDOCODE_QUESTION_RECORDS_JSON
 
 from ..ast_adapter import parse_answer
 from ..openrouter_client import OpenRouterConfig, grade_answer
@@ -37,7 +39,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--records",
         type=Path,
-        default=Path("pseudocode_writing_hits/pseudocode_question_records.json"),
+        default=PSEUDOCODE_QUESTION_RECORDS_JSON,
     )
     parser.add_argument("--parse-timeout", type=float, default=10.0)
     parser.add_argument(
@@ -110,7 +112,7 @@ def _print_report(payload: Dict[str, Any]) -> None:
     dry = any(r["dry_run"] for r in results)
     if dry:
         print("MODE: DRY RUN (no OPENROUTER_API_KEY) — placeholder marks; set the key for a real test.\n")
-    header = f"{'type':<9} {'quality':<7} {'pred':>4} {'qwen':>4} {'max':>4}  title"
+    header = f"{'type':<9} {'quality':<7} {'pred':>4} {'ai':>4} {'max':>4}  title"
     print(header)
     print("-" * len(header))
     last_title = None
@@ -133,7 +135,7 @@ def _print_report(payload: Dict[str, Any]) -> None:
         print(
             f"Scored {summary['scored']} candidates | exact {summary['exact']} | "
             f"within-1 {summary['within_1']} | MAE {summary['mae']} | "
-            f"Qwen over {summary['over_predicted']} / under {summary['under_predicted']}"
+            f"AI over {summary['over_predicted']} / under {summary['under_predicted']}"
         )
     if payload["missing_keys"]:
         print(f"WARNING: {len(payload['missing_keys'])} case(s) had no matching record: "

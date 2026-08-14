@@ -4,6 +4,13 @@ version = "0.1.0"
 edition = "2021"
 description = "Cambridge pseudocode parser CLI emitting AST JSON and diagnostics"
 
+[lib]
+name = "pseudocode_parser"
+path = "src/lib.rs"
+# `rlib` lets the CLI and tests link the parser; `cdylib` is the wasm module
+# served to the browser (`cargo build --target wasm32-unknown-unknown`).
+crate-type = ["cdylib", "rlib"]
+
 [[bin]]
 name = "pseudocode-parser"
 path = "src/main.rs"

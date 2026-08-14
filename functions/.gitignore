@@ -1,0 +1,10 @@
+# Firebase Python function build artifacts and the vendored (generated) pipeline.
+venv/
+__pycache__/
+*.pyc
+
+# Vendored at deploy time by sync_pipeline.py from src/pipeline/grading.
+grading/
+
+# Local secret values for the Functions emulator (never commit real keys).
+.secret.local

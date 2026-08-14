@@ -1,16 +1,16 @@
 """Deterministic validation of generated extraction artifacts.
 
-Inspects qp_output segmented questions, ms_output mark schemes, and the final
-joined pseudocode records, then reports counts and suspect items without
-calling any model or network service.
+Inspects generated question-paper segments, mark schemes, and the final joined
+pseudocode records, then reports counts and suspect items without calling any
+model or network service.
 
 Usage:
 
     python -m src.pipeline.analysis.diagnostics.validate_extraction \
-        --qp-dir qp_output \
-        --ms-dir ms_output \
-        --final-json pseudocode_writing_hits/pseudocode_writing_final_qp_ms_marking_points.json \
-        --output-json pseudocode_writing_hits/extraction_validation.json
+        --qp-dir resources/generated/qp_output \
+        --ms-dir resources/generated/ms_output \
+        --final-json resources/generated/pseudocode_writing_hits/pseudocode_question_records.json \
+        --output-json resources/generated/pseudocode_writing_hits/extraction_validation.json
 """
 
 from __future__ import annotations
@@ -20,6 +20,13 @@ import json
 import re
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
+
+from src.resources.paths import (
+    EXTRACTION_VALIDATION_JSON,
+    MS_OUTPUT_DIR,
+    PSEUDOCODE_QUESTION_RECORDS_JSON,
+    QP_OUTPUT_DIR,
+)
 
 ANSWER_DOTS_PATTERN = re.compile(r"\.{6,}")
 MARKS_SUFFIX_PATTERN = re.compile(r"\[\s*\d+\s*\]")
@@ -37,12 +44,12 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Validate generated qp_output, ms_output, and final pseudocode records."
     )
-    parser.add_argument("--qp-dir", type=Path, default=Path("qp_output"))
-    parser.add_argument("--ms-dir", type=Path, default=Path("ms_output"))
+    parser.add_argument("--qp-dir", type=Path, default=QP_OUTPUT_DIR)
+    parser.add_argument("--ms-dir", type=Path, default=MS_OUTPUT_DIR)
     parser.add_argument(
         "--final-json",
         type=Path,
-        default=Path("pseudocode_writing_hits/pseudocode_question_records.json"),
+        default=PSEUDOCODE_QUESTION_RECORDS_JSON,
         help=(
             "Final joined records: canonical pseudocode-question-record/v1 output "
             "from build_final_records, or the legacy final_qp_ms JSON."
@@ -51,7 +58,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output-json",
         type=Path,
-        default=Path("pseudocode_writing_hits/extraction_validation.json"),
+        default=EXTRACTION_VALIDATION_JSON,
         help="Where the machine-readable validation report is written.",
     )
     parser.add_argument(

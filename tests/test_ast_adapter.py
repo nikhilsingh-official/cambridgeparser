@@ -36,6 +36,9 @@ class AstAdapterTests(unittest.TestCase):
         self.assertEqual(result["schema_version"], "parsed-answer/v1")
         self.assertTrue(result["parse"]["ok"])
         self.assertEqual(result["parse"]["ast"]["statements"], [{"kind": "output"}])
+        self.assertIn('"ok": true', result["runner"]["stdout"])
+        self.assertEqual(result["parse"]["compiler_output"]["stdout"], "")
+        self.assertTrue(result["parse"]["compiler_output"]["raw"]["ok"])
         self.assertEqual(result["runner"]["exit_code"], 0)
         self.assertIsNone(result["runner"]["error"])
 
@@ -53,6 +56,7 @@ class AstAdapterTests(unittest.TestCase):
         self.assertEqual(
             result["parse"]["diagnostics"][0]["message"], "Expected ENDIF"
         )
+        self.assertIn("Expected ENDIF", result["runner"]["stdout"])
         self.assertIsNone(result["runner"]["error"])
 
     def test_invalid_json_is_reported_not_raised(self):
@@ -62,6 +66,7 @@ class AstAdapterTests(unittest.TestCase):
 
         self.assertFalse(result["parse"]["ok"])
         self.assertEqual(result["runner"]["error"], "invalid_json")
+        self.assertIn("not json", result["runner"]["stdout"])
         self.assertIn("invalid JSON", result["parse"]["diagnostics"][0]["message"])
 
     def test_timeout_is_reported_not_raised(self):
