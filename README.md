@@ -38,6 +38,10 @@ Vercel deploys the static frontend only. `/api/grade` remains the separately
 deployed Firebase Function described in `functions/README.md`; configure a proxy
 or migrate that endpoint before enabling AI grading on a Vercel domain.
 
+The frontend uses the official Fontshare stylesheet for General Sans display
+type, with Lexend and IBM Plex Mono bundled from the npm dependencies. IBM Plex
+Mono is reserved for code and terminal content.
+
 ## Main Workflows
 
 Source inputs live under `resources/pdfs/` and `resources/ocr/`. Parser-created

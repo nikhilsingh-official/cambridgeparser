@@ -14,7 +14,6 @@ import { RouterLink } from 'vue-router'
       </nav>
 
       <div class="hero-copy">
-        <p class="eyebrow"><span></span> Cambridge 9618 practice</p>
         <h1 id="hero-title">Make every line<br><em>earn its mark.</em></h1>
         <p class="hero-lede">
           Write, run, and refine exam pseudocode with feedback grounded in the
@@ -61,8 +60,8 @@ import { RouterLink } from 'vue-router'
   min-height: 100vh;
   padding: clamp(0.9rem, 2vw, 1.5rem);
   background:
-    radial-gradient(circle at 80% 22%, rgba(113, 215, 196, 0.1), transparent 27rem),
-    #0d1110;
+    radial-gradient(circle at 80% 22%, color-mix(in srgb, var(--accent) 11%, transparent), transparent 27rem),
+    var(--bg);
   overflow: hidden;
 }
 
@@ -79,12 +78,12 @@ import { RouterLink } from 'vue-router'
   gap: 2rem 4rem;
   align-items: center;
   padding: clamp(1.25rem, 3vw, 3rem);
-  border: 1px solid rgba(215, 242, 233, 0.14);
+  border: 1px solid var(--border);
   border-radius: 1.5rem;
   background:
-    linear-gradient(rgba(159, 190, 180, 0.055) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(159, 190, 180, 0.055) 1px, transparent 1px),
-    linear-gradient(145deg, #151b19 0%, #101513 72%);
+    linear-gradient(color-mix(in srgb, var(--accent) 5%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--accent) 5%, transparent) 1px, transparent 1px),
+    linear-gradient(145deg, var(--panel-2) 0%, var(--panel) 72%);
   background-size: 3rem 3rem, 3rem 3rem, auto;
   box-shadow: 0 2rem 7rem rgba(0, 0, 0, 0.32);
 }
@@ -95,7 +94,7 @@ import { RouterLink } from 'vue-router'
   inset: 5.5rem auto auto 47%;
   width: 1px;
   height: calc(100% - 8rem);
-  background: linear-gradient(transparent, rgba(209, 235, 226, 0.13), transparent);
+  background: linear-gradient(transparent, var(--border), transparent);
   z-index: -1;
 }
 
@@ -111,8 +110,9 @@ import { RouterLink } from 'vue-router'
   display: inline-flex;
   align-items: center;
   gap: 0.7rem;
-  color: #eef7f3;
-  font-weight: 650;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-weight: 600;
   text-decoration: none;
   letter-spacing: -0.02em;
 }
@@ -123,9 +123,9 @@ import { RouterLink } from 'vue-router'
   width: 2rem;
   height: 2rem;
   border-radius: 0.55rem;
-  background: #a6f4d2;
-  color: #0e1713;
-  font-family: var(--font-mono);
+  background: var(--accent);
+  color: var(--background);
+  font-family: var(--font-display);
   font-size: 0.78rem;
   font-weight: 700;
 }
@@ -138,16 +138,17 @@ import { RouterLink } from 'vue-router'
 
 .landing-login {
   padding: 0.55rem 1rem;
-  border: 1px solid rgba(215, 242, 233, 0.25);
+  border: 1px solid var(--border);
   border-radius: 999px;
-  color: #e8f2ee;
+  color: var(--ink);
+  font-family: var(--font-display);
   font-size: 0.88rem;
   font-weight: 600;
 }
 
 .landing-login:hover {
-  border-color: #a6f4d2;
-  background: rgba(166, 244, 210, 0.07);
+  border-color: var(--secondary-color);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
 
 .hero-copy {
@@ -155,43 +156,27 @@ import { RouterLink } from 'vue-router'
   padding-bottom: 2rem;
 }
 
-.eyebrow {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
-  margin: 0 0 1.5rem;
-  color: #8fa79f;
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-}
-
-.eyebrow span {
-  width: 1.8rem;
-  height: 1px;
-  background: #a6f4d2;
-}
-
 h1 {
   margin: 0;
-  color: #f4faf7;
+  color: var(--ink);
+  font-family: var(--font-display);
   font-size: clamp(3.25rem, 6.5vw, 7rem);
-  font-weight: 540;
-  letter-spacing: -0.07em;
-  line-height: 0.91;
+  font-weight: 600;
+  letter-spacing: -0.06em;
+  line-height: 0.94;
 }
 
 h1 em {
-  color: #a6f4d2;
-  font-family: Georgia, 'Times New Roman', serif;
-  font-weight: 400;
+  color: var(--accent);
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-style: normal;
 }
 
 .hero-lede {
   max-width: 32rem;
   margin: 1.8rem 0 2rem;
-  color: #9eb0aa;
+  color: var(--muted);
   font-size: clamp(1rem, 1.3vw, 1.18rem);
   line-height: 1.65;
 }
@@ -202,19 +187,19 @@ h1 em {
   gap: 2rem;
   padding: 0.85rem 1rem 0.85rem 1.2rem;
   border-radius: 0.65rem;
-  background: #a6f4d2;
-  color: #101814;
-  font-weight: 650;
+  background: var(--accent);
+  color: var(--background);
+  font-family: var(--font-display);
+  font-weight: 600;
 }
 
 .hero-cta span {
-  font-family: var(--font-mono);
   font-size: 1.1rem;
 }
 
 .hero-cta:hover {
   transform: translateY(-2px);
-  background: #c1ffe2;
+  background: var(--secondary-color-lightened);
 }
 
 .hero-visual {
@@ -228,26 +213,23 @@ h1 em {
 .code-window {
   position: relative;
   overflow: hidden;
-  border: 1px solid rgba(188, 224, 212, 0.2);
+  border: 1px solid var(--border);
   border-radius: 1rem;
-  background: rgba(8, 13, 11, 0.92);
-  box-shadow: 0 2.3rem 5rem rgba(0, 0, 0, 0.5);
+  background: var(--term);
+  box-shadow: 0 2.3rem 5rem rgba(0, 0, 0, 0.32);
 }
 
 .window-bar {
   display: flex;
   justify-content: space-between;
   padding: 0.78rem 1rem;
-  border-bottom: 1px solid rgba(188, 224, 212, 0.13);
-  color: #758b83;
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.72rem;
 }
 
 .window-status {
-  color: #a6f4d2;
+  color: var(--accent);
 }
 
 .window-status::before {
@@ -264,7 +246,7 @@ h1 em {
 pre {
   margin: 0;
   padding: clamp(1.2rem, 3vw, 2.1rem);
-  color: #d9e7e1;
+  color: var(--term-ink);
   font-family: var(--font-mono);
   font-size: clamp(0.7rem, 1.15vw, 0.9rem);
   line-height: 2;
@@ -272,14 +254,14 @@ pre {
 }
 
 pre b {
-  color: #a6f4d2;
+  color: var(--accent);
   font-weight: 600;
 }
 
 .line-no {
   display: inline-block;
   width: 1.8rem;
-  color: #43554e;
+  color: color-mix(in srgb, var(--muted) 55%, var(--term));
   user-select: none;
 }
 
@@ -289,9 +271,9 @@ pre b {
   right: 0;
   top: 42%;
   height: 2.15rem;
-  border-top: 1px solid rgba(166, 244, 210, 0.18);
-  border-bottom: 1px solid rgba(166, 244, 210, 0.08);
-  background: rgba(166, 244, 210, 0.045);
+  border-top: 1px solid color-mix(in srgb, var(--accent) 18%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 8%, transparent);
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
   animation: scan 5s ease-in-out infinite alternate;
   pointer-events: none;
 }
@@ -306,10 +288,10 @@ pre b {
   gap: 0.7rem;
   min-width: 15rem;
   padding: 0.75rem;
-  border: 1px solid rgba(166, 244, 210, 0.35);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
   border-radius: 0.75rem;
-  background: #1d2824;
-  color: #e8f4ef;
+  background: var(--panel-2);
+  color: var(--ink);
   box-shadow: 0 1rem 2.5rem rgba(0, 0, 0, 0.38);
   transform: rotate(-3deg);
 }
@@ -320,8 +302,8 @@ pre b {
   width: 1.85rem;
   height: 1.85rem;
   border-radius: 50%;
-  background: #a6f4d2;
-  color: #101814;
+  background: var(--accent);
+  color: var(--background);
   font-weight: 800;
 }
 
@@ -336,24 +318,25 @@ pre b {
 
 .mark-card small {
   margin-top: 0.1rem;
-  color: #8fa79f;
+  color: var(--muted);
   font-size: 0.68rem;
 }
 
 .mark-score {
-  color: #a6f4d2;
-  font-family: var(--font-mono);
+  color: var(--accent);
   font-size: 0.8rem;
+  font-weight: 600;
 }
 
 .syntax-chip {
   position: absolute;
   padding: 0.4rem 0.65rem;
-  border: 1px solid rgba(166, 244, 210, 0.25);
+  border: 1px solid var(--border);
   border-radius: 999px;
-  background: #17211d;
-  color: #8fb8a9;
-  font-family: var(--font-mono);
+  background: var(--panel-2);
+  color: var(--secondary-color-lightened);
+  font-family: var(--font-display);
+  font-weight: 600;
   font-size: 0.62rem;
   box-shadow: 0 0.8rem 2rem rgba(0, 0, 0, 0.25);
 }
@@ -374,10 +357,8 @@ pre b {
   grid-column: 1 / -1;
   align-self: end;
   margin: 0;
-  color: #5f736b;
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.04em;
+  color: var(--muted);
+  font-size: 0.74rem;
 }
 
 @keyframes scan {

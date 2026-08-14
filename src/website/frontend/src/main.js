@@ -1,4 +1,4 @@
-import '@fontsource-variable/ibm-plex-sans'
+import '@fontsource-variable/lexend'
 import '@fontsource/ibm-plex-mono/latin-400.css'
 import '@fontsource/ibm-plex-mono/latin-600.css'
 import './assets/main.css'

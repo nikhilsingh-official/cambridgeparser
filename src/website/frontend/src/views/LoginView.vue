@@ -134,7 +134,7 @@ function toggleMode() {
 
 .login-brand {
   color: var(--accent);
-  font-family: var(--font-mono);
+  font-family: var(--font-display);
   font-size: 0.78rem;
   font-weight: 600;
   letter-spacing: 0.03em;

@@ -26,7 +26,7 @@ importers:
       '@codemirror/view':
         specifier: ^6.38.1
         version: 6.43.8
-      '@fontsource-variable/ibm-plex-sans':
+      '@fontsource-variable/lexend':
         specifier: ^5.3.0
         version: 5.3.0
       '@fontsource/ibm-plex-mono':
@@ -503,8 +503,8 @@ packages:
   '@firebase/webchannel-wrapper@1.0.6':
     resolution: {integrity: sha512-Vr/Mqu79dMwGRAyGbJ4uN4+BtXB3/mRTdzetD1daWNeG8QaWuzhhbG77GltO5c0yYmYls8i250iX73624GJd7Q==}
 
-  '@fontsource-variable/ibm-plex-sans@5.3.0':
-    resolution: {integrity: sha512-agG8tXFEo0hD9+J7npa4vbbWult52eMLVaQ6WQRlhs/iCAojrMAoejru85W9HTVXHfyUj96KM7gp/KGAS87XaQ==}
+  '@fontsource-variable/lexend@5.3.0':
+    resolution: {integrity: sha512-3SXtiZ8rFbT0oaPzEboCG5RM3jtyhpNxandh1jWNLqvrJRfV/eP3R+GGw+o5e3hS1uqmAGutKxSvaWG5oyrimA==}
 
   '@fontsource/ibm-plex-mono@5.3.0':
     resolution: {integrity: sha512-eTgnZjZEGk1QtD3ZstF+Vclo2HLAni8YMy34/DxllwZvyz1lR/1RF/xTiAquOBO7MvqBx8D2Ig2WCPMVfdZu7Q==}
@@ -1664,7 +1664,7 @@ snapshots:
 
   '@firebase/webchannel-wrapper@1.0.6': {}
 
-  '@fontsource-variable/ibm-plex-sans@5.3.0': {}
+  '@fontsource-variable/lexend@5.3.0': {}
 
   '@fontsource/ibm-plex-mono@5.3.0': {}
 

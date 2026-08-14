@@ -262,6 +262,40 @@ class StaticVueWebsiteTests(unittest.TestCase):
         self.assertIn('class="hero"', landing)
         self.assertNotIn('<footer', landing)
 
+    def test_vue_pages_share_the_same_typography_and_colour_tokens(self):
+        index = (FRONTEND_ROOT / "index.html").read_text()
+        main_js = (FRONTEND_ROOT / "src" / "main.js").read_text()
+        styles = (FRONTEND_ROOT / "src" / "assets" / "main.css").read_text()
+        landing = (FRONTEND_ROOT / "src" / "views" / "LandingView.vue").read_text()
+
+        self.assertIn("api.fontshare.com", index)
+        self.assertIn("general-sans", index)
+        self.assertIn("@fontsource-variable/lexend", main_js)
+        self.assertNotIn("ibm-plex-sans", main_js)
+        self.assertIn('--font-display: "General Sans"', styles)
+        self.assertIn('--font-body: "Lexend Variable"', styles)
+        self.assertIn("font-family: var(--font-body);", styles)
+        self.assertIn(".topbar nav a {\n  color: var(--muted);\n  font-family: var(--font-display);", styles)
+        self.assertIn(".lesson-index a {", styles)
+        self.assertIn(".practice-link,\n.practice-unavailable {", styles)
+        self.assertGreater(
+            styles.index("button {\n  font-family: var(--font-display);"),
+            styles.index("button,\ninput,\ntextarea {\n  font: inherit;"),
+        )
+        self.assertNotIn("#0d1110", landing)
+        self.assertNotIn("#a6f4d2", landing)
+
+    def test_landing_and_learn_pages_have_no_eyebrow_text(self):
+        landing = (FRONTEND_ROOT / "src" / "views" / "LandingView.vue").read_text()
+        learn = (FRONTEND_ROOT / "src" / "views" / "LearnView.vue").read_text()
+        styles = (FRONTEND_ROOT / "src" / "assets" / "main.css").read_text()
+
+        for source in (landing, learn, styles):
+            self.assertNotIn("eyebrow", source)
+            self.assertNotIn("learn-kicker", source)
+            self.assertNotIn("frequency-label", source)
+            self.assertNotIn("lesson-label", source)
+
     def test_auth_ready_does_not_wait_for_profile_database_write(self):
         source = (FRONTEND_ROOT / "src" / "services" / "auth.js").read_text()
         self.assertLess(source.index("resolve(user)"), source.index("await ensureUserRecord(user)"))

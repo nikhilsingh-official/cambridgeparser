@@ -1,38 +1,40 @@
 :root {
   color-scheme: dark;
-  --font-sans: "IBM Plex Sans Variable", "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "General Sans", "Lexend Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Lexend Variable", "Lexend", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-body);
   --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
 
-  /* Mirrors the source SCSS palette. */
-  --text: #fafafa;
-  --background: #171717;
-  --secondary-background: #1a1a1a;
-  --tertiary-background: #242424;
-  --primary-color: hsl(184, 100%, 18%);
-  --primary-color-lightened: #005a61;
-  --primary-color-darkened: #004c52;
-  --secondary-color: #62bbc1;
-  --secondary-color-lightened: #69bdc3;
-  --accent: #93cfd2;
-  --danger: #d95151;
-  --danger-darkened: hsl(0, 64%, 18%);
-  --warning: #d9b24b;
-  --warning-darkened: hsl(44, 65%, 18%);
-  --success: hsl(150, 60%, 58%);
-  --success-darkened: hsl(150, 60%, 18%);
+  /* One quiet, low-glare palette for the landing page, IDE, and lessons. */
+  --text: #dce4df;
+  --background: #202522;
+  --secondary-background: #262c29;
+  --tertiary-background: #2e3531;
+  --primary-color: #345f54;
+  --primary-color-lightened: #416f63;
+  --primary-color-darkened: #2b5047;
+  --secondary-color: #75aa99;
+  --secondary-color-lightened: #83b6a5;
+  --accent: #92c5b4;
+  --danger: #d47777;
+  --danger-darkened: #472c2c;
+  --warning: #d1b66e;
+  --warning-darkened: #493f29;
+  --success: #78c29c;
+  --success-darkened: #294638;
 
   /* Semantic aliases used throughout the application. */
   --bg: var(--background);
   --panel: var(--secondary-background);
   --panel-2: var(--tertiary-background);
-  --border: color-mix(in srgb, var(--accent) 50%, var(--tertiary-background));
+  --border: color-mix(in srgb, var(--accent) 22%, var(--tertiary-background));
   --ink: var(--text);
-  --muted: color-mix(in srgb, var(--text) 62%, var(--tertiary-background));
+  --muted: color-mix(in srgb, var(--text) 62%, var(--background));
   --danger-foreground: color-mix(in srgb, var(--danger) 65%, var(--text));
-  --term: var(--background);
-  --term-ink: var(--text);
-  --paper: var(--text);
-  --paper-ink: var(--background);
+  --term: #1d221f;
+  --term-ink: #cbd5cf;
+  --paper: #f3f1ea;
+  --paper-ink: #272b28;
 }
 
 * {
@@ -43,8 +45,18 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
-  font-family: var(--font-sans);
+  font-family: var(--font-body);
   line-height: 1.45;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.brand {
+  font-family: var(--font-display);
 }
 
 ::selection {
@@ -56,6 +68,10 @@ button,
 input,
 textarea {
   font: inherit;
+}
+
+button {
+  font-family: var(--font-display);
 }
 
 .topbar {
@@ -70,7 +86,7 @@ textarea {
 
 .brand {
   color: var(--ink);
-  font-weight: 720;
+  font-weight: 600;
   text-decoration: none;
 }
 
@@ -83,6 +99,7 @@ textarea {
 
 .topbar nav a {
   color: var(--muted);
+  font-family: var(--font-display);
   text-decoration: none;
   padding: 0.35rem 0.55rem;
   border-radius: 6px;
@@ -853,31 +870,19 @@ button.tag-chip:hover {
   border-bottom: 1px solid var(--border);
 }
 
-.learn-kicker,
-.lesson-label,
-.lesson-meta,
-.frequency-label {
-  color: var(--accent);
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
 .learn-hero h1 {
   max-width: 50rem;
-  margin: 0.75rem 0 1.25rem;
+  margin: 0 0 1.25rem;
   font-size: clamp(2.8rem, 7vw, 6.5rem);
-  font-weight: 540;
-  letter-spacing: -0.065em;
-  line-height: 0.94;
+  font-weight: 600;
+  letter-spacing: -0.055em;
+  line-height: 0.96;
 }
 
 .learn-hero h1 span {
   color: var(--accent);
-  font-family: Georgia, 'Times New Roman', serif;
-  font-weight: 400;
-  font-style: italic;
+  font-family: var(--font-display);
+  font-weight: 500;
 }
 
 .learn-intro {
@@ -898,11 +903,18 @@ button.tag-chip:hover {
 }
 
 .frequency-card strong {
-  margin-top: 0.55rem;
   font-size: 1.35rem;
+  font-family: var(--font-display);
+  font-weight: 600;
 }
 
-.frequency-card > span:not(.frequency-label) {
+.frequency-note {
+  margin: 0 0 0.35rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.frequency-card > span {
   color: var(--muted);
   font-size: 0.85rem;
 }
@@ -937,6 +949,7 @@ button.tag-chip:hover {
   border: 1px solid var(--border);
   border-radius: 999px;
   color: var(--muted);
+  font-family: var(--font-display);
   font-size: 0.76rem;
   text-decoration: none;
 }
@@ -960,8 +973,8 @@ button.tag-chip:hover {
 
 .section-heading span {
   color: var(--accent);
-  font-family: var(--font-mono);
   font-size: 0.72rem;
+  font-weight: 600;
 }
 
 .section-heading h2 {
@@ -996,14 +1009,16 @@ button.tag-chip:hover {
 .lesson-number {
   padding-top: 0.2rem;
   color: var(--muted);
-  font-family: var(--font-mono);
   font-size: 0.72rem;
+  font-weight: 600;
 }
 
 .lesson-meta {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem 1rem;
+  color: var(--accent);
+  font-size: 0.72rem;
 }
 
 .lesson-meta span + span {
@@ -1065,6 +1080,13 @@ button.tag-chip:hover {
   line-height: 1.65;
 }
 
+.lesson-explanation h4 {
+  margin: 0 0 0.35rem;
+  color: var(--ink);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
 .lesson-explanation ul {
   margin: 0.45rem 0 1.25rem;
   padding-left: 1.1rem;
@@ -1082,8 +1104,8 @@ button.tag-chip:hover {
   padding: 1.2rem;
   border: 1px solid var(--border);
   border-radius: 0.65rem;
-  background: #0d1210;
-  color: #dce9e4;
+  background: var(--term);
+  color: var(--term-ink);
   font-family: var(--font-mono);
   font-size: 0.78rem;
   line-height: 1.75;
@@ -1096,17 +1118,15 @@ button.tag-chip:hover {
   gap: 0.8rem;
   align-items: center;
   color: var(--accent);
+  font-family: var(--font-display);
   font-weight: 600;
   text-decoration: none;
 }
 
 .practice-unavailable {
   color: var(--muted);
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
+  font-size: 0.76rem;
   font-weight: 400;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 
 .practice-link:hover {

@@ -298,7 +298,6 @@ onMounted(async () => {
   <main class="learn-page" data-page="learn">
     <header class="learn-hero">
       <div>
-        <p class="learn-kicker">Cambridge 9618 · syllabus-led</p>
         <h1>Learn the patterns.<br><span>Then recognise them.</span></h1>
         <p class="learn-intro">
           A focused field guide to the structures and methods that recur across the
@@ -306,13 +305,13 @@ onMounted(async () => {
         </p>
       </div>
       <div v-if="records.length" class="frequency-card">
-        <span class="frequency-label">Most frequent in this set</span>
+        <p class="frequency-note">Most frequent in this set</p>
         <strong>IF selection</strong>
         <span>{{ selectionCount }} of {{ records.length }} questions</span>
         <div class="frequency-bar"><i :style="{ width: `${selectionPercent}%` }"></i></div>
       </div>
       <div v-else class="frequency-card">
-        <span class="frequency-label">Corpus snapshot</span>
+        <p class="frequency-note">Corpus snapshot</p>
         <strong>Lessons work offline</strong>
         <span>Matching-question counts appear when the corpus loads.</span>
       </div>
@@ -358,9 +357,9 @@ onMounted(async () => {
 
           <div class="lesson-body">
             <div class="lesson-explanation">
-              <span class="lesson-label">Key idea</span>
+              <h4>Key idea</h4>
               <p>{{ lesson.idea }}</p>
-              <span class="lesson-label">Watch for</span>
+              <h4>Watch for</h4>
               <ul>
                 <li v-for="pitfall in lesson.pitfalls" :key="pitfall">{{ pitfall }}</li>
               </ul>
