@@ -38,9 +38,11 @@ Vercel deploys the static frontend only. `/api/grade` remains the separately
 deployed Firebase Function described in `functions/README.md`; configure a proxy
 or migrate that endpoint before enabling AI grading on a Vercel domain.
 
-The frontend uses the official Fontshare stylesheet for General Sans display
-type, with Lexend and IBM Plex Mono bundled from the npm dependencies. IBM Plex
-Mono is reserved for code and terminal content.
+The frontend uses the official Fontshare stylesheet for General Sans and bundles
+IBM Plex Mono from npm. The default Exam Paper theme uses General Sans with warm
+paper and oxblood ink; its saved dark-mode alternative, Terminal Blueprint,
+uses IBM Plex Mono for interface structure and amber on cold slate. Code and
+terminal content remain monospaced in both modes.
 
 ## Main Workflows
 

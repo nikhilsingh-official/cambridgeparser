@@ -1,40 +1,125 @@
 :root {
-  color-scheme: dark;
-  --font-display: "General Sans", "Lexend Variable", ui-sans-serif, system-ui, sans-serif;
-  --font-body: "Lexend Variable", "Lexend", ui-sans-serif, system-ui, sans-serif;
+  color-scheme: light;
+  --font-display: "General Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "General Sans", ui-sans-serif, system-ui, sans-serif;
   --font-sans: var(--font-body);
   --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
 
-  /* One quiet, low-glare palette for the landing page, IDE, and lessons. */
-  --text: #dce4df;
-  --background: #202522;
-  --secondary-background: #262c29;
-  --tertiary-background: #2e3531;
-  --primary-color: #345f54;
-  --primary-color-lightened: #416f63;
-  --primary-color-darkened: #2b5047;
-  --secondary-color: #75aa99;
-  --secondary-color-lightened: #83b6a5;
-  --accent: #92c5b4;
-  --danger: #d47777;
-  --danger-darkened: #472c2c;
-  --warning: #d1b66e;
-  --warning-darkened: #493f29;
-  --success: #78c29c;
-  --success-darkened: #294638;
+  /* Exam Paper: warm paper, hairline rules, and oxblood marking ink. */
+  --text: #191714;
+  --background: #faf8f3;
+  --secondary-background: #ffffff;
+  --tertiary-background: #f4f0e8;
+  --primary-color: #7b2d26;
+  --primary-color-lightened: #93463e;
+  --primary-color-darkened: #64221d;
+  --primary-foreground: #ffffff;
+  --secondary-color: #9b443b;
+  --secondary-color-lightened: #ae5b50;
+  --accent: #7b2d26;
+  --danger: #9f332a;
+  --danger-darkened: #f3dfda;
+  --warning: #8c5a2b;
+  --warning-darkened: #eee2d3;
+  --success: #1f4d3d;
+  --success-darkened: #dce9e3;
 
   /* Semantic aliases used throughout the application. */
   --bg: var(--background);
   --panel: var(--secondary-background);
   --panel-2: var(--tertiary-background);
-  --border: color-mix(in srgb, var(--accent) 22%, var(--tertiary-background));
+  --border: #ddd6c9;
   --ink: var(--text);
-  --muted: color-mix(in srgb, var(--text) 62%, var(--background));
-  --danger-foreground: color-mix(in srgb, var(--danger) 65%, var(--text));
-  --term: #1d221f;
-  --term-ink: #cbd5cf;
-  --paper: #f3f1ea;
-  --paper-ink: #272b28;
+  --muted: #6b655c;
+  --danger-foreground: #7b2d26;
+  --term: #ffffff;
+  --term-ink: #191714;
+  --paper: #ffffff;
+  --paper-ink: #191714;
+  --hero-background: #f7f3eb;
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+  --font-display: "IBM Plex Mono", ui-monospace, monospace;
+  --font-body: "General Sans", ui-sans-serif, system-ui, sans-serif;
+  --text: #e6e9ee;
+  --background: #0e1116;
+  --secondary-background: #161b22;
+  --tertiary-background: #1c222b;
+  --primary-color: #f2a93b;
+  --primary-color-lightened: #bd7920;
+  --primary-color-darkened: #845013;
+  --primary-foreground: #0e1116;
+  --secondary-color: #f2a93b;
+  --secondary-color-lightened: #f4ba61;
+  --accent: #f2a93b;
+  --danger: #e5484d;
+  --danger-darkened: #3c2024;
+  --warning: #f2a93b;
+  --warning-darkened: #43331c;
+  --success: #7fd1ae;
+  --success-darkened: #1d4034;
+  --border: #262d38;
+  --ink: #e6e9ee;
+  --muted: #8a93a0;
+  --danger-foreground: #f17478;
+  --term: #161b22;
+  --term-ink: #e6e9ee;
+  --paper: #ffffff;
+  --paper-ink: #171a1f;
+  --hero-background: #11161d;
+}
+
+/* Both selected systems are flat, rule-led interfaces with square geometry. */
+[data-theme] :is(
+  button,
+  input,
+  textarea,
+  .hero,
+  .code-window,
+  .mark-card,
+  .panel,
+  .frequency-card,
+  .lesson-index a,
+  .lesson-code,
+  .tag-chip,
+  .view-toggle,
+  .problem-link,
+  .results-card
+) {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+[data-theme] .hero {
+  background: var(--hero-background) !important;
+  background-image: none !important;
+}
+
+[data-theme] :is(.hero-visual, .mark-card, .syntax-chip) {
+  transform: none !important;
+}
+
+[data-theme] .window-status::before {
+  box-shadow: none;
+}
+
+[data-theme] :is(
+  .question-meta,
+  .lesson-meta,
+  .score-label,
+  .count-pill,
+  .explorer-header > span,
+  .window-bar,
+  .hero-footnote
+) {
+  font-family: var(--font-mono);
+  letter-spacing: 0.05em;
+}
+
+[data-theme='dark'] :is(.section-heading span, .lesson-number, .frequency-note) {
+  font-family: var(--font-mono);
 }
 
 * {
@@ -61,7 +146,7 @@ h6,
 
 ::selection {
   background: var(--primary-color-lightened);
-  color: var(--text);
+  color: var(--primary-foreground);
 }
 
 button,
@@ -394,7 +479,7 @@ button {
 
 .view-toggle button.active {
   background: var(--primary-color-lightened);
-  color: var(--text);
+  color: var(--primary-foreground);
 }
 
 /* Fill-in-the-blank fields panel. */
@@ -590,7 +675,7 @@ a:focus-visible {
 .primary-button {
   background: var(--primary-color-lightened);
   border-color: var(--secondary-color);
-  color: var(--text);
+  color: var(--primary-foreground);
 }
 
 .secondary-button {
@@ -618,7 +703,7 @@ a:focus-visible {
 .toggle-button.active {
   background: var(--primary-color-lightened);
   border-color: var(--secondary-color);
-  color: var(--text);
+  color: var(--primary-foreground);
 }
 
 .terminal-panel {
@@ -732,7 +817,7 @@ button.tag-chip:hover {
 .tag-chip.active {
   background: var(--primary-color-lightened);
   border-color: var(--secondary-color);
-  color: var(--text);
+  color: var(--primary-foreground);
 }
 
 /* A facet that nothing in the current search matches stays visible but recedes,
@@ -747,7 +832,8 @@ button.tag-chip:hover {
 }
 
 .tag-chip.active .tag-count {
-  color: var(--accent);
+  color: inherit;
+  opacity: 0.78;
 }
 
 .tag-chips.size-small .tag-chip {

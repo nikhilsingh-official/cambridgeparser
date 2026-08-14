@@ -1,5 +1,6 @@
 <script setup>
 import { RouterLink } from 'vue-router'
+import ThemeToggle from '@/components/ThemeToggle.vue'
 </script>
 
 <template>
@@ -10,7 +11,10 @@ import { RouterLink } from 'vue-router'
           <span class="brand-mark" aria-hidden="true">P/</span>
           <span>Pseudocode</span>
         </RouterLink>
-        <RouterLink class="landing-login" to="/login">Log in</RouterLink>
+        <div class="landing-actions">
+          <ThemeToggle />
+          <RouterLink class="landing-login" to="/login">Log in</RouterLink>
+        </div>
       </nav>
 
       <div class="hero-copy">
@@ -104,6 +108,12 @@ import { RouterLink } from 'vue-router'
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.landing-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
 }
 
 .landing-brand {

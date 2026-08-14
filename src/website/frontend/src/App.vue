@@ -1,5 +1,6 @@
 <script setup>
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
+import ThemeToggle from '@/components/ThemeToggle.vue'
 import { currentUser, logout } from '@/services/auth'
 
 const router = useRouter()
@@ -20,9 +21,12 @@ async function onLogout() {
       <RouterLink to="/learn">Learn</RouterLink>
     </nav>
 
-    <div v-if="currentUser" class="account">
-      <span class="who">{{ currentUser.email || currentUser.displayName }}</span>
-      <button type="button" class="signout" @click="onLogout">Sign out</button>
+    <div class="topbar-actions">
+      <ThemeToggle />
+      <div v-if="currentUser" class="account">
+        <span class="who">{{ currentUser.email || currentUser.displayName }}</span>
+        <button type="button" class="signout" @click="onLogout">Sign out</button>
+      </div>
     </div>
   </header>
 
@@ -30,11 +34,16 @@ async function onLogout() {
 </template>
 
 <style scoped>
+.topbar-actions,
 .account {
   margin-left: auto;
   display: flex;
   align-items: center;
   gap: 0.6rem;
+}
+
+.account {
+  margin-left: 0;
 }
 
 .who {

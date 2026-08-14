@@ -262,18 +262,22 @@ class StaticVueWebsiteTests(unittest.TestCase):
         self.assertIn('class="hero"', landing)
         self.assertNotIn('<footer', landing)
 
-    def test_vue_pages_share_the_same_typography_and_colour_tokens(self):
+    def test_vue_pages_share_the_selected_light_and_dark_themes(self):
         index = (FRONTEND_ROOT / "index.html").read_text()
         main_js = (FRONTEND_ROOT / "src" / "main.js").read_text()
         styles = (FRONTEND_ROOT / "src" / "assets" / "main.css").read_text()
         landing = (FRONTEND_ROOT / "src" / "views" / "LandingView.vue").read_text()
+        app = (FRONTEND_ROOT / "src" / "App.vue").read_text()
 
         self.assertIn("api.fontshare.com", index)
         self.assertIn("general-sans", index)
-        self.assertIn("@fontsource-variable/lexend", main_js)
+        self.assertNotIn("@fontsource-variable/lexend", main_js)
         self.assertNotIn("ibm-plex-sans", main_js)
         self.assertIn('--font-display: "General Sans"', styles)
-        self.assertIn('--font-body: "Lexend Variable"', styles)
+        self.assertIn('--font-body: "General Sans"', styles)
+        self.assertIn("[data-theme='dark']", styles)
+        self.assertIn("#faf8f3", styles)
+        self.assertIn("#0e1116", styles)
         self.assertIn("font-family: var(--font-body);", styles)
         self.assertIn(".topbar nav a {\n  color: var(--muted);\n  font-family: var(--font-display);", styles)
         self.assertIn(".lesson-index a {", styles)
@@ -284,6 +288,8 @@ class StaticVueWebsiteTests(unittest.TestCase):
         )
         self.assertNotIn("#0d1110", landing)
         self.assertNotIn("#a6f4d2", landing)
+        self.assertIn("ThemeToggle", landing)
+        self.assertIn("ThemeToggle", app)
 
     def test_landing_and_learn_pages_have_no_eyebrow_text(self):
         landing = (FRONTEND_ROOT / "src" / "views" / "LandingView.vue").read_text()
@@ -295,6 +301,32 @@ class StaticVueWebsiteTests(unittest.TestCase):
             self.assertNotIn("learn-kicker", source)
             self.assertNotIn("frequency-label", source)
             self.assertNotIn("lesson-label", source)
+
+    def test_theme_preference_resolution(self):
+        script = """
+          import {
+            DARK_THEME,
+            LIGHT_THEME,
+            preferredTheme,
+          } from './src/website/frontend/src/services/theme.js'
+
+          const actual = [
+            preferredTheme(LIGHT_THEME, true),
+            preferredTheme(DARK_THEME, false),
+            preferredTheme(null, true),
+            preferredTheme(null, false),
+            preferredTheme('unknown', true),
+          ]
+          const expected = [LIGHT_THEME, DARK_THEME, DARK_THEME, LIGHT_THEME, DARK_THEME]
+          if (JSON.stringify(actual) !== JSON.stringify(expected)) process.exit(1)
+        """
+        completed = subprocess.run(
+            ["node", "--input-type=module", "--eval", script],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
 
     def test_auth_ready_does_not_wait_for_profile_database_write(self):
         source = (FRONTEND_ROOT / "src" / "services" / "auth.js").read_text()
