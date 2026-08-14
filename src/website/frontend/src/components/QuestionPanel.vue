@@ -1,5 +1,9 @@
 <script setup>
 import { computed, ref } from 'vue'
+import {
+  imageIsAvailable,
+  rememberUnavailableImage,
+} from '@/services/imageAvailability'
 import { cleanContextText, markerLabel, marksFor } from '@/services/records'
 import { recordTags } from '@/services/tags'
 import PositionedQuestion from '@/components/PositionedQuestion.vue'
@@ -50,6 +54,7 @@ const showContext = ref(false)
 // than sitting open next to a problem the student has not attempted yet.
 const showTags = ref(false)
 const tags = computed(() => recordTags(props.record))
+const unavailableImages = ref(new Set())
 
 const RESOURCES_BASE = `${import.meta.env.BASE_URL}resources/`
 
@@ -66,10 +71,20 @@ function imageUrl(image) {
   return `${RESOURCES_BASE}${image.src}`
 }
 
+function markImageUnavailable(image) {
+  rememberUnavailableImage(unavailableImages.value, image)
+}
+
 // Image is the default, but fall back to the positional view if no image was
-// rendered for this record so the panel is never blank.
-const useQuestionImage = computed(() => props.viewMode === 'image' && Boolean(questionImage.value))
-const useContextImage = computed(() => props.viewMode === 'image' && Boolean(contextImage.value))
+// rendered or deployed for this record so the panel is never blank.
+const useQuestionImage = computed(
+  () => props.viewMode === 'image'
+    && imageIsAvailable(questionImage.value, unavailableImages.value),
+)
+const useContextImage = computed(
+  () => props.viewMode === 'image'
+    && imageIsAvailable(contextImage.value, unavailableImages.value),
+)
 
 // Inline editable blanks only in position mode; in image mode the inputs are in
 // the separate fields panel, so the question renders read-only there.
@@ -140,6 +155,7 @@ const ownsSubmit = computed(() => props.fillMode && props.viewMode === 'position
             class="question-image"
             :src="imageUrl(contextImage)"
             alt="Question context"
+            @error="markImageUnavailable(contextImage)"
           >
           <PositionedQuestion
             v-else-if="contextLayout"
@@ -156,6 +172,7 @@ const ownsSubmit = computed(() => props.fillMode && props.viewMode === 'position
           class="question-image"
           :src="imageUrl(questionImage)"
           alt="Question"
+          @error="markImageUnavailable(questionImage)"
         >
         <PositionedQuestion
           v-else

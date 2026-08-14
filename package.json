@@ -3,11 +3,12 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build": "vite build --config src/website/frontend/vite.config.js",
     "test:frontend": "node --test tests/frontend_*.test.mjs",
     "build:website:resources": "python -m src.website.build_static_resources --records pseudocode_writing_hits/pseudocode_question_records.json --qp-dir qp_output --marker-root normalize/normalized_marker_output",
     "build:website:wasm": "bash src/website/build_wasm_parser.sh",
     "dev:website": "npm run build:website:wasm && npm run build:website:resources && vite --config src/website/frontend/vite.config.js",
-    "build:website": "npm run build:website:wasm && npm run build:website:resources && vite build --config src/website/frontend/vite.config.js",
+    "build:website": "npm run build:website:wasm && npm run build:website:resources && npm run build",
     "preview:website": "vite preview --config src/website/frontend/vite.config.js",
     "dev:website:emulator": "VITE_USE_FIREBASE_EMULATORS=true npm run dev:website",
     "build:website:emulator": "VITE_USE_FIREBASE_EMULATORS=true npm run build:website",

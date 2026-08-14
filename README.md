@@ -13,6 +13,29 @@ python -m pip install -r requirements.txt
 `Pillow` is used for debug and review screenshots. `pylatexenc` is only needed
 when OCR lines contain `<math>...</math>` markers.
 
+## Website deployment
+
+The Vercel project uses the repository root as its Root Directory. Keep that
+dashboard setting blank: the root `package.json` owns the JavaScript
+dependencies, and `vercel.json` points Vite at
+`src/website/frontend/vite.config.js` and serves `src/website/static`.
+
+```bash
+npm run build
+```
+
+This deployment build bundles the browser-ready JSON and WASM snapshots already
+committed under `src/website/frontend/public`. It deliberately does not run the
+corpus-dependent resource generator or Rust compiler, because their source
+inputs and toolchains are not present in a clean Vercel checkout. After changing
+those inputs, run `npm run build:website` locally and commit the updated public
+artifacts before deploying. Generated question images are optional; when they
+are not deployed, the frontend falls back to its positioned-text question view.
+
+Vercel deploys the static frontend only. `/api/grade` remains the separately
+deployed Firebase Function described in `functions/README.md`; configure a proxy
+or migrate that endpoint before enabling AI grading on a Vercel domain.
+
 ## Main Workflows
 
 Source inputs live under `resources/pdfs/` and `resources/ocr/`. Parser-created
