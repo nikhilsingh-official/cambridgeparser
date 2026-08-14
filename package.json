@@ -12,7 +12,7 @@
     "preview:website": "vite preview --config src/website/frontend/vite.config.js",
     "dev:website:emulator": "VITE_USE_FIREBASE_EMULATORS=true npm run dev:website",
     "build:website:emulator": "VITE_USE_FIREBASE_EMULATORS=true npm run build:website",
-    "emulate": "npm run build:website:emulator && python3 functions/sync_pipeline.py && firebase emulators:start"
+    "emulate": "firebase emulators:exec --only auth,database 'npm run dev:website:emulator'"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.18.7",

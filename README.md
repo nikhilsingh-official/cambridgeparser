@@ -29,14 +29,31 @@ committed under `src/website/frontend/public`. It deliberately does not run the
 corpus-dependent resource generator or Rust compiler, because their source
 inputs and toolchains are not present in a clean Vercel checkout. After changing
 those inputs, run `npm run build:website` locally and commit the updated public
-artifacts before deploying. The generated question PNGs are intentional website
-assets and are tracked so a clean Vercel checkout can display them. Each image
+artifacts and `src/website/server_resources/grading_question_records.json.gz`
+before deploying. The generated question PNGs are intentional website assets
+and are tracked so a clean Vercel checkout can display them. Each image
 has a transparent, positioned text layer above it for selection and copying;
 the reconstructed text is never offered as a separate visible question view.
+Mark-scheme answers remain outside the browser bundle and are returned by the
+grading endpoint only after an authenticated submission.
 
-Vercel deploys the static frontend only. `/api/grade` remains the separately
-deployed Firebase Function described in `functions/README.md`; configure a proxy
-or migrate that endpoint before enabling AI grading on a Vercel domain.
+Vercel also deploys `api/grade.py` as the same-origin `/api/grade` Python
+Function. Add `OPENROUTER_API_KEY` under Vercel Project Settings → Environment
+Variables for Production (and Preview if desired), then redeploy; environment
+changes do not affect an already-built deployment. The key is read only inside
+the Function and is never included in the Vue bundle. The endpoint validates
+the browser's Firebase ID token before calling OpenRouter. Per-account quotas
+(8 submissions per 10 minutes and 50 per day) are stored under the
+rules-protected `gradingQuotas/$uid` Realtime Database path using that same
+token, so Vercel needs no Firebase Admin credential.
+
+Quota enforcement also requires the repository's Realtime Database rules. They
+are deployed separately from Vercel; deploy them once whenever
+`database.rules.json` changes:
+
+```bash
+firebase deploy --only database --project pseudocode-parser
+```
 
 The frontend uses the official Fontshare stylesheet for General Sans and bundles
 IBM Plex Mono from npm. The default Exam Paper theme uses General Sans with warm

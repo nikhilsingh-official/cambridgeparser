@@ -5,10 +5,6 @@
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [
       {
-        "source": "/api/**",
-        "function": { "functionId": "api", "region": "asia-southeast1" }
-      },
-      {
         "source": "**",
         "destination": "/index.html"
       }
@@ -31,18 +27,11 @@
       }
     ]
   },
-  "functions": {
-    "source": "functions",
-    "runtime": "python312",
-    "predeploy": ["python3 functions/sync_pipeline.py"],
-    "ignore": ["venv", ".git", "__pycache__", "*.pyc"]
-  },
   "database": {
     "rules": "database.rules.json"
   },
   "emulators": {
     "auth": { "port": 9099 },
-    "functions": { "port": 5001 },
     "database": { "port": 9000 },
     "hosting": { "port": 5000 },
     "ui": { "enabled": true },

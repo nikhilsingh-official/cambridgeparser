@@ -1,0 +1,197 @@
+"""Vercel Function for authenticated OpenRouter grading.
+
+The Vue client sends a Firebase ID token and a compact answer payload to this
+same-origin endpoint.  The function validates the token with Firebase Auth,
+loads the trusted question by id, and calls the shared grading pipeline with
+``OPENROUTER_API_KEY`` from Vercel's server-side environment.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import urllib.error
+import urllib.request
+from http.server import BaseHTTPRequestHandler
+from typing import Any, Mapping
+
+from api._quota import QuotaUnavailable, RateLimitExceeded, consume_quota
+from src.website.grade_one import grade_request, load_record
+
+
+GRADING_RESULT_SCHEMA = "grading-result/v1"
+MAX_REQUEST_BYTES = 256_000
+OPENROUTER_TIMEOUT_SECONDS = 50
+FIREBASE_WEB_API_KEY = os.environ.get(
+    "FIREBASE_WEB_API_KEY",
+    "AIzaSyAur3mTM0xxxFj5GSvLm3RCisbjmkYLroU",
+)
+FIREBASE_AUTH_LOOKUP_URL = os.environ.get(
+    "FIREBASE_AUTH_LOOKUP_URL",
+    "https://identitytoolkit.googleapis.com/v1/accounts:lookup",
+)
+
+
+def _error(message: str) -> dict[str, Any]:
+    return {
+        "schema_version": GRADING_RESULT_SCHEMA,
+        "ok": False,
+        "result": None,
+        "error": message,
+    }
+
+
+def _trusted_mark_scheme(record_id: Any) -> dict[str, Any] | None:
+    try:
+        record = load_record(record_id)
+    except Exception:  # noqa: BLE001 - public responses must remain JSON-shaped
+        return None
+    return (record.get("mark_scheme") or {}) if record else None
+
+
+def _error_for_record(message: str, request_payload: Mapping[str, Any]) -> dict[str, Any]:
+    """Build an error that can still reveal the submitted record's mark scheme."""
+
+    payload = _error(message)
+    mark_scheme = _trusted_mark_scheme(request_payload.get("record_id"))
+    if mark_scheme is not None:
+        payload["mark_scheme"] = mark_scheme
+    return payload
+
+
+def _bearer_token(headers: Mapping[str, str]) -> str:
+    scheme, _, token = (headers.get("Authorization") or "").partition(" ")
+    if scheme.casefold() != "bearer" or not token:
+        raise ValueError("missing bearer token")
+    return token
+
+
+def _verify_firebase_token(token: str) -> str:
+    """Return the Firebase uid for a valid current-user ID token."""
+
+    url = f"{FIREBASE_AUTH_LOOKUP_URL}?key={FIREBASE_WEB_API_KEY}"
+    request = urllib.request.Request(
+        url,
+        data=json.dumps({"idToken": token}).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=10) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+    users = payload.get("users") if isinstance(payload, dict) else None
+    uid = users[0].get("localId") if isinstance(users, list) and users else None
+    if not isinstance(uid, str) or not uid:
+        raise ValueError("token did not resolve to a Firebase user")
+    return uid
+
+
+def handle_grade(
+    method: str,
+    headers: Mapping[str, str],
+    body: bytes,
+) -> tuple[int, dict[str, Any]]:
+    """Handle one HTTP request and return ``(status, JSON payload)``."""
+
+    if method != "POST":
+        return 405, _error("POST required (this endpoint grades one submission)")
+    if len(body) > MAX_REQUEST_BYTES:
+        return 413, _error("request is too large")
+
+    try:
+        token = _bearer_token(headers)
+        uid = _verify_firebase_token(token)
+    except (ValueError, urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError):
+        return 401, _error("Sign in is required to use AI grading.")
+
+    try:
+        request_payload = json.loads(body)
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        return 400, _error(f"invalid request JSON: {error}")
+    if not isinstance(request_payload, dict):
+        return 400, _error("request JSON must be an object")
+
+    if not os.environ.get("OPENROUTER_API_KEY"):
+        return 503, _error_for_record(
+            "AI grading is not configured: OPENROUTER_API_KEY is missing.",
+            request_payload,
+        )
+
+    try:
+        remaining = consume_quota(uid, token)
+    except RateLimitExceeded as error:
+        payload = _error_for_record(
+            "AI grading limit reached. Try again later.",
+            request_payload,
+        )
+        payload["retry_after_seconds"] = error.retry_after
+        return 429, payload
+    except QuotaUnavailable:
+        return 503, _error_for_record(
+            "AI grading is temporarily unavailable. Please try again.",
+            request_payload,
+        )
+
+    try:
+        result = grade_request(request_payload, timeout=OPENROUTER_TIMEOUT_SECONDS)
+    except Exception:  # noqa: BLE001 - keep the public API JSON-shaped
+        return 500, _error_for_record(
+            "AI grading failed unexpectedly. Please try again.",
+            request_payload,
+        )
+    if "mark_scheme" not in result:
+        mark_scheme = _trusted_mark_scheme(request_payload.get("record_id"))
+        if mark_scheme is not None:
+            result["mark_scheme"] = mark_scheme
+    result["rate_limit_remaining"] = remaining
+    if result.get("ok"):
+        return 200, result
+    # A model/provider failure is a valid grading-result response. Keep it as a
+    # 200 so the results panel can render the provider's actionable error.
+    if result.get("provider") == "openrouter":
+        return 200, result
+    return 400, result
+
+
+class GradeHandler(BaseHTTPRequestHandler):
+    """Entrypoint detected by Vercel's Python runtime."""
+
+    def _respond(self, status: int, payload: dict[str, Any]) -> None:
+        body = json.dumps(payload).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(len(body)))
+        retry_after = payload.get("retry_after_seconds")
+        if status == 429 and isinstance(retry_after, int):
+            self.send_header("Retry-After", str(retry_after))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_POST(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
+        try:
+            content_length = int(self.headers.get("Content-Length") or "0")
+        except ValueError:
+            self._respond(400, _error("Content-Length must be an integer"))
+            return
+        if content_length > MAX_REQUEST_BYTES:
+            self._respond(413, _error("request is too large"))
+            return
+        try:
+            status, payload = handle_grade(
+                "POST",
+                self.headers,
+                self.rfile.read(content_length),
+            )
+        except Exception:  # noqa: BLE001 - final serverless HTTP boundary
+            status, payload = 500, _error(
+                "AI grading failed unexpectedly. Please try again."
+            )
+        self._respond(status, payload)
+
+    def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
+        status, payload = handle_grade("GET", self.headers, b"")
+        self._respond(status, payload)
+
+
+# Vercel discovers a lowercase symbol named ``handler`` for this runtime.
+handler = GradeHandler

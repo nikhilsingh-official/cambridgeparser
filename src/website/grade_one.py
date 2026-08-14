@@ -7,35 +7,44 @@ Reads a JSON request on stdin and writes a ``grading-result/v1`` JSON on stdout:
      "parse":  {"ok": bool, "statements": [...], "diagnostics": [...]}}
 
 The ``parse`` block is the browser's wasm-compiler output, so this entrypoint
-never needs the native Rust binary -- which is what lets the same code run as a
-Firebase Cloud Function (no Rust toolchain in the function runtime). Grading
-reuses the real pipeline in :mod:`src.pipeline.grading.openrouter_client`:
-dry-run without ``OPENROUTER_API_KEY``, a real Qwen call when the key is set.
+never needs the native Rust binary. The same request builder is used by the
+Vercel Function in ``api/grade.py``. Grading reuses the real pipeline in
+:mod:`src.pipeline.grading.openrouter_client`: dry-run without
+``OPENROUTER_API_KEY`` and a real model call when the key is set.
 """
 
 from __future__ import annotations
 
+import gzip
 import json
 import sys
 from pathlib import Path
 from typing import Any, Dict
 
 from src.pipeline.grading.ast_adapter import AST_VERSION, SCHEMA_VERSION
-from src.pipeline.grading.openrouter_client import OpenRouterConfig, grade_answer
+from src.pipeline.grading.openrouter_client import (
+    DEFAULT_TIMEOUT_SECONDS,
+    OpenRouterConfig,
+    grade_answer,
+)
 
 
 RECORDS_PATH = (
     Path(__file__).resolve().parents[2]
-    / "pseudocode_writing_hits"
-    / "pseudocode_question_records.json"
+    / "src"
+    / "website"
+    / "server_resources"
+    / "grading_question_records.json.gz"
 )
 _records_by_id: Dict[str, Dict[str, Any]] | None = None
+MAX_SOURCE_CHARS = 20_000
 
 
 def load_record(record_id: Any) -> Dict[str, Any] | None:
     global _records_by_id
     if _records_by_id is None:
-        payload = json.loads(RECORDS_PATH.read_text(encoding="utf-8"))
+        with gzip.open(RECORDS_PATH, "rt", encoding="utf-8") as records_file:
+            payload = json.load(records_file)
         _records_by_id = {
             str(record.get("id")): record
             for record in payload.get("records", [])
@@ -61,7 +70,11 @@ def build_parsed_answer(
     }
 
 
-def grade_request(request: Dict[str, Any]) -> Dict[str, Any]:
+def grade_request(
+    request: Dict[str, Any],
+    *,
+    timeout: int = DEFAULT_TIMEOUT_SECONDS,
+) -> Dict[str, Any]:
     if not isinstance(request, dict):
         return {
             "schema_version": "grading-result/v1",
@@ -93,6 +106,13 @@ def grade_request(request: Dict[str, Any]) -> Dict[str, Any]:
             "result": None,
             "error": "request.source must be a string",
         }
+    if len(source) > MAX_SOURCE_CHARS:
+        return {
+            "schema_version": "grading-result/v1",
+            "ok": False,
+            "result": None,
+            "error": f"request.source exceeds {MAX_SOURCE_CHARS} characters",
+        }
     if not isinstance(parse, dict):
         return {
             "schema_version": "grading-result/v1",
@@ -108,7 +128,12 @@ def grade_request(request: Dict[str, Any]) -> Dict[str, Any]:
             "error": "request.answer_kind is not supported",
         }
     parsed_answer = build_parsed_answer(source, parse, answer_kind)
-    result = grade_answer(record, parsed_answer, config=OpenRouterConfig())
+    result = grade_answer(
+        record,
+        parsed_answer,
+        config=OpenRouterConfig(),
+        timeout=timeout,
+    )
     result["mark_scheme"] = record.get("mark_scheme") or {}
     return result
 

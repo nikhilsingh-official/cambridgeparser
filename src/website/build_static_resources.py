@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import gzip
 import json
 from pathlib import Path
 from typing import Any, Dict
@@ -24,6 +25,9 @@ DEFAULT_QP_DIR = QP_OUTPUT_DIR
 DEFAULT_MARKER_ROOT = NORMALIZED_MARKER_OUTPUT_DIR
 DEFAULT_PDF_DIR = SOURCE_PDF_DIR
 DEFAULT_PUBLIC_DIR = Path("src/website/frontend/public/resources")
+DEFAULT_SERVER_RECORDS = Path(
+    "src/website/server_resources/grading_question_records.json.gz"
+)
 
 
 def _prune_stale_layout_images(images_dir: Path, referenced: set[str]) -> None:
@@ -60,6 +64,33 @@ def public_records_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
         ),
         "record_count": len(public_records),
         "records": public_records,
+    }
+
+
+def grading_records_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Keep only fields required to build a trusted server-side grading prompt."""
+
+    records = []
+    for record in payload.get("records") or []:
+        mark_scheme = record.get("mark_scheme") or {}
+        records.append(
+            {
+                key: record[key]
+                for key in ("id", "question_text", "question_context_text")
+                if key in record
+            }
+            | {
+                "mark_scheme": {
+                    key: mark_scheme[key]
+                    for key in ("answer_text", "marks_value", "max_marks", "marking_points")
+                    if key in mark_scheme
+                }
+            }
+        )
+    return {
+        "schema_version": "grading-question-records/v1",
+        "record_count": len(records),
+        "records": records,
     }
 
 
@@ -153,6 +184,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--marker-root", type=Path, default=DEFAULT_MARKER_ROOT)
     parser.add_argument("--pdf-dir", type=Path, default=DEFAULT_PDF_DIR)
     parser.add_argument("--public-dir", type=Path, default=DEFAULT_PUBLIC_DIR)
+    parser.add_argument("--server-records", type=Path, default=DEFAULT_SERVER_RECORDS)
     return parser.parse_args()
 
 
@@ -161,6 +193,12 @@ def main() -> int:
     payload = json.loads(args.records.read_text())
     records = payload.get("records") or []
 
+    args.server_records.parent.mkdir(parents=True, exist_ok=True)
+    grading_payload = json.dumps(
+        grading_records_payload(payload),
+        separators=(",", ":"),
+    ).encode("utf-8")
+    args.server_records.write_bytes(gzip.compress(grading_payload, mtime=0))
     args.public_dir.mkdir(parents=True, exist_ok=True)
     (args.public_dir / "pseudocode_question_records.json").write_text(
         json.dumps(public_records_payload(payload), separators=(",", ":"))

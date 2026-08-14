@@ -1,6 +1,6 @@
 // Submits a student answer to the grading AI. The browser never holds the
 // OpenRouter key: it POSTs to /api/grade, which is the Python pipeline in dev
-// (vite plugin) and a Firebase Cloud Function in production. The wasm parse
+// (Vite plugin) and a Vercel Python Function in production. The wasm parse
 // result travels with the request so the endpoint needs no Rust binary.
 
 import { auth } from './firebase'
@@ -56,6 +56,10 @@ export async function gradeSubmission(record, source, parse, answerKind = 'pseud
     const wait = Number.isFinite(retryAfter) && retryAfter > 0
       ? ` Try again in ${Math.ceil(retryAfter / 60)} minute(s).`
       : ''
+    if (data.schema_version === 'grading-result/v1') {
+      data.error = `${data.error || 'AI grading limit reached.'}${wait}`
+      return data
+    }
     throw new Error(`${data.error || 'AI grading limit reached.'}${wait}`)
   }
   // A grading-result/v1 with ok:false is a *handled* grading failure (e.g. no

@@ -9,8 +9,8 @@ const repoRoot = fileURLToPath(new URL('../../..', import.meta.url))
 // Dev-server grading endpoint. Mirrors the production contract: the browser
 // POSTs {record_id, source, parse} to /api/grade and gets a grading-result/v1 JSON
 // back. Locally it shells out to the real Python pipeline (dry-run without
-// OPENROUTER_API_KEY); in production Firebase Hosting rewrites /api/** to a
-// Cloud Function that reads the key from a secret.
+// OPENROUTER_API_KEY); in production api/grade.py runs as a Vercel Function and
+// reads the key from Vercel's server-side environment.
 function gradingApiPlugin() {
   const handler = (req, res, next) => {
     if (req.method !== 'POST') {

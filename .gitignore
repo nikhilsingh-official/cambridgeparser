@@ -54,6 +54,7 @@ Cargo.lock
 
 # Firebase
 .firebase/
+functions/
 firebase-debug.log
 *-debug.log
 .runtimeconfig.json

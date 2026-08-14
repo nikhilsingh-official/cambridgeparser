@@ -1,3 +1,4 @@
+import gzip
 import json
 import http.client
 import subprocess
@@ -190,6 +191,19 @@ class StaticVueWebsiteTests(unittest.TestCase):
         self.assertNotIn("marking_points", public_payload["records"][0]["mark_scheme"])
         self.assertIn("answer_text", source_payload["records"][0]["mark_scheme"])
 
+        server_path = (
+            REPO_ROOT
+            / "src"
+            / "website"
+            / "server_resources"
+            / "grading_question_records.json.gz"
+        )
+        with gzip.open(server_path, "rt", encoding="utf-8") as server_file:
+            server_payload = json.load(server_file)
+        self.assertEqual(server_payload["record_count"], len(source_payload["records"]))
+        self.assertIn("answer_text", server_payload["records"][0]["mark_scheme"])
+        self.assertNotIn("selection", server_payload["records"][0])
+
         normalized_questions = [
             " ".join(record["question_text"].casefold().split())
             for record in public_payload["records"]
@@ -247,14 +261,30 @@ class StaticVueWebsiteTests(unittest.TestCase):
         self.assertIn("/api/grade", grading)
         self.assertIn("Authorization: `Bearer ${token}`", grading)
         self.assertIn("record_id: record.id", grading)
+        self.assertIn("data.schema_version === 'grading-result/v1'", grading)
 
-    def test_production_grading_is_authenticated_and_rate_limited(self):
-        function_source = (REPO_ROOT / "functions" / "main.py").read_text()
-        self.assertIn("verify_id_token", function_source)
-        self.assertIn("_consume_account_quota", function_source)
-        self.assertIn('status=429', function_source)
-        self.assertIn('"Retry-After"', function_source)
-        self.assertNotIn('request.get("record")', function_source)
+    def test_vercel_builds_the_native_grading_function(self):
+        config = json.loads((REPO_ROOT / "vercel.json").read_text())
+        function = config["functions"]["api/grade.py"]
+        self.assertGreaterEqual(function["maxDuration"], 60)
+        self.assertIn("server_resources", function["includeFiles"])
+        self.assertNotIn("rewrites", config)
+
+    def test_production_grading_uses_firebase_auth_and_vercel_secret(self):
+        function_source = (REPO_ROOT / "api" / "grade.py").read_text()
+        self.assertIn("accounts:lookup", function_source)
+        self.assertIn('os.environ.get("OPENROUTER_API_KEY")', function_source)
+        self.assertIn("grade_request(request_payload, timeout=", function_source)
+        self.assertIn("consume_quota(uid, token)", function_source)
+        self.assertNotIn('request_payload.get("record")', function_source)
+
+    def test_grading_quota_rules_are_user_scoped(self):
+        rules = json.loads((REPO_ROOT / "database.rules.json").read_text())["rules"]
+        quota = rules["gradingQuotas"]["$uid"]
+        self.assertIn("auth.uid === $uid", quota[".read"])
+        self.assertIn("auth.uid === $uid", quota[".write"])
+        self.assertIn("<= 8", quota["burst"][".validate"])
+        self.assertIn("<= 50", quota["daily"][".validate"])
 
     def test_public_landing_page_only_links_into_login(self):
         landing = (FRONTEND_ROOT / "src" / "views" / "LandingView.vue").read_text()
@@ -362,7 +392,7 @@ class StaticVueWebsiteTests(unittest.TestCase):
 
 
 class GradeEndpointTests(unittest.TestCase):
-    """The /api/grade entrypoint reused by the vite dev server and Firebase."""
+    """The /api/grade entrypoint reused by Vite development and Vercel."""
 
     def test_grade_request_dry_run_without_key(self):
         import os
@@ -402,6 +432,20 @@ class GradeEndpointTests(unittest.TestCase):
         self.assertFalse(result["ok"])
         self.assertIn("record", result["error"])
 
+    def test_grade_request_rejects_oversized_source(self):
+        from src.website.grade_one import MAX_SOURCE_CHARS, grade_request
+
+        result = grade_request(
+            {
+                "record": {"mark_scheme": {"max_marks": 1}},
+                "source": "X" * (MAX_SOURCE_CHARS + 1),
+                "parse": {},
+            }
+        )
+
+        self.assertFalse(result["ok"])
+        self.assertIn("exceeds", result["error"])
+
     def test_grade_request_resolves_trusted_record_by_id(self):
         import os
         from unittest import mock
@@ -414,6 +458,160 @@ class GradeEndpointTests(unittest.TestCase):
 
         self.assertTrue(result["ok"])
         self.assertTrue(result["mark_scheme"]["marking_points"])
+
+
+class VercelGradeFunctionTests(unittest.TestCase):
+    def test_vercel_handler_serves_json_over_http(self):
+        from http.server import HTTPServer
+
+        from api import grade
+
+        server = HTTPServer(("127.0.0.1", 0), grade.GradeHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            connection = http.client.HTTPConnection(*server.server_address)
+            connection.request("POST", "/api/grade", body=b"{}")
+            response = connection.getresponse()
+            payload = json.loads(response.read())
+            connection.close()
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
+
+        self.assertEqual(response.status, 401)
+        self.assertEqual(response.getheader("Content-Type"), "application/json; charset=utf-8")
+        self.assertEqual(payload["schema_version"], "grading-result/v1")
+
+    def test_anonymous_request_is_rejected_as_json(self):
+        from api import grade
+
+        status, payload = grade.handle_grade("POST", {}, b"{}")
+
+        self.assertEqual(status, 401)
+        self.assertEqual(payload["schema_version"], "grading-result/v1")
+        self.assertIn("Sign in", payload["error"])
+
+    def test_missing_vercel_secret_is_reported_clearly(self):
+        import os
+        from unittest import mock
+
+        from api import grade
+
+        with (
+            mock.patch.object(grade, "_verify_firebase_token", return_value="user-1"),
+            mock.patch.dict(os.environ, {}, clear=False),
+        ):
+            os.environ.pop("OPENROUTER_API_KEY", None)
+            status, payload = grade.handle_grade(
+                "POST",
+                {"Authorization": "Bearer valid-token"},
+                b'{"record_id":23}',
+            )
+
+        self.assertEqual(status, 503)
+        self.assertIn("OPENROUTER_API_KEY", payload["error"])
+        self.assertIn("answer_text", payload["mark_scheme"])
+
+    def test_authenticated_request_uses_shared_grader(self):
+        from unittest import mock
+
+        from api import grade
+
+        expected = {
+            "schema_version": "grading-result/v1",
+            "ok": True,
+            "result": {"total_awarded": 1, "max_marks": 1, "points": []},
+            "error": None,
+        }
+        request = {"record_id": 23, "source": "OUTPUT 1", "parse": {}}
+        with (
+            mock.patch.object(grade, "_verify_firebase_token", return_value="user-1"),
+            mock.patch.object(grade, "consume_quota", return_value=7),
+            mock.patch.object(grade, "grade_request", return_value=expected) as grader,
+            mock.patch.dict("os.environ", {"OPENROUTER_API_KEY": "test-key"}),
+        ):
+            status, payload = grade.handle_grade(
+                "POST",
+                {"Authorization": "Bearer valid-token"},
+                json.dumps(request).encode(),
+            )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload, expected)
+        grader.assert_called_once_with(request, timeout=grade.OPENROUTER_TIMEOUT_SECONDS)
+
+    def test_rate_limit_returns_retry_metadata(self):
+        from unittest import mock
+
+        from api import grade
+
+        with (
+            mock.patch.object(grade, "_verify_firebase_token", return_value="user-1"),
+            mock.patch.object(
+                grade,
+                "consume_quota",
+                side_effect=grade.RateLimitExceeded(retry_after=37, limit=8),
+            ),
+            mock.patch.dict("os.environ", {"OPENROUTER_API_KEY": "test-key"}),
+        ):
+            status, payload = grade.handle_grade(
+                "POST",
+                {"Authorization": "Bearer valid-token"},
+                b'{"record_id":23,"source":"OUTPUT 1","parse":{}}',
+            )
+
+        self.assertEqual(status, 429)
+        self.assertEqual(payload["retry_after_seconds"], 37)
+        self.assertIn("answer_text", payload["mark_scheme"])
+
+    def test_unexpected_grader_failure_stays_json_shaped(self):
+        from unittest import mock
+
+        from api import grade
+
+        with (
+            mock.patch.object(grade, "_verify_firebase_token", return_value="user-1"),
+            mock.patch.object(grade, "consume_quota", return_value=7),
+            mock.patch.object(grade, "grade_request", side_effect=FileNotFoundError),
+            mock.patch.dict("os.environ", {"OPENROUTER_API_KEY": "test-key"}),
+        ):
+            status, payload = grade.handle_grade(
+                "POST",
+                {"Authorization": "Bearer valid-token"},
+                b'{"record_id":23,"source":"OUTPUT 1","parse":{}}',
+            )
+
+        self.assertEqual(status, 500)
+        self.assertEqual(payload["schema_version"], "grading-result/v1")
+        self.assertIn("answer_text", payload["mark_scheme"])
+
+    def test_validation_error_still_reveals_mark_scheme(self):
+        from unittest import mock
+
+        from api import grade
+        from src.website.grade_one import MAX_SOURCE_CHARS
+
+        request = {
+            "record_id": 23,
+            "source": "X" * (MAX_SOURCE_CHARS + 1),
+            "parse": {},
+        }
+        with (
+            mock.patch.object(grade, "_verify_firebase_token", return_value="user-1"),
+            mock.patch.object(grade, "consume_quota", return_value=7),
+            mock.patch.dict("os.environ", {"OPENROUTER_API_KEY": "test-key"}),
+        ):
+            status, payload = grade.handle_grade(
+                "POST",
+                {"Authorization": "Bearer valid-token"},
+                json.dumps(request).encode(),
+            )
+
+        self.assertEqual(status, 400)
+        self.assertIn("exceeds", payload["error"])
+        self.assertIn("answer_text", payload["mark_scheme"])
 
 
 if __name__ == "__main__":
