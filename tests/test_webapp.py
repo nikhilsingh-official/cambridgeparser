@@ -270,6 +270,24 @@ class StaticVueWebsiteTests(unittest.TestCase):
         self.assertIn("server_resources", function["includeFiles"])
         self.assertNotIn("rewrites", config)
 
+    def test_grading_function_defines_a_detectable_entrypoint(self):
+        """Vercel statically scans for a defined ``handler``/``app`` symbol.
+
+        An alias such as ``handler = GradeHandler`` is invisible to that scan,
+        so the deployment fails with "The pattern "api/grade.py" defined in
+        `functions` doesn't match any Serverless Functions inside the `api`
+        directory."
+        """
+        import ast
+
+        module = ast.parse((REPO_ROOT / "api" / "grade.py").read_text())
+        defined = {
+            node.name
+            for node in module.body
+            if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef))
+        }
+        self.assertTrue(defined & {"handler", "app"})
+
     def test_production_grading_uses_firebase_auth_and_vercel_secret(self):
         function_source = (REPO_ROOT / "api" / "grade.py").read_text()
         self.assertIn("accounts:lookup", function_source)
@@ -466,7 +484,7 @@ class VercelGradeFunctionTests(unittest.TestCase):
 
         from api import grade
 
-        server = HTTPServer(("127.0.0.1", 0), grade.GradeHandler)
+        server = HTTPServer(("127.0.0.1", 0), grade.handler)
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
         try:

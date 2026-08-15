@@ -152,8 +152,15 @@ def handle_grade(
     return 400, result
 
 
-class GradeHandler(BaseHTTPRequestHandler):
-    """Entrypoint detected by Vercel's Python runtime."""
+class handler(BaseHTTPRequestHandler):  # noqa: N801 - Vercel entrypoint name
+    """Entrypoint detected by Vercel's Python runtime.
+
+    Vercel's static analysis only recognises a class or function *defined*
+    under a lowercase ``handler`` (or ``app``) name; an alias assigned from
+    another name is invisible to it and the deployment fails with
+    ``The pattern "api/grade.py" defined in `functions` doesn't match any
+    Serverless Functions inside the `api` directory.``
+    """
 
     def _respond(self, status: int, payload: dict[str, Any]) -> None:
         body = json.dumps(payload).encode("utf-8")
@@ -191,7 +198,3 @@ class GradeHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
         status, payload = handle_grade("GET", self.headers, b"")
         self._respond(status, payload)
-
-
-# Vercel discovers a lowercase symbol named ``handler`` for this runtime.
-handler = GradeHandler
