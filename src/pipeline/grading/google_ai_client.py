@@ -6,18 +6,20 @@ directly with the same prompt, the same strict JSON contract, and the same
 interchangeable from the caller's point of view.
 
     GOOGLE_AI_STUDIO_API_KEY  required; set in Vercel's project environment
-    GOOGLE_AI_MODEL           default: gemini-2.5-flash-lite
+    GOOGLE_AI_MODELS          comma-separated rotation; default DEFAULT_ROTATION
+    GOOGLE_AI_MODEL           pins one model, disabling the rotation
     GOOGLE_AI_BASE_URL        default: https://generativelanguage.googleapis.com/v1beta
     GOOGLE_AI_THINKING_BUDGET optional; sends generationConfig.thinkingConfig
 
-Going direct rather than through OpenRouter removes the reseller margin, and
-Flash-Lite's output tokens are ~6x cheaper than gemini-2.5-flash's. When Google
-rate-limits us the caller falls back to OpenRouter -- see
-``grading.router.grade_answer_with_fallback``.
+AI Studio meters each model separately, so spreading requests across models
+multiplies the free allowance. Rotating *keys* would not: Google applies rate
+limits per project, not per key. When every free model is exhausted the caller
+falls back to OpenRouter -- see ``grading.router.grade_answer_routed``.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import urllib.error
@@ -35,11 +37,36 @@ from src.pipeline.grading.openrouter_client import (
     validate_grading_payload,
 )
 
-# gemini-2.5-flash-lite was the cheap default until Google closed it to new API
-# keys ("no longer available to new users", HTTP 404). 3.1-flash-lite is the
-# cheapest *current* Flash-Lite on the direct API at $0.25/$1.50 per 1M; note
-# 3.5-flash-lite costs $0.30/$2.50 -- newer, but no cheaper than 2.5-flash.
-DEFAULT_MODEL = "gemini-3.1-flash-lite"
+# Free-tier *capacity* picks the default here, not per-token price. Measured at
+# ~1.6K tokens per grade, AI Studio's free limits work out to:
+#
+#   gemma-4-31b-it        16K TPM -> ~10 grades/min, 14,400/day
+#   gemini-3.1-flash-lite 15 RPM  -> ~15 grades/min,     500/day
+#
+# Flash-Lite's 500/day is ten users at the 50/day account quota, so Gemma leads
+# and Flash-Lite is the next hop; both are free before OpenRouter costs money.
+# The eval harness put them level on marks (exact 32/45 each, MAE 0.38 vs 0.33).
+DEFAULT_MODEL = "gemma-4-31b-it"
+
+# AI Studio meters each model separately, so rotating models multiplies free
+# capacity in a way rotating *keys* cannot (limits are per project, not per
+# key). Every entry was verified against the real grading payload -- HTTP 200
+# and a reply passing validate_grading_payload() -- with its measured latency:
+#
+#   gemini-3.5-flash-lite  2.0s      gemma-4-31b-it        10.3s
+#   gemini-3.6-flash       3.5s      gemini-3.1-flash-lite 13.7s
+#
+# Verified but excluded: gemini-3.5-flash works and is correct, but averaged
+# 35.3s -- one slow model in the rotation would make one question in N crawl.
+# Rejected outright: gemini-3.7-flash (503), gemini-3-flash / gemini-2.5-flash
+# / gemini-2.5-flash-lite (404, closed to new keys), gemma-4-26b-a4b-it (timed
+# out past 120s). Re-run scratchpad/probe_models.py before adding any model.
+DEFAULT_ROTATION: List[str] = [
+    "gemini-3.5-flash-lite",
+    "gemini-3.6-flash",
+    "gemma-4-31b-it",
+    "gemini-3.1-flash-lite",
+]
 DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
 DEFAULT_TIMEOUT_SECONDS = 120
 MAX_ATTEMPTS = 2
@@ -108,13 +135,25 @@ class GoogleAIConfig:
         model: Optional[str] = None,
         base_url: Optional[str] = None,
         thinking_budget: Optional[int] = None,
+        models: Optional[List[str]] = None,
     ) -> None:
         self.api_key = (
             api_key
             if api_key is not None
             else os.environ.get("GOOGLE_AI_STUDIO_API_KEY")
         )
-        self.model = model or os.environ.get("GOOGLE_AI_MODEL") or DEFAULT_MODEL
+        # A single pinned model always wins over the rotation. The eval harness
+        # depends on this: comparing models is meaningless if the rotation can
+        # answer with a different one mid-run.
+        pinned = model or os.environ.get("GOOGLE_AI_MODEL")
+        if models is not None:
+            self.models = list(models)
+        elif pinned:
+            self.models = [pinned]
+        else:
+            self.models = _env_list("GOOGLE_AI_MODELS") or list(DEFAULT_ROTATION)
+        self.models = self.models or [DEFAULT_MODEL]
+        self.model = self.models[0]
         self.base_url = (
             base_url or os.environ.get("GOOGLE_AI_BASE_URL") or DEFAULT_BASE_URL
         ).rstrip("/")
@@ -130,6 +169,40 @@ class GoogleAIConfig:
     @property
     def has_api_key(self) -> bool:
         return bool(self.api_key)
+
+    def rotation_for(self, key: Any = None) -> List[str]:
+        """The rotation, ordered so ``key`` deterministically picks the head.
+
+        Keying on the question id spreads load across models while keeping one
+        question on one model, so two students answering the same question are
+        marked by the same grader. Models differ in generosity -- the eval put
+        gemma-4-31b-it at 11 over-awards to 2 under, against 8/5 for
+        gemini-3.1-flash-lite -- so an unkeyed rotation would decide marks by
+        coin flip. Without a key, order is preserved.
+        """
+        models = list(self.models)
+        if key is None or len(models) < 2:
+            return models
+        digest = hashlib.sha256(str(key).encode("utf-8")).digest()
+        offset = int.from_bytes(digest[:4], "big") % len(models)
+        return models[offset:] + models[:offset]
+
+    def for_model(self, model: str) -> "GoogleAIConfig":
+        """A copy pinned to one model, so the rotation never mutates shared state."""
+        return GoogleAIConfig(
+            api_key=self.api_key,
+            base_url=self.base_url,
+            thinking_budget=self.thinking_budget,
+            models=[model],
+        )
+
+
+def _env_list(name: str) -> Optional[List[str]]:
+    value = os.environ.get(name)
+    if not value:
+        return None
+    items = [item.strip() for item in value.split(",") if item.strip()]
+    return items or None
 
 
 def _env_int(name: str) -> Optional[int]:

@@ -50,8 +50,21 @@ token, so Vercel needs no Firebase Admin credential.
 
 ### Grading providers
 
-Grading calls Google AI Studio directly (`gemini-3.1-flash-lite`) and falls
-back to OpenRouter for exactly two failures, both Google's rather than ours:
+Grading rotates across several free Google models, then falls back to
+OpenRouter once they are all exhausted. AI Studio meters **each model
+separately**, so the rotation multiplies the free allowance — note that
+rotating API *keys* would not, because Google applies rate limits per project,
+not per key.
+
+The rotation is ordered by a hash of the question id, so one question always
+lands on the same model. That matters because models differ in generosity (the
+eval put `gemma-4-31b-it` at 11 over-awards to 2 under, against 8/5 for
+`gemini-3.1-flash-lite`), and an unkeyed rotation would let luck decide marks.
+Different questions still spread across the whole list. The grading model is
+reported in the result's `model` field.
+
+A hop to the next model happens for exactly two failures, both Google's rather
+than ours:
 
 - `rate_limit` — HTTP 429, or a `RESOURCE_EXHAUSTED` body (Google sometimes
   returns that as a 403).
@@ -64,12 +77,43 @@ bugs, and retrying them through a second vendor spends money to fail twice. A
 fallback result carries `fallback_from` — including the reason — so the switch
 is visible rather than silent.
 
-**On model choice:** the Flash-Lite tier is no longer uniformly cheap.
-`gemini-3.5-flash-lite` costs $0.30/$2.50 per 1M — newer than `gemini-2.5-flash`
-but no cheaper. `gemini-3.1-flash-lite` at $0.25/$1.50 is the cheapest current
-Flash-Lite on the direct API, which is why it is the default. Cheaper still is
-the retired `google/gemini-2.5-flash-lite` at $0.10/$0.40 via OpenRouter, which
-is only reachable through the fallback path.
+**Which models are in the rotation** was decided by probing every candidate
+with the real grading payload and keeping only those that returned HTTP 200
+*and* a reply passing `validate_grading_payload()`:
+
+| Model | Verdict | Latency |
+| --- | --- | --- |
+| `gemini-3.5-flash-lite` | in rotation | 2.0s |
+| `gemini-3.6-flash` | in rotation | 3.5s |
+| `gemma-4-31b-it` | in rotation | 10.3s |
+| `gemini-3.1-flash-lite` | in rotation | 13.7s |
+| `gemini-3.5-flash` | works, excluded — too slow | 35.3s |
+| `gemini-3.7-flash` | 503 | — |
+| `gemini-3-flash`, `gemini-2.5-flash`, `gemini-2.5-flash-lite` | 404, closed to new keys | — |
+| `gemma-4-26b-a4b-it` | timed out past 120s | — |
+
+Re-run `probe_models.py` before adding a model; a model that 404s or returns
+prose instead of JSON would otherwise burn a rotation slot on every request.
+
+**On model choice:** free-tier *capacity* decides the order, not per-token
+price. Measured at ~1.6K tokens per grade, AI Studio's free limits give:
+
+| Model | binding limit | grades/min | grades/day | users/day at the 50/day quota |
+| --- | --- | --- | --- | --- |
+| `gemma-4-31b-it` | 16K TPM | ~10 | 14,400 | ~288 |
+| `gemini-3.1-flash-lite` | 15 RPM | ~15 | 500 | ~10 |
+
+Flash-Lite is faster per minute but runs out after 500 requests a day — ten
+users at full quota — so Gemma leads and Flash-Lite is the second free hop.
+Note each model's *other* limit never binds: Gemma's 30 RPM is unreachable
+under 16K TPM, and Flash-Lite's 250K TPM is unreachable under 15 RPM.
+
+The eval harness put the two level on marks (exact 32/45 each; MAE 0.38 vs
+0.33), but Gemma skews generous — it over-awarded 11 times against 2
+under-awards, versus 8/5 for Flash-Lite — so re-check accuracy with the eval
+before changing this order. Paid alternatives, if the free tiers stop being
+enough: `gemini-3.1-flash-lite` at $0.25/$1.50 per 1M, or the retired
+`google/gemini-2.5-flash-lite` at $0.10/$0.40, reachable only via OpenRouter.
 
 Both providers enforce the same strict JSON contract and return the same
 `grading-result/v1` envelope, and `validate_grading_payload()` re-checks every
@@ -78,7 +122,8 @@ response regardless of provider. Overrides:
 | Variable | Default |
 | --- | --- |
 | `GOOGLE_AI_STUDIO_API_KEY` | — (required for the primary path) |
-| `GOOGLE_AI_MODEL` | `gemini-3.1-flash-lite` |
+| `GOOGLE_AI_MODELS` | `gemini-3.5-flash-lite,gemini-3.6-flash,gemma-4-31b-it,gemini-3.1-flash-lite` |
+| `GOOGLE_AI_MODEL` | unset; pins one model and disables the rotation (the eval harness relies on this) |
 | `GOOGLE_AI_BASE_URL` | `https://generativelanguage.googleapis.com/v1beta` |
 | `GOOGLE_AI_THINKING_BUDGET` | unset (Flash-Lite does not think by default) |
 | `OPENROUTER_API_KEY` | — (required for the fallback path) |

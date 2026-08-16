@@ -14,7 +14,7 @@ the eval harness instead of being silently absorbed.
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from src.pipeline.grading.google_ai_client import (
     GoogleAIConfig,
@@ -64,17 +64,33 @@ def grade_answer_routed(
             timeout=timeout,
         )
 
-    primary = grade_answer_google(
-        record,
-        parsed_answer,
-        config=google_config,
-        dry_run=False,
-        transport=google_transport,
-        timeout=timeout,
-    )
-    fallback_reason = primary.get("fallback_reason")
-    if primary.get("ok") or not fallback_reason:
-        return primary
+    # Walk the free Google models in order, exhausting each free tier before the
+    # next. Only a rate_limit/model_unavailable verdict advances the chain.
+    attempts: List[Dict[str, Any]] = []
+    primary: Dict[str, Any] = {}
+    fallback_reason: Optional[str] = None
+    for model in google_config.rotation_for(record.get("id")):
+        primary = grade_answer_google(
+            record,
+            parsed_answer,
+            config=google_config.for_model(model),
+            dry_run=False,
+            transport=google_transport,
+            timeout=timeout,
+        )
+        fallback_reason = primary.get("fallback_reason")
+        if primary.get("ok") or not fallback_reason:
+            if attempts:
+                primary["fallback_from"] = attempts[-1]
+            return primary
+        attempts.append(
+            {
+                "provider": primary.get("provider"),
+                "model": model,
+                "reason": fallback_reason,
+                "error": primary.get("error"),
+            }
+        )
 
     if not openrouter_config.has_api_key:
         primary["error"] = (
@@ -90,12 +106,8 @@ def grade_answer_routed(
         transport=openrouter_transport,
         timeout=timeout,
     )
-    fallback["fallback_from"] = {
-        "provider": primary.get("provider"),
-        "model": primary.get("model"),
-        "reason": fallback_reason,
-        "error": primary.get("error"),
-    }
+    fallback["fallback_from"] = attempts[-1]
+    fallback["fallback_chain"] = attempts
     return fallback
 
 

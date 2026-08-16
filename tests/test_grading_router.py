@@ -292,3 +292,110 @@ class RouterTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ModelRotationTests(unittest.TestCase):
+    """Spread load across models, which AI Studio meters separately."""
+
+    def _rotation_transport(self, failures):
+        """Fail for models named in `failures`, succeed otherwise."""
+
+        def transport(url, headers, body, timeout):
+            for model, code in failures.items():
+                if f"/{model}:generateContent" in url:
+                    raise urllib.error.HTTPError(
+                        url, code, "err", {}, __import__("io").BytesIO(b'{"e":1}')
+                    )
+            return gemini_response(GOOD_PAYLOAD)
+
+        return transport
+
+    def test_default_rotation_is_the_verified_models(self):
+        self.assertEqual(
+            GoogleAIConfig(api_key="g").models,
+            [
+                "gemini-3.5-flash-lite",
+                "gemini-3.6-flash",
+                "gemma-4-31b-it",
+                "gemini-3.1-flash-lite",
+            ],
+        )
+
+    def test_rotation_is_a_permutation_of_the_whole_list(self):
+        config = GoogleAIConfig(api_key="g")
+        for key in ("q1", "q2", "17", "some-record"):
+            self.assertCountEqual(config.rotation_for(key), config.models)
+
+    def test_same_question_always_gets_the_same_model(self):
+        """Two students, one question, one grader -- marks stay comparable."""
+        config = GoogleAIConfig(api_key="g")
+        first = config.rotation_for("record-42")[0]
+        for _ in range(5):
+            self.assertEqual(config.rotation_for("record-42")[0], first)
+
+    def test_different_questions_spread_across_models(self):
+        config = GoogleAIConfig(api_key="g")
+        heads = {config.rotation_for(f"record-{i}")[0] for i in range(40)}
+        self.assertGreater(len(heads), 1, "rotation is not spreading load")
+
+    def test_pinning_a_model_disables_rotation(self):
+        """The eval harness depends on this: one run, one model."""
+        config = GoogleAIConfig(api_key="g", model="gemma-4-31b-it")
+        self.assertEqual(config.models, ["gemma-4-31b-it"])
+        self.assertEqual(config.rotation_for("anything"), ["gemma-4-31b-it"])
+
+    def test_explicit_list_overrides_the_default(self):
+        config = GoogleAIConfig(api_key="g", models=["a", "b"])
+        self.assertEqual(config.models, ["a", "b"])
+
+    def test_rate_limited_model_advances_to_the_next(self):
+        def openrouter(url, headers, body, timeout):
+            raise AssertionError("must exhaust the free Google models first")
+
+        config = GoogleAIConfig(api_key="g")
+        first = config.rotation_for(RECORD["id"])[0]
+        result = grade_answer_routed(
+            RECORD,
+            PARSED,
+            google_config=config,
+            openrouter_config=OpenRouterConfig(api_key="o"),
+            google_transport=self._rotation_transport({first: 429}),
+            openrouter_transport=openrouter,
+        )
+        self.assertTrue(result["ok"], result.get("error"))
+        self.assertEqual(result["provider"], "google-ai-studio")
+        self.assertNotEqual(result["model"], first)
+        self.assertEqual(result["fallback_from"]["model"], first)
+
+    def test_every_model_exhausted_reaches_openrouter(self):
+        config = GoogleAIConfig(api_key="g")
+        result = grade_answer_routed(
+            RECORD,
+            PARSED,
+            google_config=config,
+            openrouter_config=OpenRouterConfig(api_key="o"),
+            google_transport=self._rotation_transport(
+                {model: 429 for model in config.models}
+            ),
+            openrouter_transport=RouterTests()._openrouter_ok(),
+        )
+        self.assertTrue(result["ok"], result.get("error"))
+        self.assertEqual(result["provider"], "openrouter")
+        self.assertEqual(len(result["fallback_chain"]), len(config.models))
+
+    def test_a_real_bug_stops_instead_of_burning_the_rotation(self):
+        config = GoogleAIConfig(api_key="g")
+        first = config.rotation_for(RECORD["id"])[0]
+        result = grade_answer_routed(
+            RECORD,
+            PARSED,
+            google_config=config,
+            openrouter_config=OpenRouterConfig(api_key="o"),
+            google_transport=self._rotation_transport({first: 400}),
+        )
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["model"], first)
+
+
+if __name__ == "__main__":
+    unittest.main()
