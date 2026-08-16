@@ -1,7 +1,7 @@
 """Google AI Studio client + provider routing.
 
-The fallback rule under test: OpenRouter is used when Google rate-limits us,
-and *only* then.
+The fallback rule under test: OpenRouter is used when Google refuses on quota
+or the model is unavailable to our key, and *only* then.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ import urllib.error
 from src.pipeline.grading.google_ai_client import (
     GoogleAIConfig,
     grade_answer_google,
-    is_rate_limit,
+    classify_failure,
     to_gemini_request,
 )
 from src.pipeline.grading.openrouter_client import OpenRouterConfig
@@ -147,18 +147,37 @@ class GoogleClientTests(unittest.TestCase):
             RECORD, PARSED, config=GoogleAIConfig(api_key="k"), transport=http_error(429)
         )
         self.assertFalse(result["ok"])
-        self.assertTrue(result["rate_limited"])
+        self.assertEqual(result["fallback_reason"], "rate_limit")
 
-    def test_other_errors_are_not_flagged_as_rate_limits(self):
+    def test_retired_model_404_is_flagged_for_the_router(self):
+        """Regression: Google retired gemini-2.5-flash-lite for new keys."""
+        body = (
+            b'{"error":{"code":404,"message":"This model models/gemini-2.5-flash-lite'
+            b' is no longer available to new users.","status":"NOT_FOUND"}}'
+        )
+        result = grade_answer_google(
+            RECORD,
+            PARSED,
+            config=GoogleAIConfig(api_key="k"),
+            transport=http_error(404, body),
+        )
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["fallback_reason"], "model_unavailable")
+
+    def test_other_errors_are_not_flagged_for_fallback(self):
         result = grade_answer_google(
             RECORD, PARSED, config=GoogleAIConfig(api_key="k"), transport=http_error(400)
         )
         self.assertFalse(result["ok"])
-        self.assertFalse(result["rate_limited"])
+        self.assertIsNone(result["fallback_reason"])
 
-    def test_resource_exhausted_body_counts_as_a_rate_limit(self):
-        self.assertTrue(is_rate_limit(403, '{"error":{"status":"RESOURCE_EXHAUSTED"}}'))
-        self.assertFalse(is_rate_limit(400, "bad request"))
+    def test_failure_classification(self):
+        self.assertEqual(
+            classify_failure(403, '{"error":{"status":"RESOURCE_EXHAUSTED"}}'),
+            "rate_limit",
+        )
+        self.assertEqual(classify_failure(404, "NOT_FOUND"), "model_unavailable")
+        self.assertIsNone(classify_failure(400, "bad request"))
 
     def test_invalid_model_json_is_rejected_not_passed_through(self):
         def transport(url, headers, body, timeout):
@@ -208,6 +227,21 @@ class RouterTests(unittest.TestCase):
         self.assertTrue(result["ok"], result.get("error"))
         self.assertEqual(result["provider"], "openrouter")
         self.assertEqual(result["fallback_from"]["provider"], "google-ai-studio")
+        self.assertEqual(result["fallback_from"]["reason"], "rate_limit")
+
+    def test_retired_model_falls_back_to_openrouter(self):
+        """The 404 outage must not take grading down when OpenRouter can serve."""
+        result = grade_answer_routed(
+            RECORD,
+            PARSED,
+            google_config=GoogleAIConfig(api_key="g"),
+            openrouter_config=OpenRouterConfig(api_key="o"),
+            google_transport=http_error(404, b'{"error":{"status":"NOT_FOUND"}}'),
+            openrouter_transport=self._openrouter_ok(),
+        )
+        self.assertTrue(result["ok"], result.get("error"))
+        self.assertEqual(result["provider"], "openrouter")
+        self.assertEqual(result["fallback_from"]["reason"], "model_unavailable")
 
     def test_non_rate_limit_failure_does_not_fall_back(self):
         def openrouter(url, headers, body, timeout):

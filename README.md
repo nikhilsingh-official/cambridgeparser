@@ -50,12 +50,26 @@ token, so Vercel needs no Firebase Admin credential.
 
 ### Grading providers
 
-Grading calls Google AI Studio directly (`gemini-2.5-flash-lite`) and falls
-back to OpenRouter **only** when Google refuses on quota — an HTTP 429 or a
-`RESOURCE_EXHAUSTED` body. Every other failure (a 400, a schema violation, an
-outage) stays on Google: those are our bugs, and retrying them through a second
-vendor spends money to fail twice. A fallback result carries `fallback_from`
-so the switch is visible rather than silent.
+Grading calls Google AI Studio directly (`gemini-3.1-flash-lite`) and falls
+back to OpenRouter for exactly two failures, both Google's rather than ours:
+
+- `rate_limit` — HTTP 429, or a `RESOURCE_EXHAUSTED` body (Google sometimes
+  returns that as a 403).
+- `model_unavailable` — HTTP 404 / `NOT_FOUND`. This is not hypothetical:
+  `gemini-2.5-flash-lite` was retired for new API keys while OpenRouter kept
+  serving it, which took grading down until the fallback covered it.
+
+Every other failure (a 400, a schema violation) stays on Google: those are our
+bugs, and retrying them through a second vendor spends money to fail twice. A
+fallback result carries `fallback_from` — including the reason — so the switch
+is visible rather than silent.
+
+**On model choice:** the Flash-Lite tier is no longer uniformly cheap.
+`gemini-3.5-flash-lite` costs $0.30/$2.50 per 1M — newer than `gemini-2.5-flash`
+but no cheaper. `gemini-3.1-flash-lite` at $0.25/$1.50 is the cheapest current
+Flash-Lite on the direct API, which is why it is the default. Cheaper still is
+the retired `google/gemini-2.5-flash-lite` at $0.10/$0.40 via OpenRouter, which
+is only reachable through the fallback path.
 
 Both providers enforce the same strict JSON contract and return the same
 `grading-result/v1` envelope, and `validate_grading_payload()` re-checks every
@@ -64,7 +78,7 @@ response regardless of provider. Overrides:
 | Variable | Default |
 | --- | --- |
 | `GOOGLE_AI_STUDIO_API_KEY` | — (required for the primary path) |
-| `GOOGLE_AI_MODEL` | `gemini-2.5-flash-lite` |
+| `GOOGLE_AI_MODEL` | `gemini-3.1-flash-lite` |
 | `GOOGLE_AI_BASE_URL` | `https://generativelanguage.googleapis.com/v1beta` |
 | `GOOGLE_AI_THINKING_BUDGET` | unset (Flash-Lite does not think by default) |
 | `OPENROUTER_API_KEY` | — (required for the fallback path) |

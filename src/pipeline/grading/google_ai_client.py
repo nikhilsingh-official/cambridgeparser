@@ -35,7 +35,11 @@ from src.pipeline.grading.openrouter_client import (
     validate_grading_payload,
 )
 
-DEFAULT_MODEL = "gemini-2.5-flash-lite"
+# gemini-2.5-flash-lite was the cheap default until Google closed it to new API
+# keys ("no longer available to new users", HTTP 404). 3.1-flash-lite is the
+# cheapest *current* Flash-Lite on the direct API at $0.25/$1.50 per 1M; note
+# 3.5-flash-lite costs $0.30/$2.50 -- newer, but no cheaper than 2.5-flash.
+DEFAULT_MODEL = "gemini-3.1-flash-lite"
 DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
 DEFAULT_TIMEOUT_SECONDS = 120
 MAX_ATTEMPTS = 2
@@ -198,11 +202,26 @@ def extract_text(envelope: Dict[str, Any]) -> str:
     return text
 
 
-def is_rate_limit(code: int, detail: str) -> bool:
-    """True when Google is refusing on quota rather than on the request itself."""
-    if code == 429:
-        return True
-    return "RESOURCE_EXHAUSTED" in detail
+def classify_failure(code: int, detail: str) -> Optional[str]:
+    """Name the failures worth retrying on the other provider, else None.
+
+    Two cases are Google's problem rather than ours, and OpenRouter may well
+    serve the same request:
+
+    ``rate_limit``        quota refusal (429, or RESOURCE_EXHAUSTED in the body,
+                          which Google sometimes returns as 403).
+    ``model_unavailable`` the model is gone for this key (404 / NOT_FOUND) --
+                          how gemini-2.5-flash-lite broke: retired for new users
+                          while OpenRouter still served it.
+
+    Everything else (a 400, a bad schema) is our bug; retrying it elsewhere
+    would only spend money to fail twice.
+    """
+    if code == 429 or "RESOURCE_EXHAUSTED" in detail:
+        return "rate_limit"
+    if code == 404 or "NOT_FOUND" in detail:
+        return "model_unavailable"
+    return None
 
 
 def _failure(
@@ -210,7 +229,7 @@ def _failure(
     error: str,
     raw_response: Optional[str],
     *,
-    rate_limited: bool = False,
+    fallback_reason: Optional[str] = None,
 ) -> Dict[str, Any]:
     return {
         "schema_version": RESULT_SCHEMA_VERSION,
@@ -221,7 +240,7 @@ def _failure(
         "result": None,
         "error": error,
         "raw_response": raw_response,
-        "rate_limited": rate_limited,
+        "fallback_reason": fallback_reason,
     }
 
 
@@ -267,9 +286,12 @@ def grade_answer_google(
             except Exception:  # noqa: BLE001 - best-effort detail capture
                 pass
             last_error = f"HTTP {error.code}: {detail or error.reason}"
-            if is_rate_limit(error.code, detail):
+            fallback_reason = classify_failure(error.code, detail)
+            if fallback_reason is not None:
                 # Do not burn the retry here: OpenRouter is the better next hop.
-                return _failure(config, last_error, raw_response, rate_limited=True)
+                return _failure(
+                    config, last_error, raw_response, fallback_reason=fallback_reason
+                )
             if error.code in (500, 502, 503) and attempt < MAX_ATTEMPTS:
                 continue
             break

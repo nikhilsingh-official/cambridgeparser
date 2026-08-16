@@ -1,10 +1,11 @@
 """Provider routing for grading: Google AI Studio first, OpenRouter as backup.
 
-Google AI Studio is the default because it is the cheapest path to the model we
-actually want (gemini-2.5-flash-lite). OpenRouter stays configured as the
-fallback for one specific failure: Google refusing the call on quota. Every
-other failure is *our* problem (a bad prompt, a broken schema, an outage) and
-retrying it through a second vendor would only spend money to fail twice.
+Google AI Studio is the default because calling Google directly avoids the
+reseller margin. OpenRouter stays configured as the fallback for the two
+failures that are Google's problem rather than ours: a quota refusal, and a
+model that has become unavailable to our key (see ``classify_failure``). Every
+other failure is *our* problem (a bad prompt, a broken schema) and retrying it
+through a second vendor would only spend money to fail twice.
 
 The returned envelope is grading-result/v1 either way. When a fallback happened
 the result carries ``fallback_from`` so the failure is visible in logs and in
@@ -71,7 +72,8 @@ def grade_answer_routed(
         transport=google_transport,
         timeout=timeout,
     )
-    if primary.get("ok") or not primary.get("rate_limited"):
+    fallback_reason = primary.get("fallback_reason")
+    if primary.get("ok") or not fallback_reason:
         return primary
 
     if not openrouter_config.has_api_key:
@@ -91,6 +93,7 @@ def grade_answer_routed(
     fallback["fallback_from"] = {
         "provider": primary.get("provider"),
         "model": primary.get("model"),
+        "reason": fallback_reason,
         "error": primary.get("error"),
     }
     return fallback
