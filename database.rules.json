@@ -32,11 +32,15 @@
 
         "burst": {
           ".validate": "newData.hasChildren(['startedAt', 'count']) && newData.child('startedAt').isNumber() && newData.child('count').isNumber() && newData.child('count').val() >= 1 && newData.child('count').val() <= 8 && ((!data.exists() && newData.child('startedAt').val() <= now && newData.child('startedAt').val() >= now - 60000 && newData.child('count').val() === 1) || (data.exists() && ((now < data.child('startedAt').val() + 600000 && newData.child('startedAt').val() === data.child('startedAt').val() && newData.child('count').val() === data.child('count').val() + 1) || (now >= data.child('startedAt').val() + 600000 && newData.child('startedAt').val() <= now && newData.child('startedAt').val() >= now - 60000 && newData.child('count').val() === 1))))",
+          "startedAt": { ".validate": "newData.isNumber()" },
+          "count": { ".validate": "newData.isNumber()" },
           "$other": { ".validate": false }
         },
 
         "daily": {
           ".validate": "newData.hasChildren(['startedAt', 'count']) && newData.child('startedAt').isNumber() && newData.child('count').isNumber() && newData.child('count').val() >= 1 && newData.child('count').val() <= 50 && ((!data.exists() && newData.child('startedAt').val() <= now && newData.child('startedAt').val() >= now - 60000 && newData.child('count').val() === 1) || (data.exists() && ((now < data.child('startedAt').val() + 86400000 && newData.child('startedAt').val() === data.child('startedAt').val() && newData.child('count').val() === data.child('count').val() + 1) || (now >= data.child('startedAt').val() + 86400000 && newData.child('startedAt').val() <= now && newData.child('startedAt').val() >= now - 60000 && newData.child('count').val() === 1))))",
+          "startedAt": { ".validate": "newData.isNumber()" },
+          "count": { ".validate": "newData.isNumber()" },
           "$other": { ".validate": false }
         },
 

@@ -18,7 +18,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from src.resources.paths import PSEUDOCODE_QUESTION_RECORDS_JSON
 
 from ..ast_adapter import parse_answer
-from ..openrouter_client import OpenRouterConfig, grade_answer
+from ..router import grade_answer_routed
 from .cases import CASES
 
 Key = Tuple[str, str, Optional[str], Optional[str]]
@@ -56,8 +56,6 @@ def run(records_path: Path, parse_timeout: float) -> Dict[str, Any]:
     by_key: Dict[Key, Dict[str, Any]] = {
         _record_key(r): r for r in payload.get("records") or []
     }
-    config = OpenRouterConfig()
-
     results: List[Dict[str, Any]] = []
     missing: List[Key] = []
     for case in CASES:
@@ -69,7 +67,9 @@ def run(records_path: Path, parse_timeout: float) -> Dict[str, Any]:
         max_marks = (record.get("mark_scheme") or {}).get("max_marks")
         for candidate in case["candidates"]:
             parsed = parse_answer(candidate["answer"], timeout=parse_timeout)
-            grading = grade_answer(record, parsed, config=config)
+            # Route exactly as production does, so the eval measures the
+            # provider and model that actually grade student answers.
+            grading = grade_answer_routed(record, parsed)
             awarded = None
             if grading.get("ok"):
                 awarded = (grading.get("result") or {}).get("total_awarded")

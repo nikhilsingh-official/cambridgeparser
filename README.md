@@ -38,14 +38,45 @@ Mark-scheme answers remain outside the browser bundle and are returned by the
 grading endpoint only after an authenticated submission.
 
 Vercel also deploys `api/grade.py` as the same-origin `/api/grade` Python
-Function. Add `OPENROUTER_API_KEY` under Vercel Project Settings → Environment
-Variables for Production (and Preview if desired), then redeploy; environment
-changes do not affect an already-built deployment. The key is read only inside
-the Function and is never included in the Vue bundle. The endpoint validates
-the browser's Firebase ID token before calling OpenRouter. Per-account quotas
+Function. Add `GOOGLE_AI_STUDIO_API_KEY` and `OPENROUTER_API_KEY` under Vercel
+Project Settings → Environment Variables for Production (and Preview if
+desired), then redeploy; environment changes do not affect an already-built
+deployment. The keys are read only inside the Function and are never included
+in the Vue bundle. The endpoint validates the browser's Firebase ID token
+before calling the model provider. Per-account quotas
 (8 submissions per 10 minutes and 50 per day) are stored under the
 rules-protected `gradingQuotas/$uid` Realtime Database path using that same
 token, so Vercel needs no Firebase Admin credential.
+
+### Grading providers
+
+Grading calls Google AI Studio directly (`gemini-2.5-flash-lite`) and falls
+back to OpenRouter **only** when Google refuses on quota — an HTTP 429 or a
+`RESOURCE_EXHAUSTED` body. Every other failure (a 400, a schema violation, an
+outage) stays on Google: those are our bugs, and retrying them through a second
+vendor spends money to fail twice. A fallback result carries `fallback_from`
+so the switch is visible rather than silent.
+
+Both providers enforce the same strict JSON contract and return the same
+`grading-result/v1` envelope, and `validate_grading_payload()` re-checks every
+response regardless of provider. Overrides:
+
+| Variable | Default |
+| --- | --- |
+| `GOOGLE_AI_STUDIO_API_KEY` | — (required for the primary path) |
+| `GOOGLE_AI_MODEL` | `gemini-2.5-flash-lite` |
+| `GOOGLE_AI_BASE_URL` | `https://generativelanguage.googleapis.com/v1beta` |
+| `GOOGLE_AI_THINKING_BUDGET` | unset (Flash-Lite does not think by default) |
+| `OPENROUTER_API_KEY` | — (required for the fallback path) |
+| `OPENROUTER_MODEL` | `google/gemini-2.5-flash` |
+
+If only one key is set, that provider is used alone; with neither, grading runs
+in deterministic dry-run mode. Model changes should be measured with the eval
+harness before shipping, which routes exactly as production does:
+
+```bash
+python -m src.pipeline.grading.eval --output-json eval.json
+```
 
 Quota enforcement also requires the repository's Realtime Database rules. They
 are deployed separately from Vercel; deploy them once whenever

@@ -1,9 +1,12 @@
-"""Vercel Function for authenticated OpenRouter grading.
+"""Vercel Function for authenticated AI grading.
 
 The Vue client sends a Firebase ID token and a compact answer payload to this
 same-origin endpoint.  The function validates the token with Firebase Auth,
-loads the trusted question by id, and calls the shared grading pipeline with
-``OPENROUTER_API_KEY`` from Vercel's server-side environment.
+loads the trusted question by id, and calls the shared grading pipeline.
+
+Grading runs on Google AI Studio (``GOOGLE_AI_STUDIO_API_KEY``) and falls back
+to OpenRouter (``OPENROUTER_API_KEY``) when Google rate-limits us.  Both keys
+are read from Vercel's server-side environment and never reach the browser.
 """
 
 from __future__ import annotations
@@ -110,9 +113,14 @@ def handle_grade(
     if not isinstance(request_payload, dict):
         return 400, _error("request JSON must be an object")
 
-    if not os.environ.get("OPENROUTER_API_KEY"):
+    # Google AI Studio is the primary provider; OpenRouter is the rate-limit
+    # fallback. Either key alone is enough to grade.
+    has_google_key = bool(os.environ.get("GOOGLE_AI_STUDIO_API_KEY"))
+    has_openrouter_key = bool(os.environ.get("OPENROUTER_API_KEY"))
+    if not has_google_key and not has_openrouter_key:
         return 503, _error_for_record(
-            "AI grading is not configured: OPENROUTER_API_KEY is missing.",
+            "AI grading is not configured: set GOOGLE_AI_STUDIO_API_KEY "
+            "(or OPENROUTER_API_KEY).",
             request_payload,
         )
 
@@ -147,7 +155,7 @@ def handle_grade(
         return 200, result
     # A model/provider failure is a valid grading-result response. Keep it as a
     # 200 so the results panel can render the provider's actionable error.
-    if result.get("provider") == "openrouter":
+    if result.get("provider") in {"openrouter", "google-ai-studio"}:
         return 200, result
     return 400, result
 

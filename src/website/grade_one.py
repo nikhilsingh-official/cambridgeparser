@@ -22,11 +22,8 @@ from pathlib import Path
 from typing import Any, Dict
 
 from src.pipeline.grading.ast_adapter import AST_VERSION, SCHEMA_VERSION
-from src.pipeline.grading.openrouter_client import (
-    DEFAULT_TIMEOUT_SECONDS,
-    OpenRouterConfig,
-    grade_answer,
-)
+from src.pipeline.grading.openrouter_client import DEFAULT_TIMEOUT_SECONDS
+from src.pipeline.grading.router import grade_answer_routed
 
 
 RECORDS_PATH = (
@@ -128,10 +125,9 @@ def grade_request(
             "error": "request.answer_kind is not supported",
         }
     parsed_answer = build_parsed_answer(source, parse, answer_kind)
-    result = grade_answer(
+    result = grade_answer_routed(
         record,
         parsed_answer,
-        config=OpenRouterConfig(),
         timeout=timeout,
     )
     result["mark_scheme"] = record.get("mark_scheme") or {}

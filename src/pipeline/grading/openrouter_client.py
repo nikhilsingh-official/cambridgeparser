@@ -423,8 +423,9 @@ def dry_run_result(record: Dict[str, Any], parsed_answer: Dict[str, Any]) -> Dic
                 "max_marks": max_marks if isinstance(max_marks, int) else total,
                 "points": points,
                 "overall_explanation": (
-                    "DRY RUN: deterministic placeholder grading. Set OPENROUTER_API_KEY "
-                    "to grade with the real model."
+                    "DRY RUN: deterministic placeholder grading. Set "
+                    "GOOGLE_AI_STUDIO_API_KEY (or OPENROUTER_API_KEY) to grade "
+                    "with the real model."
                 ),
             },
             max_marks,

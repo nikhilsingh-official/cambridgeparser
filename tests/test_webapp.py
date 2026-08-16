@@ -291,6 +291,9 @@ class StaticVueWebsiteTests(unittest.TestCase):
     def test_production_grading_uses_firebase_auth_and_vercel_secret(self):
         function_source = (REPO_ROOT / "api" / "grade.py").read_text()
         self.assertIn("accounts:lookup", function_source)
+        # Both provider keys are read server-side only: Google AI Studio is the
+        # primary grader, OpenRouter the rate-limit fallback.
+        self.assertIn('os.environ.get("GOOGLE_AI_STUDIO_API_KEY")', function_source)
         self.assertIn('os.environ.get("OPENROUTER_API_KEY")', function_source)
         self.assertIn("grade_request(request_payload, timeout=", function_source)
         self.assertIn("consume_quota(uid, token)", function_source)
