@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import LoadingScreen from './LoadingScreen.vue';
+// the results screen shown when the attempt ends.
+import EndScreen from './EndScreen.vue';
 import { onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue';
 import TopBar from './TopBar.vue';
 import SideWindow from './SideWindow.vue';
@@ -30,6 +32,8 @@ import router from '@/router/router';
 // types for the vendored pdf.js viewer and the fetch-pdf contract.
 import { asPdfViewerWindow, type PdfPageView } from '@/lib/types/pdfViewer';
 import type { FetchPdfResponse, LoadedPaper } from '@/lib/types/fetchPdf';
+// local summary computation for the end screen.
+import { buildExamSummary, type ExamSummary } from '@/lib/types/examSummary';
 import { renderHighlights } from '@/lib/render/renderHighlights';
 import { renderFocusAreas } from '@/lib/render/renderFocusAreas';
 
@@ -62,6 +66,14 @@ let answers: TableRow[] | null = null;
 // held for the duration of the attempt - opened in startExam(), written to
 // throughout, closed in endExam().
 let examAttemptId: string | null = null;
+
+// end-screen state. `examFinished` drives the overlay; `summary` is null
+// until endExam() has marked the paper, which is what shows the interim
+// "Marking your paper..." state.
+const examFinished = ref(false);
+const summary = ref<ExamSummary | null>(null);
+const saving = ref(false);
+const saveError = ref<string | null>(null);
 
 // the fetch-pdf edge function's response had no type at all - `answers`
 // was `any`, so the mark-scheme rows flowed untyped into getQuestionsAnalytics
@@ -129,6 +141,12 @@ async function startExam() {
 }
 
 async function endExam() {
+  // the results screen goes up immediately, before any network work, so
+  // the candidate is never left looking at the paper wondering if it worked.
+  examFinished.value = true;
+  saving.value = true;
+  saveError.value = null;
+
   try {
     if(!answers) return;
     const questionsData = getQuestionsAnalytics(highlights, focusAreas, answers);
@@ -137,6 +155,10 @@ async function endExam() {
     if (perfStart == null) throw new Error("Exam hasn't started");
 
     const elapsedMs = Math.round(performance.now() - perfStart);
+
+    // marked locally from data already in hand, so the score paints even if
+    // every write below fails. The database remains authoritative.
+    summary.value = buildExamSummary(props.schema, questionsData, answers, elapsedMs);
 
     // fall back to opening one now if startExam() could not.
     if (!examAttemptId) {
@@ -156,9 +178,25 @@ async function endExam() {
 
     return { examAttemptId, insertedCount: Array.isArray(insertedQuestions) ? insertedQuestions.length : 0 };
   } catch (err) {
+    // a persistence failure must not hide the result. The screen stays up
+    // and says so; it no longer rethrows, which would have left the overlay in
+    // its indeterminate state.
     console.error('endExam failed', err);
-    throw err;
+    saveError.value = err instanceof Error ? err.message : String(err);
+  } finally {
+    saving.value = false;
   }
+}
+
+// end-screen actions.
+function goToDashboard() {
+  router.push('/');
+}
+
+// dismisses the overlay and returns to the paper, read-only - the attempt
+// is already closed, so nothing further is recorded.
+function reviewPaper() {
+  examFinished.value = false;
 }
 
 function injectStyles(doc: Document) {
@@ -429,7 +467,25 @@ onMounted(async () => {
 
 <template>
 
-  <LoadingScreen :state="examLoaded"></LoadingScreen>
+  <!-- @start is what actually begins the attempt - see LoadingScreen. -->
+  <LoadingScreen
+    :state="examLoaded"
+    :schema="props.schema"
+    @start="startExam"
+    @back="router.push('/browser')"
+  ></LoadingScreen>
+
+  <!-- results overlay. Fades in over the paper when the attempt ends. -->
+  <Transition name="screen-fade">
+    <EndScreen
+      v-if="examFinished"
+      :summary="summary"
+      :saving="saving"
+      :save-error="saveError"
+      @dashboard="goToDashboard"
+      @review="reviewPaper"
+    />
+  </Transition>
 
   <main class="solver-container">
     <ToolsContainer></ToolsContainer>
@@ -457,7 +513,8 @@ onMounted(async () => {
       </aside>
     </section>
 
-    <BottomBar></BottomBar>
+    <!-- BottomBar had no End Exam control, so endExam() was unreachable. -->
+    <BottomBar @end-exam="endExam"></BottomBar>
   </main>
 </template>
 <style lang="scss" scoped>

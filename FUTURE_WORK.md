@@ -42,22 +42,17 @@ read the errors before trusting any of the DDL.**
 Adding types to previously-`any` boundaries exposed two real defects. Both had
 been invisible because nothing checked the shapes involved.
 
-### ⚠️ 1b.1 The exam lifecycle is never invoked — **persistence is unreachable**
-`startExam()` and `endExam()` are defined in `MCQNav.vue` and **called from
-nowhere**. They are not in its template and not passed to any child:
+### 1b.1 The exam lifecycle was never invoked — **fixed**
+`startExam()` and `endExam()` were defined in `MCQNav.vue` and called from
+nowhere: `LoadingScreen` had its own Start button wired to a local
+`startCountdown()` and declared no emits, and `BottomBar` had no End Exam
+control at all. **No attempt had ever been written to Supabase**, so the entire
+write path was dead code.
 
-- `LoadingScreen.vue:98` has its own "Start Exam" button wired to a local
-  `startCountdown()`, and the component declares **no `defineEmits`** — so the
-  parent is never told.
-- `BottomBar.vue` has no End Exam control at all.
-
-Consequence: in the dashboard prong, **no attempt has ever been written to
-Supabase**, and the entire write path added in §1 is dead code until this is
-connected. `vue-tsc` reports both functions as unused, which is what gave it away.
-
-Not fixed here, because it needs a product decision rather than a type: where
-does "End Exam" live, and should `LoadingScreen` emit `start` or should MCQNav
-own the button? Wiring it is a ~10-line change once that is decided.
+Fixed when the start/end screens were built: `LoadingScreen` now emits `start`
+after its countdown, `BottomBar` emits `endExam` from a new two-step control,
+and `MCQNav` orchestrates both. `vue-tsc` confirms it — both functions dropped
+off the unused list (11 errors -> 9).
 
 ### 1b.2 Deselection events were never logged — **fixed**
 `selectOption.ts` built its log key as `` `${nextState}_${optionState}` `` while

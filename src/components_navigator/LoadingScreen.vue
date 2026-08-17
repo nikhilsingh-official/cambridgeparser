@@ -5,9 +5,18 @@ import type { AnimationItem } from "lottie-web";
 import animationData from "@/assets/soluer-loader.json";
 import { ChevronLeft } from "lucide-vue-next";
 
+// `schema` added so the paper code is the real one rather than the
+// hardcoded '0625_w23_12' the template used to print.
 defineProps<{
   state: boolean
+  schema?: string
 }>()
+
+// this component previously swallowed the start of the exam entirely - it
+// flipped a LOCAL `examVisible` flag and declared no emits, so MCQNav's
+// startExam() was never called and no attempt was ever opened. It now tells the
+// parent, which is what actually begins the attempt.
+const emit = defineEmits<{ (e: 'start'): void; (e: 'back'): void }>();
 
 const examVisible = ref(false);
 const lottieContainer = ref<HTMLElement | null>(null);
@@ -64,6 +73,9 @@ let countdownInterval: number | null = null;
 
 function endLoadingScreen() {
   clearInterval(countdownInterval!);
+  // tell MCQNav first so the attempt is opened and the event epoch is set
+  // before the paper is revealed, then play the overlay out.
+  emit('start');
   examVisible.value = true;
 }
 
@@ -88,12 +100,15 @@ onBeforeUnmount(() => {
 });
 </script>
 <template>
-<div :style="{ display: examVisible ? 'none' : 'flex' }" class="loading-screen">
-    <div class="back-btn"><ChevronLeft class="icon" /> Back to Browser</div>
+<!-- was `display: none`, which snapped the paper into view. A Transition
+     lets the overlay fade and lift away, revealing the paper underneath. -->
+<Transition name="screen-fade">
+<div v-if="!examVisible" class="loading-screen">
+    <div class="back-btn" @click="emit('back')"><ChevronLeft class="icon" /> Back to Browser</div>
     <div class="centered-content">
       <div :style="{ display: !countdownStarted ? 'flex' : 'none' }" ref="lottieContainer" class="lottie"></div>
       <h3 :style="{ display: !countdownStarted ? 'flex' : 'none' }">{{ loading_messages[currentLoadingIndex] }}</h3>        
-      <h5 :style="{ display: !countdownStarted ? 'flex' : 'none' }">Paper · 0625_w23_12</h5>
+      <h5 :style="{ display: !countdownStarted ? 'flex' : 'none' }">Paper · {{ schema ?? '—' }}</h5>
       <div class="button-container">
         <button :style="{ display: state && !countdownStarted ? 'flex' : 'none' }" @click="startCountdown">Start Exam</button>
       </div>
@@ -106,6 +121,7 @@ onBeforeUnmount(() => {
       </div>
     </Transition>
 </div>
+</Transition>
 </template>
 <style lang="scss" scoped>
 .loading-screen {
@@ -215,6 +231,22 @@ onBeforeUnmount(() => {
   width: 20px;
   height: 20px;
   stroke-width: 2.4;
+}
+
+/* the start screen lifting away to reveal the paper. Slightly longer on
+   leave than enter so the reveal reads as deliberate rather than a cut. */
+.screen-fade-leave-active {
+  transition: opacity 0.55s ease, transform 0.55s ease;
+}
+.screen-fade-enter-active {
+  transition: opacity 0.3s ease;
+}
+.screen-fade-leave-to {
+  opacity: 0;
+  transform: scale(1.04);
+}
+.screen-fade-enter-from {
+  opacity: 0;
 }
 
 .tip-fade-enter-active,
