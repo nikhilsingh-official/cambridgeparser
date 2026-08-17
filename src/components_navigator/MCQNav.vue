@@ -15,8 +15,17 @@ import { extractText, identifyQuestionNumbers, segmentQuestions, getOptions } fr
 import type { HighlightMode, EventLogs } from '@/lib/utils/utilsTypes';
 import { enrichAnalytics } from '@/lib/processing/enrichAnalytics';
 import { getQuestionsAnalytics } from '@/lib/processing/getQuestionAnalytics';
-import { pushToAttemptsTable } from '@/lib/supabase/pushToAttemptsTable';
-import { pushToExamTable } from '@/lib/supabase/pushToExamTable';
+// pushQuestionMetrics added - the weighted scores now live in their own
+// versioned table rather than inline on question_attempts.
+import { pushToAttemptsTable, pushQuestionMetrics } from '@/lib/supabase/pushToAttemptsTable';
+// the one-shot pushToExamTable is replaced by the two-phase lifecycle.
+import { startExamAttempt, finishExamAttempt } from '@/lib/supabase/pushToExamTable';
+// new writers for the raw event stream and the cached mark-scheme key.
+import { pushEventLogs } from '@/lib/supabase/pushEventLogs';
+import { cacheAnswerKey } from '@/lib/supabase/cacheAnswerKey';
+// exam-relative event timing, and the shared session the flag buttons read.
+import { setEventEpoch } from '@/lib/utils/addEventLog';
+import { registerExamSession } from './composable';
 import router from '@/router/router';
 import { renderHighlights } from '@/lib/render/renderHighlights';
 import { renderFocusAreas } from '@/lib/render/renderFocusAreas';
@@ -43,8 +52,13 @@ const totalScale = ref(1);
 const { register, unregister } = createKeydownHandlers(highlightMode);
 const { session } = useAuthStore();
 
-let dateStart = "";
+// `dateStart` removed - it existed only to back-date started_at in the old
+// one-shot write. startExamAttempt() now stamps started_at when the attempt
+// actually opens, so nothing consumed it any more.
 let answers: TableRow[] | null = null;
+// held for the duration of the attempt - opened in startExam(), written to
+// throughout, closed in endExam().
+let examAttemptId: string | null = null;
 
 async function getPDF(): Promise<{ answers: any; pdfBytes: Uint8Array; pdfUrl: string }> {
 
@@ -77,10 +91,27 @@ async function getPDF(): Promise<{ answers: any; pdfBytes: Uint8Array; pdfUrl: s
 }
 
 
-function startExam() {
+// the attempt row is now opened here rather than at endExam(), so an
+// abandoned paper is still recorded and started_at is an observation instead of
+// a value the client back-dates at the end.
+async function startExam() {
   perfStart = performance.now();
-  dateStart = new Date().toISOString()
+  // anchor event timing to exam start so stored elapsed_ms is meaningful.
+  setEventEpoch(perfStart);
+  // hand the event log and focus areas to the shared exam session so the
+  // flag buttons in ToolsContainer can log against the focused question.
+  registerExamSession(eventLogs, focusAreas);
   examStarted.value = true;
+
+  try {
+    examAttemptId = await startExamAttempt(supabase, props, session, answers?.length);
+    // cache the mark-scheme key so the DB can decide correctness itself.
+    if (answers) await cacheAnswerKey(supabase, props.schema, answers);
+  } catch (err) {
+    // a failed open must not block the student from sitting the paper. The
+    // attempt simply is not persisted; endExam() detects the null id.
+    console.error('startExam: could not open attempt', err);
+  }
 }
 
 async function endExam() {
@@ -92,11 +123,20 @@ async function endExam() {
     if (perfStart == null) throw new Error("Exam hasn't started");
 
     const elapsedMs = Math.round(performance.now() - perfStart);
-    const finishedAtIso = new Date().toISOString();
 
-    const examAttemptId = await pushToExamTable(supabase, props, session, elapsedMs, dateStart, finishedAtIso);
+    // fall back to opening one now if startExam() could not.
+    if (!examAttemptId) {
+      examAttemptId = await startExamAttempt(supabase, props, session, answers.length);
+    }
+
+    const answeredCount = questionsData.filter(q => q.selectedOption != null).length;
 
     const insertedQuestions = await pushToAttemptsTable(supabase, examAttemptId, enrichedData);
+    // weighted scores go to the versioned question_metrics table.
+    await pushQuestionMetrics(supabase, insertedQuestions ?? [], enrichedData);
+    // persist the raw stream - previously discarded at this exact point.
+    await pushEventLogs(supabase, examAttemptId, eventLogs);
+    await finishExamAttempt(supabase, examAttemptId, elapsedMs, answeredCount, 'completed');
 
     return { examAttemptId, insertedCount: Array.isArray(insertedQuestions) ? insertedQuestions.length : 0 };
   } catch (err) {
