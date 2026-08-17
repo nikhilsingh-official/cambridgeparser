@@ -1,5 +1,9 @@
 import type { Ref } from "vue";
-import { addEventLog } from "../utils/addEventLog";
+// switched to the typed focus-area constructor. logFocusArea has no
+// `option` parameter at all, which is what the five `undefined` arguments
+// below were standing in for.
+import { logFocusArea } from "../utils/addEventLog";
+import { FocusAreaAction } from "@/lib/types/enums";
 import type { EventLogs } from "../utils/utilsTypes";
 import type { DocumentFocusAreas, FocusArea } from "./focusAreasTypes";
 import { throttle } from "../utils/throttle";
@@ -49,7 +53,7 @@ export function eventListenersInit(
     if (previousActive && previousActive !== current) previousActive.active = false;
 
     current.active = true;
-    addEventLog(eventLogs, "focusArea", "userClick", current.questionNumber, undefined);
+    logFocusArea(eventLogs, FocusAreaAction.UserClick, current.questionNumber);
   });
 
   function handleMouseMove(e: MouseEvent) {
@@ -65,7 +69,7 @@ export function eventListenersInit(
 
     if (!pageFocusAreas) {
       if (last) {
-        addEventLog(eventLogs, "focusArea", "userHoveredOutPage", last.questionNumber, undefined);
+        logFocusArea(eventLogs, FocusAreaAction.UserHoveredOutPage, last.questionNumber);
         lastHoverPerPage.set(pageIndex, null);
       }
       return;
@@ -75,11 +79,11 @@ export function eventListenersInit(
     const current = pageFocusAreas.find((f) => f.y <= y && f.y2 >= y) ?? null;
 
     if (last && current !== last) {
-      addEventLog(eventLogs, "focusArea", "userHoveredOutPage", last.questionNumber, undefined);
+      logFocusArea(eventLogs, FocusAreaAction.UserHoveredOutPage, last.questionNumber);
     }
 
     if (current && current !== last) {
-      addEventLog(eventLogs, "focusArea", "userHoveredIn", current.questionNumber, undefined);
+      logFocusArea(eventLogs, FocusAreaAction.UserHoveredIn, current.questionNumber);
     }
 
     lastHoverPerPage.set(pageIndex, current);
@@ -91,7 +95,7 @@ export function eventListenersInit(
   viewer.addEventListener("mouseleave", () => {
     for (const [_pageIndex, last] of lastHoverPerPage.entries()) {
       if (last) {
-        addEventLog(eventLogs, "focusArea", "userHoveredOutPage", last.questionNumber, undefined);
+        logFocusArea(eventLogs, FocusAreaAction.UserHoveredOutPage, last.questionNumber);
       }
     }
     lastHoverPerPage.clear();

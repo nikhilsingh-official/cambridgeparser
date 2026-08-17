@@ -20,10 +20,12 @@
 
 import type { TableRow } from "@/lib/processing/processingTypes";
 import { letterToIndex } from "./letterToIndex";
+// typed against the schema mirror, replacing `supabase: any`.
+import type { Db, PaperAnswerInsert } from "@/lib/types/database";
 import type { OptionLetter } from "@/lib/processing/processingTypes";
 
 export async function cacheAnswerKey(
-  supabase: any,
+  supabase: Db,
   paperId: string,
   answers: TableRow[] | null,
   sourceUrl?: string,
@@ -48,7 +50,7 @@ export async function cacheAnswerKey(
   }
 
   const rows = answers
-    .map((a) => {
+    .map((a): PaperAnswerInsert | null => {
       const optionIndex = letterToIndex(String(a.answer).trim().toUpperCase() as OptionLetter);
       if (optionIndex === null) return null;
       const marks = Number.parseInt(String(a.marks), 10);
@@ -60,7 +62,7 @@ export async function cacheAnswerKey(
         marks: Number.isFinite(marks) && marks > 0 ? marks : 1,
       };
     })
-    .filter((r): r is NonNullable<typeof r> => r !== null);
+    .filter((r): r is PaperAnswerInsert => r !== null);
 
   if (rows.length === 0) return 0;
 

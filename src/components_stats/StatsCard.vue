@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { computed, type CSSProperties } from 'vue';
 import { codeToBg, codeToSubject, categoryToIcon, categoryToText, categoryIsSubjectSpecific } from '../constants/codeMaps';
+// the `category` prop was `number`, which accepted any integer including
+// ones with no card behind them. StatCategory restricts it to the 17 that exist.
+import type { StatCategory } from '@/lib/types/enums';
 
 const { category, text, metricData } = defineProps<{
-  category: number;
+  category: StatCategory;
   text: string;
   metricData: string;
 }>();

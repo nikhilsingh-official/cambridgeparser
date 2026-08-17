@@ -37,6 +37,43 @@ read the errors before trusting any of the DDL.**
 
 ---
 
+## 1b. Bugs surfaced by the typing pass
+
+Adding types to previously-`any` boundaries exposed two real defects. Both had
+been invisible because nothing checked the shapes involved.
+
+### ⚠️ 1b.1 The exam lifecycle is never invoked — **persistence is unreachable**
+`startExam()` and `endExam()` are defined in `MCQNav.vue` and **called from
+nowhere**. They are not in its template and not passed to any child:
+
+- `LoadingScreen.vue:98` has its own "Start Exam" button wired to a local
+  `startCountdown()`, and the component declares **no `defineEmits`** — so the
+  parent is never told.
+- `BottomBar.vue` has no End Exam control at all.
+
+Consequence: in the dashboard prong, **no attempt has ever been written to
+Supabase**, and the entire write path added in §1 is dead code until this is
+connected. `vue-tsc` reports both functions as unused, which is what gave it away.
+
+Not fixed here, because it needs a product decision rather than a type: where
+does "End Exam" live, and should `LoadingScreen` emit `start` or should MCQNav
+own the button? Wiring it is a ~10-line change once that is decided.
+
+### 1b.2 Deselection events were never logged — **fixed**
+`selectOption.ts` built its log key as `` `${nextState}_${optionState}` `` while
+`logMap` is keyed by *(mode, previous state)*. Since `nextState` is `"neutral"`
+whenever the student deselects, the key came out as `neutral_correct` /
+`neutral_eliminated` — neither of which is in the map — and the old
+`if (logString)` guard silently swallowed the miss.
+
+So `deselectedCorrect` and `deselectedElim` **could never fire**, which also
+skewed `eliminationReversalCount` in `enrichAnalytics`. The smartsolver original
+used `highlightMode.value`; the dashboard prong regressed it. Restored, and the
+key is now a template-literal type so the lookup is total and a missing entry is
+a compile error rather than a dropped event.
+
+---
+
 ## 2. Blocking — do before building the stats page
 
 ### 2.1 Apply and validate the schema

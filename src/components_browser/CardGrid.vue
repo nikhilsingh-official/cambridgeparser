@@ -1,18 +1,15 @@
 <script setup lang="ts">;
 import { defineProps, watch } from 'vue';
 import Card from './Card.vue';
-
-interface Card {
-  color: string;
-  subject: string;
-  code: string;
-  variant: string;
-  condensed: string;
-  icon: string;
-}
+// this file declared its own `interface Card` which BOTH shadowed the
+// imported component of the same name AND differed from the Card interface in
+// constants/codeMaps.ts (it required `color`, the other had no such field).
+// TypeScript therefore saw two unrelated types called Card and rejected the
+// assignment in BrowserPage. Now there is one shared shape.
+import type { Card as CardData } from '@/constants/codeMaps';
 
 const props = defineProps<{
-  array: Card[];
+  array: CardData[];
 }>();
 
 watch(() => props.array, (newArray) => {

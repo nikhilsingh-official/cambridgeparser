@@ -2,7 +2,10 @@ import type { Ref } from "vue";
 import type { DocumentHighlights, OptionHighlights, OptionState, SegmentHighlights, Highlight } from "./highlightTypes";
 import { computeGlobalIndex } from "../utils/computeGlobalIndex";
 import type { EventLogs } from "@/lib/utils/utilsTypes";
-import { addEventLog } from "../utils/addEventLog";
+// switched to the typed highlight constructor; HighlightAction and
+// HighlightMode come from the central enum module.
+import { logHighlight } from "../utils/addEventLog";
+import { HighlightAction, type HighlightMode } from "@/lib/types/enums";
 
 function setHighlightColor(
   elements: HTMLElement | HTMLElement[],
@@ -39,13 +42,25 @@ function updateOptionState(optionHighlights: Highlight[], domElements: HTMLEleme
   else markNeutral(domElements);
 }
 
-const logMap: Record<string, string> = {
-  "correct_correct": "deselectedCorrect",
-  "correct_eliminated": "elimToCorrect",
-  "correct_neutral": "setCorrect",
-  "eliminated_correct": "correctToElim",
-  "eliminated_eliminated": "deselectedElim",
-  "eliminated_neutral": "setElim",
+// was `Record<string, string>`, which meant the compiler knew nothing about
+// either the keys or the values - a typo in a key silently produced `undefined`
+// and no event, and the values were plain strings that had to be cast on the way
+// into the event log.
+//
+// The key is now a template-literal type, so the map is exhaustive by
+// construction: it must contain exactly one entry for every
+// (mode, previous state) pair, and `logMap[key]` is known to be a
+// HighlightAction rather than a string. Adding a fourth OptionState or a third
+// HighlightMode becomes a compile error here instead of a silent no-op.
+type TransitionKey = `${HighlightMode}_${OptionState}`;
+
+const logMap: Record<TransitionKey, HighlightAction> = {
+  "correct_correct": HighlightAction.DeselectedCorrect,
+  "correct_eliminated": HighlightAction.ElimToCorrect,
+  "correct_neutral": HighlightAction.SetCorrect,
+  "eliminated_correct": HighlightAction.CorrectToElim,
+  "eliminated_eliminated": HighlightAction.DeselectedElim,
+  "eliminated_neutral": HighlightAction.SetElim,
 };
 
 export function selectOption(highlightMode: Ref<"correct" | "eliminated">, eventLogs: EventLogs, pageIndex: number, segmentIndex: number, optionIndex: number, highlights: DocumentHighlights, groupHighlights: HTMLElement[]) {
@@ -85,7 +100,20 @@ export function selectOption(highlightMode: Ref<"correct" | "eliminated">, event
 
   updateOptionState(currentOptionHighlights, groupHighlights, nextState);
 
-  const key = `${nextState}_${optionState}`;
-  const logString = logMap[key];
-  if (logString) addEventLog(eventLogs, "highlight", logString, questionNumber, optionIndex);
+  // BUG FIX, surfaced by typing this lookup.
+  //
+  // This read `${nextState}_${optionState}`, but logMap is keyed by
+  // (mode, previous state) - the smartsolver original was
+  // `${highlightMode.value}_${optionState}`. Because nextState is "neutral"
+  // whenever the student deselects, the key became "neutral_correct" or
+  // "neutral_eliminated", neither of which is in the map. The old
+  // `if (logString)` guard then silently swallowed it, so DESELECTION EVENTS
+  // WERE NEVER LOGGED: "deselectedCorrect" and "deselectedElim" could not occur,
+  // and enrichAnalytics' elimination-reversal count was correspondingly wrong.
+  //
+  // Typing the key as TransitionKey makes the lookup total - all six
+  // (mode x previous state) combinations exist, so no guard is needed and a
+  // missing entry is a compile error rather than a dropped event.
+  const key: TransitionKey = `${highlightMode.value}_${optionState}`;
+  logHighlight(eventLogs, logMap[key], questionNumber, optionIndex);
 }

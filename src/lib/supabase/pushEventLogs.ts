@@ -20,18 +20,21 @@
 // ==========================================================================
 
 import type { EventLogs } from "@/lib/utils/utilsTypes";
+// typed against the schema mirror, replacing `supabase: any`.
+import type { AttemptEventInsert, Db } from "@/lib/types/database";
+import { EventElement } from "@/lib/types/enums";
 
 const CHUNK_SIZE = 500;
 
 export async function pushEventLogs(
-  supabase: any,
+  supabase: Db,
   examAttemptId: string,
   eventLogs: EventLogs,
-) {
+): Promise<number> {
   if (!examAttemptId) throw new Error('examAttemptId required');
   if (!Array.isArray(eventLogs) || eventLogs.length === 0) return 0;
 
-  const payload = eventLogs.map((e, index) => ({
+  const payload: AttemptEventInsert[] = eventLogs.map((e, index) => ({
     exam_attempt_id: examAttemptId,
     // Fall back to array position if setEventEpoch() was never called, so a
     // missing epoch degrades to "still ordered" rather than "rejected".
@@ -39,7 +42,11 @@ export async function pushEventLogs(
     question_number: e.question ?? null,
     element_type: e.elementType,
     action_type: e.actionType,
-    option_index: e.option ?? null,
+    // `option` exists only on HighlightEvent, so it must be reached for
+    // through the discriminant. Under the old wide type this read as
+    // `e.option ?? null` on every event and quietly produced null for the
+    // two families that never had one - the union now forces the narrowing.
+    option_index: e.elementType === EventElement.Highlight ? e.option : null,
     elapsed_ms: e.elapsedMs ?? 0,
     occurred_at: e.dateTimestamp,
   }));

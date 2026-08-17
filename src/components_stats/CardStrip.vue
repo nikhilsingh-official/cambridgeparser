@@ -1,10 +1,14 @@
 <script setup lang="ts">
+// import added for the category enum used below.
+import { ALL_STAT_CATEGORIES, StatCategory } from '@/lib/types/enums';
 import StatsCard from './StatsCard.vue';
 
 const testStats = Array.from({ length: 30 }, (_, i) => {
-  const category = i % 17
+  // was `i % 17`, a magic modulus that silently breaks if a category is
+  // ever added. ALL_STAT_CATEGORIES is derived from the enum, so it cannot.
+  const category = ALL_STAT_CATEGORIES[i % ALL_STAT_CATEGORIES.length]!
   const subjectCodes = ['0620', '0610', '0580', '0455', '0478', '0500']
-  const text = category === 0 ? subjectCodes[i % subjectCodes.length] : `${Math.floor(Math.random() * 5000)}`
+  const text = category === StatCategory.TopSubject ? subjectCodes[i % subjectCodes.length] : `${Math.floor(Math.random() * 5000)}`
   const metricData = `${Math.floor(Math.random() * 50) + 50}%`
   return { category, text, metricData }
 })

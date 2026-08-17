@@ -1,4 +1,12 @@
 import type { QuestionsAnalytics } from "../processing/processingTypes";
+// typed against the schema mirror. QuestionAttemptInsert deliberately
+// omits is_correct, so an attempt to send it will not compile.
+import type {
+  Db,
+  QuestionAttemptInsert,
+  QuestionAttemptRef,
+  QuestionMetricsInsert,
+} from "@/lib/types/database";
 import { lettersToMask } from "./lettersToMask";
 import { letterToIndex } from "./letterToIndex";
 
@@ -11,11 +19,11 @@ import { letterToIndex } from "./letterToIndex";
 // untouched and the stored unit finally matches the column name.
 const SECONDS_TO_MS = 1000;
 
-export async function pushToAttemptsTable(supabase: any, examAttemptId: string, enrichedData: QuestionsAnalytics) {
+export async function pushToAttemptsTable(supabase: Db, examAttemptId: string, enrichedData: QuestionsAnalytics): Promise<QuestionAttemptRef[]> {
   if (!examAttemptId) throw new Error('examAttemptId required');
   if (!Array.isArray(enrichedData)) throw new Error('enrichedData must be an array');
 
-  const payload = enrichedData.map(q => ({
+  const payload: QuestionAttemptInsert[] = enrichedData.map(q => ({
     exam_attempt_id: examAttemptId,
     question_number: q.questionNumber,
 
@@ -62,7 +70,7 @@ export async function pushToAttemptsTable(supabase: any, examAttemptId: string, 
     throw error;
   }
 
-  return data;
+  return (data ?? []) as QuestionAttemptRef[];
 }
 
 // new. The three weighted composites now live in their own versioned table,
@@ -71,8 +79,8 @@ export async function pushToAttemptsTable(supabase: any, examAttemptId: string, 
 // properties of a single response and they change when the formula changes.
 // `rows` is what pushToAttemptsTable() returned, so ids line up by question.
 export async function pushQuestionMetrics(
-  supabase: any,
-  insertedRows: Array<{ id: string; question_number: number }>,
+  supabase: Db,
+  insertedRows: QuestionAttemptRef[],
   enrichedData: QuestionsAnalytics,
   metricsVersion = 1,
 ) {
@@ -80,10 +88,12 @@ export async function pushQuestionMetrics(
 
   const idByQuestion = new Map(insertedRows.map(r => [r.question_number, r.id]));
 
-  const payload = enrichedData
+  const payload: QuestionMetricsInsert[] = enrichedData
     .filter(q => idByQuestion.has(q.questionNumber))
     .map(q => ({
-      question_attempt_id: idByQuestion.get(q.questionNumber),
+      // non-null asserted - the .filter() above already proved the key is
+      // present, which Map.get()'s signature cannot express.
+      question_attempt_id: idByQuestion.get(q.questionNumber)!,
       metrics_version: metricsVersion,
       confidence: q.confidenceScore ?? 0,
       difficulty: q.difficultyScore ?? 0,

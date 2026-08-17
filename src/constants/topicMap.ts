@@ -27,6 +27,9 @@
 // bottom is the loader to call once you have filled it in.
 // ==========================================================================
 
+// import added for the Db type used by the loaders below.
+import type { Db, TopicInsert } from '@/lib/types/database';
+
 export interface Topic {
   code: string;        // stable within the subject, e.g. '4.1'
   name: string;        // 'Electromagnetic induction'
@@ -82,8 +85,9 @@ export const PAPER_QUESTION_TOPICS: Record<string, Record<number, string>> = {
 // --------------------------------------------------------------------------
 
 /** Push SUBJECT_TOPICS into the `topics` table. */
-export async function seedTopics(supabase: any): Promise<number> {
-  const rows = Object.entries(SUBJECT_TOPICS).flatMap(([subjectCode, topics]) =>
+// typed against the schema mirror, replacing `supabase: any`.
+export async function seedTopics(supabase: Db): Promise<number> {
+  const rows: TopicInsert[] = Object.entries(SUBJECT_TOPICS).flatMap(([subjectCode, topics]) =>
     topics.map((t) => ({
       subject_code: subjectCode,
       code: t.code,
@@ -105,7 +109,7 @@ export async function seedTopics(supabase: any): Promise<number> {
  * Attach topic ids to `paper_answers` for one paper, from PAPER_QUESTION_TOPICS.
  * Call after the answer key for that paper has been cached.
  */
-export async function applyPaperTopics(supabase: any, paperId: string): Promise<number> {
+export async function applyPaperTopics(supabase: Db, paperId: string): Promise<number> {
   const mapping = PAPER_QUESTION_TOPICS[paperId];
   if (!mapping) return 0;
 

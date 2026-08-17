@@ -2,6 +2,8 @@ import type { DocumentGraphics, DocumentOptionsText, DocumentText, OptionMarker,
 import { getGraphFont } from "./getGraphFont";
 import { extractGraphics } from "./extractGraphics";
 import { detectOptionFonts } from "./detectOptionFont";
+// import added for the PDFDocumentProxy parameter type.
+import type { PDFDocumentProxy } from "pdfjs-dist";
 import { classifySegmentedQuestions } from "./classifyQuestions";
 import { OPS } from "pdfjs-dist";
 
@@ -145,12 +147,16 @@ function summarizeOps(
     for (const g of pageGraphics) {
       if (g.fnId === OPS.moveTo) {
         moveToCount++;
-        currentPoint = { x: g.args[0], y: g.args[1] };
+        // GraphicsItem.args is `unknown[]` (op-specific positional tuple).
+        // moveTo/lineTo carry [x, y] as numbers; narrowed here where fnId is known.
+        const [mx, my] = g.args as [number, number];
+        currentPoint = { x: mx, y: my };
       }
 
       else if (g.fnId === OPS.lineTo && currentPoint) {
         lineToCount++;
-        const [x, y] = g.args;
+        // see the moveTo note above.
+        const [x, y] = g.args as [number, number];
         angles.push(Math.atan2(y - currentPoint.y, x - currentPoint.x));
         currentPoint = { x, y };
       }
@@ -178,7 +184,9 @@ function summarizeOps(
   return summaries;
 }
 
-export async function getOptions(pdf: any, totalText: DocumentText, segmentedQuestions: SegmentedQuestions): Promise<DocumentOptionsText> {
+// was `pdf: any`. PDFDocumentProxy is pdfjs-dist's own type for a loaded
+// document and is what extractGraphics() already expects downstream.
+export async function getOptions(pdf: PDFDocumentProxy, totalText: DocumentText, segmentedQuestions: SegmentedQuestions): Promise<DocumentOptionsText> {
   let options: DocumentOptionsText = []
 
   const graphics = await extractGraphics(pdf);

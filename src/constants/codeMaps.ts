@@ -1,3 +1,7 @@
+// StatCategory replaces the bare numbers 0-16 that used to key the three
+// maps below. The numeric VALUES are unchanged, so nothing downstream breaks -
+// only the spelling improves: StatCategory.PeakSolvingHour instead of 13.
+import { StatCategory } from '@/lib/types/enums';
 import circle from '@/assets/images/circle.svg';
 import polygon from '@/assets/images/polygon.svg';
 import polygon2 from '@/assets/images/polygon2.svg';
@@ -49,7 +53,15 @@ import goal from '@/assets/icons/goal.svg?raw';
 import barChart3 from '@/assets/icons/chart-no-axes-combined.svg?raw';        
 import activity from '@/assets/icons/activity.svg?raw';            
 
-interface Card {
+// exported so consumers (components_browser/Card.vue) can name the shape
+// they receive instead of re-declaring a structurally-identical local type.
+export interface Card {
+  // optional - the `cards` array below does not set it, but CardGrid and
+  // Card.vue both pass it through to Tag. It was previously absent here and
+  // REQUIRED on a second, shadowing `Card` interface declared inside
+  // CardGrid.vue, which is why the two were "unrelated types with the same
+  // name" to the compiler.
+  color?: string;
   subject: string;
   code: string;
   variant: string;
@@ -128,65 +140,65 @@ export const codeToBg: Record<string, string> = {
   "default": neutral
 };
 
-export const categoryToText: Record<number, string> = {
-  0: "Your Top Subject",
-  1: "Total Papers Solved",
-  2: "Total Time Solving",
-  3: "Overall Accuracy",
-  4: "Practice Streak",
-  5: "Strongest Subject",
-  6: "Most Improved Subject",
-  7: "Most Attempted Subject",
-  8: "This Week's Accuracy",
-  9: "This Week's Solving Time",
-  10: "Time Since Last Paper",
-  11: "Fastest Completion Time",
-  12: "Longest Session",
-  13: "Peak Solving Hour",
-  14: "Next Goal",
-  15: "Improvement Rate",
-  16: "Performance Overview"
+export const categoryToText: Record<StatCategory, string> = {
+  [StatCategory.TopSubject]: "Your Top Subject",
+  [StatCategory.TotalPapersSolved]: "Total Papers Solved",
+  [StatCategory.TotalTimeSolving]: "Total Time Solving",
+  [StatCategory.OverallAccuracy]: "Overall Accuracy",
+  [StatCategory.PracticeStreak]: "Practice Streak",
+  [StatCategory.StrongestSubject]: "Strongest Subject",
+  [StatCategory.MostImprovedSubject]: "Most Improved Subject",
+  [StatCategory.MostAttemptedSubject]: "Most Attempted Subject",
+  [StatCategory.ThisWeeksAccuracy]: "This Week's Accuracy",
+  [StatCategory.ThisWeeksSolvingTime]: "This Week's Solving Time",
+  [StatCategory.TimeSinceLastPaper]: "Time Since Last Paper",
+  [StatCategory.FastestCompletionTime]: "Fastest Completion Time",
+  [StatCategory.LongestSession]: "Longest Session",
+  [StatCategory.PeakSolvingHour]: "Peak Solving Hour",
+  [StatCategory.NextGoal]: "Next Goal",
+  [StatCategory.ImprovementRate]: "Improvement Rate",
+  [StatCategory.PerformanceOverview]: "Performance Overview"
 };
 
-export const categoryIsSubjectSpecific: Record<number, boolean> = {
-  0: true,  
-  1: false, 
-  2: false, 
-  3: false, 
-  4: false, 
-  5: true,  
-  6: true,  
-  7: true,  
-  8: false, 
-  9: false, 
-  10: false,
-  11: false,
-  12: false,
-  13: false,
-  14: false,
-  15: false,
-  16: false 
+export const categoryIsSubjectSpecific: Record<StatCategory, boolean> = {
+  [StatCategory.TopSubject]: true,  
+  [StatCategory.TotalPapersSolved]: false, 
+  [StatCategory.TotalTimeSolving]: false, 
+  [StatCategory.OverallAccuracy]: false, 
+  [StatCategory.PracticeStreak]: false, 
+  [StatCategory.StrongestSubject]: true,  
+  [StatCategory.MostImprovedSubject]: true,  
+  [StatCategory.MostAttemptedSubject]: true,  
+  [StatCategory.ThisWeeksAccuracy]: false, 
+  [StatCategory.ThisWeeksSolvingTime]: false, 
+  [StatCategory.TimeSinceLastPaper]: false,
+  [StatCategory.FastestCompletionTime]: false,
+  [StatCategory.LongestSession]: false,
+  [StatCategory.PeakSolvingHour]: false,
+  [StatCategory.NextGoal]: false,
+  [StatCategory.ImprovementRate]: false,
+  [StatCategory.PerformanceOverview]: false 
 };
 
 
-export const categoryToIcon: Record<number, string> = {
-  0: trophy,        
-  1: fileText,      
-  2: clock,         
-  3: target,        
-  4: flame,         
-  5: shield,        
-  6: trendingUp,    
-  7: repeat,        
-  8: calendarCheck, 
-  9: calendarClock, 
-  10: hourglass,    
-  11: zap,          
-  12: timer,        
-  13: sunMoon,      
-  14: goal,         
-  15: barChart3,    
-  16: activity
+export const categoryToIcon: Record<StatCategory, string> = {
+  [StatCategory.TopSubject]: trophy,        
+  [StatCategory.TotalPapersSolved]: fileText,      
+  [StatCategory.TotalTimeSolving]: clock,         
+  [StatCategory.OverallAccuracy]: target,        
+  [StatCategory.PracticeStreak]: flame,         
+  [StatCategory.StrongestSubject]: shield,        
+  [StatCategory.MostImprovedSubject]: trendingUp,    
+  [StatCategory.MostAttemptedSubject]: repeat,        
+  [StatCategory.ThisWeeksAccuracy]: calendarCheck, 
+  [StatCategory.ThisWeeksSolvingTime]: calendarClock, 
+  [StatCategory.TimeSinceLastPaper]: hourglass,    
+  [StatCategory.FastestCompletionTime]: zap,          
+  [StatCategory.LongestSession]: timer,        
+  [StatCategory.PeakSolvingHour]: sunMoon,      
+  [StatCategory.NextGoal]: goal,         
+  [StatCategory.ImprovementRate]: barChart3,    
+  [StatCategory.PerformanceOverview]: activity
 };
 
 export const codeToSubject: Record<string, string> = {};

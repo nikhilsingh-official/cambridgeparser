@@ -3,12 +3,16 @@ import { computed, defineProps, type CSSProperties } from 'vue'
 import Tag from './Tag.vue'
 import { codeToBg } from '../constants/codeMaps';
 
-const { subject, code, icon } = defineProps<{
+// `color` was used in the template (<Tag :color="color">) but never
+// declared as a prop, so it resolved to nothing at runtime and Tag always fell
+// back to its default. Declared here and destructured so it actually arrives.
+const { subject, code, icon, color } = defineProps<{
   subject: string;
   code: string;
   variant: string;
   condensed: string;
-  icon: string; 
+  icon: string;
+  color?: string;
 }>();
 
 const scienceSubjects = ["0620", "0625", "0610", "0654", "0653", "0680", "0697"];

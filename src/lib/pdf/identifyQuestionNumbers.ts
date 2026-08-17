@@ -37,14 +37,15 @@ export function identifyQuestionNumbers(totalText: DocumentText): DocumentQuesti
 
   const question_numbers: DocumentQuestionMarkers = totalText.map(page => {
     return page
-      .map((item: textbox, index: number) => ({
+      // this listed seven fields by hand, so the result was missing
+      // rawFontName/width/height/fontSize/transform and did NOT satisfy
+      // indexed_textbox - which is what the declared DocumentQuestionMarkers
+      // return type claims. The filter below then re-annotated its parameter as
+      // indexed_textbox, papering over the gap. Spreading the source textbox
+      // makes the value genuinely match the declared type.
+      .map((item: textbox, index: number): indexed_textbox => ({
+        ...item,
         index,
-        text: item.text,
-        font: item.font,
-        x: item.x,
-        y: item.y,
-        x2: item.x2,
-        y2: item.y2
       }))
       .filter((item: indexed_textbox) =>
         !isNaN(Number(item.text)) &&

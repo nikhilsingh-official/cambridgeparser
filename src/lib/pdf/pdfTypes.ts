@@ -42,7 +42,11 @@ export type PageOptionsText = SegmentOptionsText[];
 export type DocumentOptionsText = PageOptionsText[];
 export interface GraphicsItem {
   fnId: number;
-  args: any[];
+  // was `any[]`. pdf.js operator arguments are a positional, op-specific
+  // tuple of numbers, strings, typed arrays or nested arrays - `unknown[]`
+  // states that honestly and forces a cast at each use site, where the op is
+  // known. Consumers index it as args[0], args[1] after checking fnId.
+  args: unknown[];
   name?: string;
 }
 export interface BoundingBox {

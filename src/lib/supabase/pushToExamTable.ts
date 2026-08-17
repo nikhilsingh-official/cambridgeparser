@@ -5,6 +5,18 @@
 // startExamAttempt() at the start, finishExamAttempt() at the end.
 // The original single-shot export is kept at the bottom for compatibility.
 
+// typed against the schema mirror in @/lib/types/database, replacing
+// `supabase: any` / `session: any`. A misspelled column or a wrong unit is
+// now a compile error rather than a Postgres error at runtime.
+import type { Session } from '@supabase/supabase-js';
+import type {
+  Db,
+  ExamAttemptFinish,
+  ExamAttemptInsert,
+  ExamAttemptRow,
+} from '@/lib/types/database';
+import { AttemptStatus } from '@/lib/types/enums';
+
 // local calendar date in the user's own timezone. "Practice streak" and
 // "peak solving hour" are local-calendar ideas; deriving them from a UTC
 // timestamp is wrong for anyone not on UTC. Computed here rather than as a
@@ -22,9 +34,9 @@ function localDateFor(timezone: string, when: Date): string {
 // opens an attempt. Returns the row id, which the caller holds for the rest
 // of the exam and passes to every subsequent write.
 export async function startExamAttempt(
-  supabase: any,
+  supabase: Db,
   props: { schema: string },
-  session: any,
+  session: Session,
   questionsTotal?: number,
 ): Promise<string> {
   if (!session?.user?.id) throw new Error('No session user id');
@@ -32,13 +44,13 @@ export async function startExamAttempt(
   const now = new Date();
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
-  const payload: Record<string, unknown> = {
+  const payload: ExamAttemptInsert = {
     user_id: session.user.id,
     // the Cambridge schema string stays ground truth. subject_code, series,
     // exam_year, paper_number and variant are GENERATED from it in Postgres, so
     // there is nothing extra to send and the two can never disagree.
     paper_id: props.schema,
-    status: 'in_progress',
+    status: AttemptStatus.InProgress,
     started_at: now.toISOString(),
     client_timezone: timezone,
     local_date: localDateFor(timezone, now),
@@ -56,20 +68,20 @@ export async function startExamAttempt(
     throw error;
   }
   if (!data?.id) throw new Error('No exam_attempt id returned from Supabase');
-  return data.id as string;
+  return (data as ExamAttemptRow).id;
 }
 
 // closes an attempt opened by startExamAttempt().
 export async function finishExamAttempt(
-  supabase: any,
+  supabase: Db,
   examAttemptId: string,
   totalTimeMs: number | null,
   questionsAnswered: number,
-  status: 'completed' | 'abandoned' = 'completed',
+  status: typeof AttemptStatus.Completed | typeof AttemptStatus.Abandoned = AttemptStatus.Completed,
 ): Promise<void> {
   if (!examAttemptId) throw new Error('examAttemptId required');
 
-  const payload: Record<string, unknown> = {
+  const payload: ExamAttemptFinish = {
     status,
     finished_at: new Date().toISOString(),
     questions_answered: questionsAnswered,
@@ -90,9 +102,9 @@ export async function finishExamAttempt(
 // kept so any caller still using the old one-shot signature keeps working.
 // Prefer startExamAttempt() + finishExamAttempt().
 export async function pushToExamTable(
-  supabase: any,
+  supabase: Db,
   props: { schema: string },
-  session: any,
+  session: Session,
   totalTimeMs: number | null,
   _startedIso?: string,
   _finishedAtIso?: string,

@@ -27,6 +27,9 @@ import { cacheAnswerKey } from '@/lib/supabase/cacheAnswerKey';
 import { setEventEpoch } from '@/lib/utils/addEventLog';
 import { registerExamSession } from './composable';
 import router from '@/router/router';
+// types for the vendored pdf.js viewer and the fetch-pdf contract.
+import { asPdfViewerWindow, type PdfPageView } from '@/lib/types/pdfViewer';
+import type { FetchPdfResponse, LoadedPaper } from '@/lib/types/fetchPdf';
 import { renderHighlights } from '@/lib/render/renderHighlights';
 import { renderFocusAreas } from '@/lib/render/renderFocusAreas';
 
@@ -60,7 +63,10 @@ let answers: TableRow[] | null = null;
 // throughout, closed in endExam().
 let examAttemptId: string | null = null;
 
-async function getPDF(): Promise<{ answers: any; pdfBytes: Uint8Array; pdfUrl: string }> {
+// the fetch-pdf edge function's response had no type at all - `answers`
+// was `any`, so the mark-scheme rows flowed untyped into getQuestionsAnalytics
+// and cacheAnswerKey. FetchPdfResponse/LoadedPaper name that contract.
+async function getPDF(): Promise<LoadedPaper> {
 
   const { data, error } = await supabase.functions.invoke("fetch-pdf", {
     body: {
@@ -73,12 +79,15 @@ async function getPDF(): Promise<{ answers: any; pdfBytes: Uint8Array; pdfUrl: s
     throw error;
   }
 
-  const answers = data.answers;
+  // `functions.invoke` returns `any`, so the response is named here at the
+  // boundary. Everything downstream of this line is typed.
+  const body = data as FetchPdfResponse;
+  const answers = body.answers;
 
   const pdfBytes = new Uint8Array(
-    Array.isArray(data.qp)
-      ? data.qp
-      : Object.values(data.qp)
+    Array.isArray(body.qp)
+      ? body.qp
+      : Object.values(body.qp)
   );
 
   const pdfBlob = new Blob([pdfBytes], {
@@ -104,6 +113,11 @@ async function startExam() {
   examStarted.value = true;
 
   try {
+    // `session` is Session | null - typing startExamAttempt surfaced that it
+    // was being passed unchecked. It is also captured once at setup (Pinia
+    // destructuring is not reactive), so a session that arrives later leaves
+    // this null; see FUTURE_WORK.md.
+    if (!session) throw new Error('No Supabase session; attempt not persisted');
     examAttemptId = await startExamAttempt(supabase, props, session, answers?.length);
     // cache the mark-scheme key so the DB can decide correctness itself.
     if (answers) await cacheAnswerKey(supabase, props.schema, answers);
@@ -126,6 +140,8 @@ async function endExam() {
 
     // fall back to opening one now if startExam() could not.
     if (!examAttemptId) {
+      // same null guard as in startExam().
+      if (!session) throw new Error('No Supabase session; attempt not persisted');
       examAttemptId = await startExamAttempt(supabase, props, session, answers.length);
     }
 
@@ -270,8 +286,11 @@ const onLoad = async (pdfBytes: Uint8Array) => {
 
   injectStyles(doc)
 
-  const app = (iframeWindow as any).PDFViewerApplication;
-  const pdfjsLib = (iframeWindow as any).pdfjsLib;
+  // was two `as any` casts. asPdfViewerWindow names the two globals the
+  // vendored pdf.js viewer publishes on its window.
+  const viewerWindow = asPdfViewerWindow(iframeWindow);
+  const app = viewerWindow.PDFViewerApplication;
+  const pdfjsLib = viewerWindow.pdfjsLib;
 
   await app.initializedPromise;
 
@@ -285,7 +304,8 @@ const onLoad = async (pdfBytes: Uint8Array) => {
     const pages = pdfViewer._pages;
     if (!Array.isArray(pages)) return;
 
-    pages.forEach((pageView: any, index: number) => {
+    // was `pageView: any`.
+    pages.forEach((pageView: PdfPageView, index: number) => {
       const pageEl = pageView?.div;
       if (!pageEl) return;
 

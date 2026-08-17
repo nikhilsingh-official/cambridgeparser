@@ -1,4 +1,6 @@
-import { addEventLog } from "../utils/addEventLog";
+// switched to the typed button constructor.
+import { logButton } from "../utils/addEventLog";
+import { ButtonAction } from "@/lib/types/enums";
 import type { EventLogs } from "../utils/utilsTypes";
 import type { Button } from "./buttonTypes";
 
@@ -9,13 +11,13 @@ export function handleButtonClick(button: Button, eventLogs: EventLogs) {
       button.el.classList.add("btn-active");
       button.el.classList.remove("btn-inactive");
     }
-    addEventLog(eventLogs, button.type, "Selection", button.parent!.questionNum, undefined);
+    logButton(eventLogs, button.type, ButtonAction.Selection, button.parent!.questionNum);
   } else {
     button.state = false;
     if(button.el) {
       button.el.classList.add("btn-inactive");
       button.el.classList.remove("btn-active");
     }
-    addEventLog(eventLogs, button.type, "Deselection", button.parent!.questionNum, undefined);
+    logButton(eventLogs, button.type, ButtonAction.Deselection, button.parent!.questionNum);
   }
 }
