@@ -1,0 +1,79 @@
+<script setup lang="ts">
+import { Wrench, LayoutGrid } from 'lucide-vue-next';
+import { getShowStates } from './composable';
+
+const { showOverview, showTools } = getShowStates()
+</script>
+<template>
+    <div class="bottom-bar">
+      <div class="exam-code-container">
+        <p>0625_w22_21</p>
+      </div>
+      <div class="drawers-caller">
+        <div class="tools-wrapper" @click="showTools = !showTools">
+          <Wrench></Wrench>
+          <p>Tools</p>
+        </div>
+        <div class="overview-wrapper" @click="showOverview = !showOverview">
+          <LayoutGrid></LayoutGrid>
+          <p>Overview</p>
+        </div>
+      </div>
+      <div class="save-container">
+        <div class="dot-save-indicator"></div>
+        <p>Saved</p>
+      </div>
+    </div>
+</template>
+<style lang="scss" scoped>
+.bottom-bar {
+  flex: 0 0 auto;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1.3rem;
+  gap: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  .exam-code-container {
+    color: lightgray;
+    font-family: 'Kode Mono';
+    font-size: 13.5px;
+  }
+  .drawers-caller {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    .tools-wrapper, .overview-wrapper {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7.5px;
+      svg {
+        stroke: $accent;
+        width: 15px;
+      }  
+      color: $text;
+      font-family: 'Inter';
+      font-size: 13.5px;
+      cursor: pointer;
+    }
+  }
+  .save-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7.5px;
+    .dot-save-indicator {
+      width: 10px;
+      aspect-ratio: 1/1;
+      border-radius: 50%;
+      background-color: $success;
+    }
+    color: $text;
+    font-family: 'Inter';
+    font-size: 13.5px;
+  }
+}
+</style>

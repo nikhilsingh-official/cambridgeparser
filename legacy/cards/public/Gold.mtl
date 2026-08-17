@@ -1,0 +1,7 @@
+# Gold.mtl
+newmtl Gold
+Ka 0.247 0.199 0.074  # Ambient color (dark gold)
+Kd 0.751 0.606 0.226  # Diffuse color (main gold)
+Ks 0.628 0.555 0.366  # Specular color (shinier gold)
+d 1.0  # Fully opaque
+illum 2  # Illumination model (diffuse shading)
