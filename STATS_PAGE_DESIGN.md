@@ -11,44 +11,57 @@ slots already laid out in `components_stats/`.
 
 ---
 
-## 0. Two things to settle before any chart is drawn
+## 0. Decisions taken
 
-### 0.1 "Accuracy" currently means two different numbers
+### 0.1 Accuracy is **marks awarded / marks total** — DECIDED
 
-`v_attempt_summary.accuracy` is `avg((qa.is_correct)::int)`. Postgres `avg`
-skips nulls, and `is_correct` is null for unanswered questions — so this is
-**correct ÷ answered**.
+Everywhere. It is the exam-realistic number: an unanswered question counts
+against you, exactly as it would in the real paper.
 
-The end screen shows `marksAwarded ÷ marksTotal`, where `marksTotal` counts
-every question **including unanswered ones**.
+This previously disagreed with itself. `v_attempt_summary.accuracy` was
+`avg((qa.is_correct)::int)`; Postgres `avg` skips nulls and `is_correct` is null
+for unanswered questions, so it was really correct ÷ **answered**. The end screen
+has always divided by the full paper. The same attempt could read 60% on one
+screen and 80% on the other.
 
-On a paper where 30/40 were attempted and 24 were right, the end screen says
-**60%** and the stats page will say **80%**. Same paper, same session, two
-numbers — which reads as a bug even though both queries are correct.
+`v_attempt_summary`, `v_subject_stats` and `v_topic_mastery` are now all
+marks-based and agree with the end screen by construction. The old ratio survives
+as `precision_when_answered` — "when you commit, how often are you right" — which
+is a real question, just not the headline.
 
-Fix before building: name them separately and show both.
-- **Score** = correct ÷ total — the exam-realistic number. This is the headline.
-- **Precision** = correct ÷ answered — "when you commit, how often are you
-  right". Useful, but a supporting stat.
+Subject-level accuracy is **marks-weighted**, not the mean of per-paper
+percentages, so a 10-mark paper does not count as much as a 40-mark one.
 
-Everything below uses **Score** as the default y-axis unless stated.
-
-### 0.2 `confidence` is inferred, not stated
+### 0.2 Confidence stays behavioural — DECIDED
 
 `question_metrics.confidence` is a weighted composite of time, eliminations,
-review marks and revisits. It is a **behavioural proxy** for confidence, not the
-student's own claim. That matters for the calibration curve, which is
-conventionally "stated confidence vs observed accuracy".
+review marks and revisits, rather than a value the student states.
 
-Two honest options:
-- Label the axis **"behavioural confidence"** and treat the curve as "does
-  hesitation predict being wrong?" — still genuinely useful, and buildable today.
-- Add a one-tap confidence prompt per question later, and get real calibration.
+Kept deliberately, and the reasoning is sound: a confidence prompt is only
+accurate if it is answered honestly every time, and in practice students
+optimising for accuracy dismiss it. A dismissed or reflexively-tapped prompt is
+worse than a behavioural estimate, because it *looks* like ground truth. The
+inferred metric costs the student nothing and is never skipped.
 
-Do not label a proxy as if it were stated confidence. The chart's whole value is
-that the student trusts what it says about them.
+Two consequences to hold onto:
+- **Label it "behavioural confidence"** in the UI. The calibration chart is
+  answering "does hesitation predict being wrong?" — which is genuinely useful,
+  and is not the same claim as classical calibration. Say what it measures.
+- It is **weight-dependent**, which is exactly why `question_metrics` is
+  versioned by `metrics_version`. Retuning the weights in `enrichAnalytics.ts`
+  without inserting a new version silently makes old and new attempts
+  incomparable on this axis. See `FUTURE_WORK.md` §6.4.
 
----
+### 0.3 Two view bugs fixed while settling the above
+
+`v_daily_activity.total_time_ms` and `v_subject_stats.total_time_ms` were
+`sum(ea.duration_ms)` computed across a join to `question_attempts`, so each
+attempt's duration was summed once **per question** — roughly 40x the real study
+time on a 40-question paper. `count(distinct ea.id)` next to it was correct,
+which is what hid it. Both views now aggregate the two grains separately.
+
+Worth noting because the engagement section is largely built on these two
+columns; unfixed, it would have reported ~26-hour study days.
 
 ## 1. What is recorded
 
@@ -227,7 +240,7 @@ multiselects.
 | Slot | Chart | Series | Source |
 |---|---|---|---|
 | `.multi-line-container` (largest) | **Multi-series line, score over time** | one line per subject, x = `local_date`, y = score | `v_attempt_summary` |
-| `.progress-line-container` (wide, short) | **Score-per-paper column chart**, coloured by subject, doubling as the `dataZoom` controller for the multiline above | x = attempt, y = score | `v_attempt_summary` |
+| `.progress-line-container` (wide, short) | **Accuracy-per-paper column chart**, coloured by subject, doubling as the `dataZoom` controller for the multiline above | x = attempt, y = score | `v_attempt_summary` |
 | `.donut-container` | **Outcome donut**: correct / incorrect / unanswered, with **lucky guesses carved out of correct** as a separate slice | centre label = score % | `v_attempt_summary` + `v_question_flags` |
 | 7 × `.quickview-container` | `TotalPapersSolved`, `OverallAccuracy`, `StrongestSubject`, `MostImprovedSubject`, `ImprovementRate`, `FastestCompletionTime`, `ThisWeeksAccuracy` | number + sparkline | `StatCategory` already defines all of these |
 
@@ -251,22 +264,56 @@ of cyclical data — a **polar bar chart** (ECharts `polar` + `angleAxis` of 24)
 reads instantly as a clock face and shows the *shape* of when you work, not just
 the argmax. If a quickview tile is too small, promote it into the section.
 
-### Section 3 — FOCUS
+### Section 3 — FOCUS *(redesigned — see §3.1)*
 
-This section has the most valuable and least obvious data. Your placeholder is a
-tall `focus-pie-container` plus six small tiles — **I would change this one**,
-because the two best charts in the whole dataset live here and neither is a pie.
+The original layout put a tall `focus-pie-container` plus six tiles in
+**columns 1–7 only**, leaving roughly 70% of the section's width empty, and four
+of its ten tiles shared the class `quickview-container-1`, so they stacked in a
+single cell. It was the least-finished section, and it is also where the two
+most insight-dense charts in the dataset belong — neither of which is a pie.
 
-| Slot | Proposed | Why |
+Redesigned below. The original is preserved at tag `stats-page-original`.
+
+### 3.1 Focus — final layout
+
+Dropped the fixed 20×20 grid here for a **flow of rows**, because this section's
+content is naturally two big charts plus a metric bar, and forcing that into
+20 equal rows only makes the sizes arbitrary. Progress and Engagement keep their
+grids; they suit them.
+
+```
+┌───────────────────────────────────────────────────────────┐
+│  CALIBRATION CURVE            │  TIME vs CORRECTNESS       │   row 1
+│  behavioural confidence       │  scatter, log x            │   (2 cols)
+│  vs observed accuracy         │  guesses cluster ↙         │
+│  y=x diagonal + bucket counts │  overthinking ↗            │
+├───────────────────────────────────────────────────────────┤
+│  ANSWER-CHANGE SANKEY                                      │   row 2
+│  first choice → final choice, split right/wrong            │   (full width)
+├───────────────────────────────────────────────────────────┤
+│ over- │ under- │ guess │ guess │ elim.  │ mean            │   row 3
+│ conf. │ conf.  │ count │ acc.  │ precis.│ hesitation      │   (6 tiles)
+└───────────────────────────────────────────────────────────┘
+```
+
+| Panel | Chart | Source |
 |---|---|---|
-| `.focus-pie-container` (tall, left) | **Calibration curve** — x = behavioural confidence bucket, y = observed score, with a y=x diagonal `markLine` and bucket counts as faint bars behind | The single most insight-dense chart available. Above the line = underconfident, below = overconfident |
-| new wide slot | **Time vs correctness scatter** — x = `time_spent_ms` (log), y = `confidence`, colour = `is_correct`, size = `exploration_depth` | Guesses cluster bottom-left, overthinking top-right. One chart, two behaviours |
-| remaining tiles | Overconfident count, underconfident count, guess count, guess accuracy, mean hesitation, elimination precision | all from `v_question_flags` |
+| Calibration curve | ECharts `line` + `markLine` diagonal, faint `bar` behind for bucket counts | `v_calibration_curve` |
+| Time vs correctness | ECharts `scatter`, x = `time_spent_ms` (log), y = `confidence`, colour = `is_correct`, size = `exploration_depth` | `question_attempts` + `question_metrics` |
+| Answer-change sankey | ECharts `sankey` | `attempt_events` (§5) |
+| 6 tiles | plain numbers | `v_question_flags` |
 
-If you want to keep a pie here, the honestly pie-shaped data is the **flag
-breakdown**: marked for review / difficult / saved / unflagged.
+Why these two charts carry the section:
+- The **calibration curve** is the only view that says something about the
+  student rather than the score. Above the diagonal = underconfident (you know
+  more than you think), below = overconfident (the dangerous direction).
+- The **scatter** puts two different failure modes on one pair of axes: fast +
+  low-confidence + wrong is guessing, slow + high-confidence + wrong is a
+  misconception. They need opposite remedies, and no single number separates them.
 
----
+The sankey is placed but **renders empty until the query layer reads
+`attempt_events`** (§5). Give it the low-n empty state from §6 rather than a
+blank card.
 
 ## 4. What should *not* be a chart
 
@@ -331,8 +378,7 @@ papers to see a trend"* — not a blank card.
 
 ## 7. Build order
 
-1. **Settle §0.1** — pick Score vs Precision naming. Everything downstream
-   inherits it, and changing it later means touching every chart.
+1. ~~Settle §0.1~~ — **done**, accuracy is marks/total everywhere (§0).
 2. **Query layer.** `src/lib/supabase/queries/` — the app still performs zero
    reads (`FUTURE_WORK.md` §2.3). Typed against `database.ts`, one function per
    view. Nothing below is possible first.

@@ -312,6 +312,19 @@ create index if not exists idx_goals_user on goals(user_id) where active;
 -- Read layer
 -- ==========================================================================
 
+-- `accuracy` is MARKS AWARDED / MARKS TOTAL, where marks_total comes from
+-- the whole answer key - so an unanswered question counts against you, exactly
+-- as it would in the real exam.
+--
+-- It previously read `avg((qa.is_correct)::int)`. Postgres `avg` skips nulls and
+-- is_correct is null for unanswered questions, so that expression was really
+-- correct/ANSWERED. The end screen has always divided by the full paper, so the
+-- same attempt could read 60% there and 80% here. Now they agree by construction.
+--
+-- The old ratio is still available as precision_when_answered ("when you commit,
+-- how often are you right"), which is a genuinely different and useful question -
+-- it just is not the headline number. Not named `precision`: that is a Postgres
+-- keyword (DOUBLE PRECISION).
 create or replace view v_attempt_summary as
 select
   ea.id, ea.user_id, ea.paper_id, ea.status,
@@ -322,12 +335,32 @@ select
   count(qa.id)                                         as questions_recorded,
   count(qa.selected_option)                            as questions_answered,
   count(*) filter (where qa.is_correct)                as questions_correct,
-  avg((qa.is_correct)::int)                            as accuracy,
+
+  coalesce(sum(pa.marks) filter (where qa.is_correct), 0)::int as marks_awarded,
+  key.marks_total,
+  -- null (not 0) when the answer key is missing, so "unmarked" is visibly
+  -- distinct from "scored zero" on every chart downstream.
+  case when key.marks_total > 0
+       then coalesce(sum(pa.marks) filter (where qa.is_correct), 0)::numeric
+            / key.marks_total
+  end                                                  as accuracy,
+  avg((qa.is_correct)::int)                            as precision_when_answered,
   avg(qa.time_spent_ms)::int                           as avg_time_per_question_ms
 from exam_attempts ea
 left join subjects s          on s.code = ea.subject_code
 left join question_attempts qa on qa.exam_attempt_id = ea.id
-group by ea.id, s.name, s.qualification;
+-- per-question marks, for the awarded half.
+left join paper_answers pa on pa.paper_id = ea.paper_id
+                          and pa.question_number = qa.question_number
+-- the denominator must come from the KEY, not from the rows that happen to
+-- exist - otherwise a paper the student abandoned halfway would be scored out
+-- of only the questions they reached, which flatters every abandoned attempt.
+left join lateral (
+  select coalesce(sum(marks), 0)::int as marks_total
+  from paper_answers
+  where paper_id = ea.paper_id
+) key on true
+group by ea.id, s.name, s.qualification, key.marks_total;
 
 -- Per-question flags. This is where "overconfident", "underconfident" and
 -- "guessed" actually get decided - none of them existed before, and none of
@@ -379,18 +412,35 @@ join question_metrics qm   on qm.question_attempt_id = qa.id
 where qa.is_correct is not null
 group by ea.user_id, width_bucket(qm.confidence, 0, 1, 10);
 
+-- BUG FIX - total_time_ms was `sum(ea.duration_ms)` computed across a join
+-- to question_attempts, so each attempt's duration was summed once PER QUESTION.
+-- On a 40-question paper that reported ~40x the real study time. `papers` was
+-- already correct because it used count(distinct), which hid the problem.
+-- The two grains are now aggregated separately and joined, so neither fans out.
 create or replace view v_daily_activity as
-select
-  ea.user_id,
-  ea.local_date,
-  count(distinct ea.id)                 as papers,
-  sum(ea.duration_ms)                   as total_time_ms,
-  count(qa.id)                          as questions,
-  count(*) filter (where qa.is_correct) as correct
-from exam_attempts ea
-left join question_attempts qa on qa.exam_attempt_id = ea.id
-where ea.status = 'completed'
-group by ea.user_id, ea.local_date;
+with attempt_totals as (
+  select user_id, local_date,
+         count(*)         as papers,
+         sum(duration_ms) as total_time_ms
+  from exam_attempts
+  where status = 'completed'
+  group by user_id, local_date
+),
+question_totals as (
+  select ea.user_id, ea.local_date,
+         count(qa.id)                          as questions,
+         count(*) filter (where qa.is_correct) as correct
+  from exam_attempts ea
+  join question_attempts qa on qa.exam_attempt_id = ea.id
+  where ea.status = 'completed'
+  group by ea.user_id, ea.local_date
+)
+select a.user_id, a.local_date, a.papers, a.total_time_ms,
+       coalesce(q.questions, 0) as questions,
+       coalesce(q.correct,   0) as correct
+from attempt_totals a
+left join question_totals q
+       on q.user_id = a.user_id and q.local_date = a.local_date;
 
 -- "Peak solving hour" - local, per D10. Kept separate from v_daily_activity
 -- because it aggregates over attempts rather than over days.
@@ -404,25 +454,41 @@ from exam_attempts ea
 where ea.status = 'completed'
 group by ea.user_id, 2;
 
+-- rebuilt on top of v_attempt_summary so `accuracy` has exactly ONE
+-- definition in the whole schema (marks awarded / marks total). Aggregating an
+-- aggregate also fixes the same duration fan-out described above.
 create or replace view v_subject_stats as
+with per_subject_metrics as (
+  select ea.user_id, ea.subject_code,
+         avg(qm.confidence) as avg_confidence,
+         avg(qm.difficulty) as avg_difficulty,
+         avg(qm.interest)   as avg_interest
+  from exam_attempts ea
+  join question_attempts qa on qa.exam_attempt_id = ea.id
+  join question_metrics  qm on qm.question_attempt_id = qa.id
+                           and qm.metrics_version = ea.metrics_version
+  where ea.status = 'completed'
+  group by ea.user_id, ea.subject_code
+)
 select
-  ea.user_id,
-  ea.subject_code,
-  s.name as subject_name,
-  count(distinct ea.id)                 as attempts,
-  avg((qa.is_correct)::int)             as accuracy,
-  sum(ea.duration_ms)                   as total_time_ms,
-  max(ea.finished_at)                   as last_attempt_at,
-  avg(qm.confidence)                    as avg_confidence,
-  avg(qm.difficulty)                    as avg_difficulty,
-  avg(qm.interest)                      as avg_interest
-from exam_attempts ea
-left join subjects s           on s.code = ea.subject_code
-left join question_attempts qa on qa.exam_attempt_id = ea.id
-left join question_metrics qm  on qm.question_attempt_id = qa.id
-                              and qm.metrics_version = ea.metrics_version
-where ea.status = 'completed'
-group by ea.user_id, ea.subject_code, s.name;
+  vs.user_id,
+  vs.subject_code,
+  vs.subject_name,
+  count(*)                                                        as attempts,
+  sum(vs.marks_awarded)::int                                      as marks_awarded,
+  sum(vs.marks_total)::int                                        as marks_total,
+  -- weighted by marks across the subject, NOT avg(per-paper accuracy) -
+  -- a 10-mark paper should not count as much as a 40-mark one.
+  sum(vs.marks_awarded)::numeric / nullif(sum(vs.marks_total), 0) as accuracy,
+  sum(vs.duration_ms)                                             as total_time_ms,
+  max(vs.finished_at)                                             as last_attempt_at,
+  m.avg_confidence, m.avg_difficulty, m.avg_interest
+from v_attempt_summary vs
+left join per_subject_metrics m
+       on m.user_id = vs.user_id and m.subject_code = vs.subject_code
+where vs.status = 'completed'
+group by vs.user_id, vs.subject_code, vs.subject_name,
+         m.avg_confidence, m.avg_difficulty, m.avg_interest;
 
 -- Per-topic mastery. Returns nothing until `topics` and
 -- `paper_answers.topic_id` are populated - see src/constants/topicMap.ts.
@@ -434,7 +500,12 @@ select
   t.name as topic_name,
   count(*)                              as questions,
   count(*) filter (where qa.is_correct) as correct,
-  avg((qa.is_correct)::int)             as accuracy,
+  -- marks-based, matching v_attempt_summary. An unanswered question in a
+  -- topic counts against mastery of that topic - skipping is not mastery.
+  coalesce(sum(pa.marks) filter (where qa.is_correct), 0)::int      as marks_awarded,
+  coalesce(sum(pa.marks), 0)::int                                   as marks_total,
+  coalesce(sum(pa.marks) filter (where qa.is_correct), 0)::numeric
+    / nullif(sum(pa.marks), 0)          as accuracy,
   avg(qa.time_spent_ms)::int            as avg_time_ms
 from question_attempts qa
 join exam_attempts ea on ea.id = qa.exam_attempt_id
