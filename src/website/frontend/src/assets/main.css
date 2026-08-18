@@ -37,6 +37,16 @@
   --paper: #ffffff;
   --paper-ink: #191714;
   --hero-background: #f7f3eb;
+
+  /* Shared with SmartSolver's theme layer so one login screen serves both
+     apps. Geometry is a token because these themes are deliberately flat and
+     square, while SmartSolver's default theme is rounded. */
+  --grid-line: #ebe5d9;
+  --card-shadow: none;
+  --focus-ring: rgba(123, 45, 38, 0.18);
+  --radius-card: 0px;
+  --radius-control: 0px;
+  --radius-pill: 0px;
 }
 
 [data-theme='dark'] {
@@ -69,6 +79,13 @@
   --paper: #ffffff;
   --paper-ink: #171a1f;
   --hero-background: #11161d;
+
+  --grid-line: #0e1116;
+  --card-shadow: none;
+  --focus-ring: rgba(242, 169, 59, 0.22);
+  --radius-card: 0px;
+  --radius-control: 0px;
+  --radius-pill: 0px;
 }
 
 /* Both selected systems are flat, rule-led interfaces with square geometry. */

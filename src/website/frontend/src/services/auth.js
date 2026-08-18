@@ -16,6 +16,7 @@ import {
   createUserWithEmailAndPassword,
   signInWithPopup,
   GoogleAuthProvider,
+  sendPasswordResetEmail,
   signOut,
 } from 'firebase/auth'
 
@@ -58,6 +59,12 @@ export function registerWithEmail(email, password) {
 
 export function loginWithGoogle() {
   return signInWithPopup(auth, new GoogleAuthProvider())
+}
+
+// Added so the login screen's "Forgot password" is real rather than decorative.
+// Matches the same affordance in SmartSolver, which the two apps now share.
+export function sendPasswordReset(email) {
+  return sendPasswordResetEmail(auth, email)
 }
 
 export function logout() {
