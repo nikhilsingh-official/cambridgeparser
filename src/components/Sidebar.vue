@@ -1,3 +1,21 @@
+<script setup lang="ts">
+// added. Sidebar had no script block at all, so the "Log Out" item below
+// was an inert <a> - logout() existed in the auth store and NOTHING called it.
+// With route guards now in place that was a trap: once signed in there was no
+// way out, and /login is guestOnly so it redirects a signed-in user away.
+import { useAuthStore } from '@/stores/useAuth';
+import { useRouter } from 'vue-router';
+
+const { logout } = useAuthStore();
+const router = useRouter();
+
+async function handleLogout() {
+  await logout();
+  // replace() rather than push() so Back cannot return to a page that is
+  // now unauthorised - the guard would bounce it, but the flash is avoidable.
+  await router.replace('/login');
+}
+</script>
 <template>
     <div class="sidebar">
         <ul class="sidebar-items">
@@ -74,7 +92,8 @@
                     <div class="sidebar-icon">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-log-out"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
                     </div>
-                    <a class="sidebar-text">Log Out</a>
+                    <!-- was inert; now wired to the auth store. -->
+                    <a class="sidebar-text logout-link" @click="handleLogout">Log Out</a>
                 </li>
             </div>
         </ul>
@@ -82,6 +101,9 @@
 </template>
 
 <style lang="scss" scoped>
+/* the logout anchor has no href, so it needs an explicit affordance. */
+.logout-link { cursor: pointer; }
+
 .sidebar {
   @extend %centered;
   position: fixed;
