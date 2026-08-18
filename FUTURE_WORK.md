@@ -135,10 +135,21 @@ supabase db reset
 psql "$DB_URL" -f supabase/seed_subjects.sql     # 196 subjects
 ```
 
-### 2.3 The query layer does not exist
-The app still performs **zero reads**. Every view in §Read layer of `schema.sql`
-is unconsumed. Until `src/lib/supabase/queries/` exists, the stats page cannot
-show anything real regardless of what is stored.
+### 2.3 ~~The query layer does not exist~~ — **built**
+`src/lib/supabase/queries/` now exists: `core.ts` (filters + error unwrapping),
+`attempts.ts`, `activity.ts`, `focus.ts`, `subjects.ts`, `goals.ts`. Every view
+has a typed reader.
+
+Two rules hold across it, both worth preserving:
+- **Every query takes an explicit `userId` and filters on it.** RLS is deferred
+  (§3.2), so that predicate is currently the *only* thing scoping data to the
+  right user. It is never optional and never inferred.
+- Errors unwrap in one place. `PostgrestError` is not an `Error`, so throwing it
+  raw produces a stackless object; `unwrap()` names the failing query.
+
+**Still unconsumed by the UI** — the components in `components_stats/` do not
+call these yet, and no charting library is installed (see
+`STATS_PAGE_DESIGN.md` §2 and §8: Apache ECharts, tree-shaken).
 
 ### 2.4 Replace the placeholder data in `components_stats/`
 - `StatsPage.vue:10–17` — filters hardcoded to `['Wade Cooper','Arlene Mccoy',…]`,

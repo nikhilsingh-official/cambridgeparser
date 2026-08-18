@@ -271,14 +271,31 @@ export interface AttemptSummaryView {
   questions_recorded: number;
   questions_answered: number;
   questions_correct: number;
-  /** 0..1, or null when nothing has been marked yet. */
+
+  // marks-based scoring. `accuracy` is marks_awarded / marks_total over the
+  // WHOLE answer key, so unanswered questions count against it - the same
+  // definition the end screen uses. See STATS_PAGE_DESIGN.md §0.1.
+  marks_awarded: number;
+  marks_total: number;
+  /** 0..1, or null when the answer key is missing (never 0 in that case). */
   accuracy: number | null;
+  /**
+   * correct / ANSWERED - the old meaning of `accuracy`. Kept because
+   * "when you commit, how often are you right" is a real question; it is just
+   * not the headline number.
+   */
+  precision_when_answered: number | null;
   avg_time_per_question_ms: number | null;
 }
 
 export interface QuestionFlagsView {
   question_attempt_id: string;
   exam_attempt_id: string;
+  // added to the view so it can be filtered per user and per subject.
+  user_id: string;
+  paper_id: PaperSchema;
+  subject_code: SubjectCode;
+  local_date: IsoDate;
   question_number: number;
   is_correct: boolean | null;
   confidence: number | null;
@@ -312,11 +329,25 @@ export interface DailyActivityView {
   correct: number;
 }
 
+// v_hour_of_day had no matching type. 24 bins of local-hour activity -
+// the "peak solving hour" card, and the polar chart in the engagement section.
+export interface HourOfDayView {
+  user_id: string;
+  /** 0..23, in the user's own timezone at the time of the attempt. */
+  local_hour: number;
+  papers: number;
+  total_time_ms: number | null;
+}
+
 export interface SubjectStatsView {
   user_id: string;
   subject_code: SubjectCode;
   subject_name: string | null;
   attempts: number;
+  // marks-weighted across the subject, not the mean of per-paper
+  // percentages - a 10-mark paper must not count as much as a 40-mark one.
+  marks_awarded: number;
+  marks_total: number;
   accuracy: number | null;
   total_time_ms: number | null;
   last_attempt_at: IsoTimestamp | null;
@@ -332,6 +363,9 @@ export interface TopicMasteryView {
   topic_name: string;
   questions: number;
   correct: number;
+  // marks-based, matching every other accuracy in the schema.
+  marks_awarded: number;
+  marks_total: number;
   accuracy: number | null;
   avg_time_ms: number | null;
 }

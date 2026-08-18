@@ -375,6 +375,14 @@ with per_attempt as (
 select
   qa.id as question_attempt_id,
   qa.exam_attempt_id,
+  -- user_id, subject_code and local_date added so the stats page can filter
+  -- this view per user and per subject. Without user_id the view was unusable
+  -- from the client: RLS is deferred, so a select with no user predicate would
+  -- return every user's questions.
+  ea.user_id,
+  ea.paper_id,
+  ea.subject_code,
+  ea.local_date,
   qa.question_number,
   qa.is_correct,
   qm.confidence,
