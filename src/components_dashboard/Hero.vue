@@ -111,7 +111,7 @@ onMounted(() => {
                             </svg>
                         </button>
                     </div>
-                    <img src="@/assets/images/stats.png" class="cta-img" data-type="stats">
+                    <img src="@/assets/images/stats.webp" class="cta-img" data-type="stats">
                 </div>
                 <div class="carousel-item">
                     <div class="cta-text-container">
@@ -119,7 +119,7 @@ onMounted(() => {
                         <p>Dive into our full archive of past paper questions.</p>
                         <button class="cta-redirect">Open Paper Browser <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-chevron-right"><polyline points="9 18 15 12 9 6"></polyline></svg></button>
                     </div>
-                    <img src="@/assets/images/paper.png" class="cta-img" data-type="paper">
+                    <img src="@/assets/images/paper.webp" class="cta-img" data-type="paper">
                 </div>
                 <div class="carousel-item">
                     <div class="cta-text-container">
@@ -134,7 +134,7 @@ onMounted(() => {
                             </svg>
                         </button>
                     </div>
-                    <img src="@/assets/images/stats.png" class="cta-img" data-type="stats">
+                    <img src="@/assets/images/stats.webp" class="cta-img" data-type="stats">
                 </div>
                 <div class="carousel-item">
                     <div class="cta-text-container">
@@ -142,7 +142,7 @@ onMounted(() => {
                         <p>Dive into our full archive of past paper questions.</p>
                         <button class="cta-redirect">Open Paper Browser <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-chevron-right"><polyline points="9 18 15 12 9 6"></polyline></svg></button>
                     </div>
-                    <img src="@/assets/images/paper.png" class="cta-img" data-type="paper">
+                    <img src="@/assets/images/paper.webp" class="cta-img" data-type="paper">
                 </div>
             </div>
         </div>

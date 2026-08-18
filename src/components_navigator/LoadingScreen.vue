@@ -49,13 +49,43 @@ let tipInterval: number | undefined;
 onMounted(() => {
   if (!lottieContainer.value) return;
 
+  // PERFORMANCE. This animation was the single most expensive thing on the
+  // loading screen. Measured on a real GPU (tests/perf/solver-cpu.mjs, HEADED=1):
+  //
+  //   svg renderer                20% of one core,  61 layouts/sec
+  //   canvas renderer             16% of one core,   3 layouts/sec
+  //   canvas + setSubframe(false) 10% of one core,   3 layouts/sec
+  //
+  // Two separate wins:
+  //
+  // 1. renderer "canvas" instead of "svg". lottie's SVG renderer animates by
+  //    writing transform/path attributes onto SVG nodes, and every such write
+  //    invalidates layout for the SVG subtree - hence 61 layouts a second, one
+  //    per frame. Canvas draws into a bitmap and touches no DOM, so layout
+  //    drops to nothing. This matters more than the CPU number suggests:
+  //    layout runs on the main thread and blocks interaction, whereas
+  //    rasterisation is largely handed to the GPU.
+  //
+  // 2. setSubframe(false). The animation is authored at 30fps but rAF fires at
+  //    the display's 60Hz, and by default lottie interpolates at fractional
+  //    frames - so it was rendering twice per authored frame for no visible
+  //    benefit. Snapping to whole frames halves the work.
+  //
+  // dpr is pinned rather than left to devicePixelRatio: the canvas renderer
+  // rasterises at a fixed size, and on a 3x phone screen an unpinned dpr would
+  // quietly make this 9x the pixels. 2 is the point past which it stops being
+  // visible on a 300px decorative spinner.
   animation = lottie.loadAnimation({
     container: lottieContainer.value,
-    renderer: "svg",
+    renderer: "canvas",
     loop: true,
     autoplay: true,
     animationData,
+    rendererSettings: {
+      dpr: Math.min(window.devicePixelRatio || 1, 2),
+    },
   });
+  animation.setSubframe(false);
 
   loadingInterval = window.setInterval(() => {
     currentLoadingIndex.value =
@@ -83,6 +113,10 @@ function startCountdown() {
   if (countdownInterval) return;
 
   countdownStarted.value = true;
+  // the lottie is display:none from here on, but `display: none` does not
+  // stop lottie - it keeps its rAF loop running and keeps computing frames
+  // nobody can see. Pause it explicitly.
+  animation?.pause();
 
   countdownInterval = window.setInterval(() => {
     countdown.value--;

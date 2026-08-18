@@ -136,10 +136,51 @@ Fixed by extracting `stripInlineBackground()` (idempotent, unit-tested in
 `tests/stripInlineBackground.test.ts`) and only writing when the value actually
 changes.
 
-**Still outstanding:** the loading screen costs **~50% of one core** on its own,
-from the lottie animation. It is correctly destroyed on unmount so it does not
-leak into the exam, but half a core for a spinner is worth revisiting — either a
-lighter animation or `renderer: 'canvas'`.
+### 1b.8 Loading-screen and bundle optimisation — **done**
+
+**Measurement caveat first:** headless Chrome rasterises in software, which
+inflates paint-bound numbers. The earlier "50% of a core" for the lottie was
+**20%** on a real GPU. Perf numbers here are all `HEADED=1`.
+
+| | CPU (GPU) | layouts/s |
+|---|---|---|
+| lottie, svg renderer (before) | 20% | 61 |
+| canvas renderer | 16% | 3 |
+| + `setSubframe(false)` | 10% | 3 |
+| + pause when hidden (final) | **~4%** | 2 |
+
+The lottie's *JavaScript* was never the cost — a CPU profile put it at ~1.5%,
+with 43% in `(program)`, i.e. the browser's own render pipeline. The SVG
+renderer animates by writing attributes onto SVG nodes, and each write
+invalidates layout: 61 layouts/sec, one per frame. Canvas touches no DOM.
+`setSubframe(false)` stops lottie interpolating fractional frames at 60Hz for a
+30fps animation.
+
+**Bundle** (`vite build`):
+
+| | before | after |
+|---|---|---|
+| entry JS chunk | 1.4 MB | 128 kB |
+| fonts (TTF → WOFF2) | 1084 kB | 434 kB |
+| dashboard images (PNG → WebP) | 2.29 MB | 341 kB |
+| total `dist/assets` | 5.6 MB | 3.7 MB |
+
+Routes are now lazy (`() => import(...)`), so opening the solver no longer
+downloads the dashboard, stats and browser code. Login stays eager: the guard
+redirects there before anything else loads. `pdfjs-dist`, `lottie-web` and
+`@supabase/supabase-js` are split into their own chunks so a component change
+does not invalidate them in cache.
+
+`cytoscape` (6.1 MB installed) was removed — it was never imported.
+
+**Still worth considering:** `lottie-web` is **308 kB of JS (79 kB gzipped)
+for a decorative loading spinner**, and it is on the solver's critical path. A
+CSS/SVG spinner would remove that download and the remaining ~4% CPU outright.
+Left alone because it is a deliberate piece of the app's identity — a call for
+the designer, not the profiler.
+
+The original 1024×1024 PNGs are kept in `src/assets/images/` as the source for
+regenerating the WebP; nothing references them, so they are not bundled.
 
 ---
 

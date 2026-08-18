@@ -1,8 +1,18 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
-import DashboardPage from '@/components_dashboard/DashboardPage.vue'
-import BrowserPage from '@/components_browser/BrowserPage.vue'
-import StatsPage from '@/components_stats/StatsPage.vue'
-import MCQNav from '@/components_navigator/MCQNav.vue'
+// PERFORMANCE. These were static imports, so every route's code - the
+// dashboard, the stats page, the browser, pdfjs-dist, lottie - was bundled into
+// one 1.4 MB chunk that had to be downloaded and PARSED before any page could
+// render. Opening the Paper Solver paid for the entire application.
+//
+// Lazy imports give each route its own chunk. The solver pays for pdf.js; the
+// dashboard pays for its images; neither pays for the other.
+const DashboardPage = () => import('@/components_dashboard/DashboardPage.vue')
+const BrowserPage = () => import('@/components_browser/BrowserPage.vue')
+const StatsPage = () => import('@/components_stats/StatsPage.vue')
+const MCQNav = () => import('@/components_navigator/MCQNav.vue')
+// Login stays EAGER on purpose. It is the first thing an unauthenticated
+// visitor sees, and the guard redirects there before anything else has loaded -
+// making it a separate round trip would delay the one screen that must be fast.
 import Login from '@/components_auth/Login.vue'
 import { authReady, supabase } from '@/stores/useAuth'
 
