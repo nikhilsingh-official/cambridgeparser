@@ -1,0 +1,173 @@
+// ==========================================================================
+//
+// Theme definitions. Imported ONCE from main.ts, deliberately NOT forwarded
+// through main.scss: vite.config.ts injects main.scss into every component's
+// <style> block, so anything emitting real CSS there is re-emitted per
+// component. SCSS variable declarations (_variables.scss) emit nothing and are
+// safe to forward; `:root {}` rules are not.
+//
+// The token names are shared with the Cambridge IDE's main.css, which already
+// used --text/--background/--accent/--danger/... with the same semantic roles.
+// That 1:1 overlap is what makes one login screen able to serve both apps.
+//
+// DEFAULT is soluer-dark. index.html stamps data-theme before first paint.
+// ==========================================================================
+
+// --------------------------------------------------------------------------
+// soluer-dark - the original teal-on-near-black aesthetic. DEFAULT.
+// Values are the ones previously hardcoded in _variables.scss.
+// --------------------------------------------------------------------------
+:root,
+[data-theme='soluer-dark'] {
+  color-scheme: dark;
+
+  --font-display: 'Lexend', ui-sans-serif, system-ui, sans-serif;
+  --font-body: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'Kode Mono', ui-monospace, monospace;
+
+  --text: #fafafa;
+  --background: #171717;
+  --secondary-background: #1a1a1a;
+  --tertiary-background: #242424;
+
+  --primary-color: hsl(184, 100%, 18%);
+  --primary-color-lightened: #005a61;
+  --primary-color-darkened: #004c52;
+  --primary-foreground: #fafafa;
+  --secondary-color: #62bbc1;
+  --secondary-color-lightened: #69bdc3;
+  --accent: #93cfd2;
+
+  --danger: #d95151;
+  --danger-darkened: hsl(0, 64%, 18%);
+  --danger-foreground: #f08a8a;
+  --warning: #d9b24b;
+  --warning-darkened: hsl(44, 65%, 18%);
+  --success: hsl(150, 60%, 58%);
+  --success-darkened: hsl(150, 60%, 18%);
+
+  // surface details that were previously hardcoded rgba() literals in
+  // components. They MUST be tokens - a hardcoded rgba(255,255,255,0.06)
+  // border is invisible on a light theme.
+  --border: rgba(255, 255, 255, 0.08);
+  --muted: #9a9a9a;
+  --grid-line: #171717;          // the gridded backdrop on login/loading/end
+  --card-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+  --focus-ring: rgba(98, 187, 193, 0.22);
+
+  // geometry as a theme token. The Cambridge themes are deliberately flat
+  // and square; expressing that as a variable means components do not need to
+  // know which theme is active.
+  --radius-card: 20px;
+  --radius-control: 10px;
+  --radius-pill: 50px;
+
+  --hero-background: #1a1a1a;
+  --paper: #ffffff;
+  --paper-ink: #171717;
+}
+
+// --------------------------------------------------------------------------
+// exam-paper - the Cambridge IDE light theme. Warm paper, hairline rules,
+// oxblood marking ink. Ported verbatim from the IDE's main.css :root block.
+// --------------------------------------------------------------------------
+[data-theme='exam-paper'] {
+  color-scheme: light;
+
+  --font-display: 'General Sans', 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-body: 'General Sans', 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'Kode Mono', ui-monospace, monospace;
+
+  --text: #191714;
+  --background: #faf8f3;
+  --secondary-background: #ffffff;
+  --tertiary-background: #f4f0e8;
+
+  --primary-color: #7b2d26;
+  --primary-color-lightened: #93463e;
+  --primary-color-darkened: #64221d;
+  --primary-foreground: #ffffff;
+  --secondary-color: #9b443b;
+  --secondary-color-lightened: #ae5b50;
+  --accent: #7b2d26;
+
+  --danger: #9f332a;
+  --danger-darkened: #f3dfda;
+  --danger-foreground: #7b2d26;
+  --warning: #8c5a2b;
+  --warning-darkened: #eee2d3;
+  --success: #1f4d3d;
+  --success-darkened: #dce9e3;
+
+  --border: #ddd6c9;
+  --muted: #6b655c;
+  --grid-line: #ebe5d9;
+  --card-shadow: none;
+  --focus-ring: rgba(123, 45, 38, 0.18);
+
+  --radius-card: 0px;
+  --radius-control: 0px;
+  --radius-pill: 0px;
+
+  --hero-background: #f7f3eb;
+  --paper: #ffffff;
+  --paper-ink: #191714;
+}
+
+// --------------------------------------------------------------------------
+// cambridge-dark - the Cambridge IDE dark theme. Amber on slate, square.
+// --------------------------------------------------------------------------
+[data-theme='cambridge-dark'] {
+  color-scheme: dark;
+
+  // the IDE switches its DISPLAY face to mono in dark mode - that is part
+  // of the theme's identity, not an oversight, so it is preserved.
+  --font-display: 'IBM Plex Mono', 'Kode Mono', ui-monospace, monospace;
+  --font-body: 'General Sans', 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'Kode Mono', ui-monospace, monospace;
+
+  --text: #e6e9ee;
+  --background: #0e1116;
+  --secondary-background: #161b22;
+  --tertiary-background: #1c222b;
+
+  --primary-color: #f2a93b;
+  --primary-color-lightened: #bd7920;
+  --primary-color-darkened: #845013;
+  --primary-foreground: #0e1116;
+  --secondary-color: #f2a93b;
+  --secondary-color-lightened: #f4ba61;
+  --accent: #f2a93b;
+
+  --danger: #e5484d;
+  --danger-darkened: #3c2024;
+  --danger-foreground: #f17478;
+  --warning: #f2a93b;
+  --warning-darkened: #43331c;
+  --success: #7fd1ae;
+  --success-darkened: #1d4034;
+
+  --border: #262d38;
+  --muted: #8a93a0;
+  --grid-line: #0e1116;
+  --card-shadow: none;
+  --focus-ring: rgba(242, 169, 59, 0.22);
+
+  --radius-card: 0px;
+  --radius-control: 0px;
+  --radius-pill: 0px;
+
+  --hero-background: #11161d;
+  --paper: #ffffff;
+  --paper-ink: #171a1f;
+}
+
+// global baseline. body must repaint on theme change, and previously
+// nothing set it at all - the dark palette only appeared because every page
+// painted its own background.
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--text);
+  font-family: var(--font-body);
+}

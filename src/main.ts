@@ -3,6 +3,14 @@ import App from "@/App.vue";
 import router from '@/router/router';
 import { createPinia } from "pinia";
 import { useAuthStore } from "@/stores/useAuth";
+// the theme layer. themes.scss is imported here rather than forwarded
+// through main.scss because vite injects main.scss into every component's
+// <style> block - see the header comment in themes.scss.
+import "@/styles/themes.scss";
+import { initializeTheme } from "@/lib/theme";
+
+// before createApp so the first painted frame is already themed.
+initializeTheme();
 
 const app = createApp(App);
 

@@ -1,17 +1,48 @@
-$text: #fafafa;
-$background: #171717;
-$secondary-background: #1a1a1a;
-$tertiary-background: #242424;
-$primary-color: hsl(184, 100%, 18%);
-$primary-color-lightened: #005a61;
-$primary-color-darkened: #004c52;
-$secondary-color: #62BBC1;
-$secondary-color-lightened: #69bdc3;
-$accent: #93cfd2;
+// ==========================================================================
+// these were literal colour values. They are now aliases onto the CSS
+// custom properties defined in themes.scss, so all 26 existing consumers of
+// `$accent`, `$background`, ... keep working unchanged while becoming
+// theme-reactive.
+//
+// SAFE because nothing in this codebase passes these to a Sass colour function
+// (lighten/darken/mix/rgba) - verified by grep before the change. Sass cannot
+// compute on a var(); if you ever need a derived shade, add a token to
+// themes.scss instead of computing one here.
+//
+// Interpolation still works: `#{$success}` yields `var(--success)`, which is
+// valid inside conic-gradient() and friends.
+// ==========================================================================
+$text: var(--text);
+$background: var(--background);
+$secondary-background: var(--secondary-background);
+$tertiary-background: var(--tertiary-background);
+$primary-color: var(--primary-color);
+$primary-color-lightened: var(--primary-color-lightened);
+$primary-color-darkened: var(--primary-color-darkened);
+$primary-foreground: var(--primary-foreground);
+$secondary-color: var(--secondary-color);
+$secondary-color-lightened: var(--secondary-color-lightened);
+$accent: var(--accent);
 
-$danger: #d95151;
-$danger-darkened: hsl(0, 64%, 18%);
-$warning: #d9b24b;
-$warning-darkened: hsl(44, 65%, 18%);
-$success: hsl(150, 60%, 58%);
-$success-darkened: hsl(150, 60%, 18%);
+$danger: var(--danger);
+$danger-darkened: var(--danger-darkened);
+$danger-foreground: var(--danger-foreground);
+$warning: var(--warning);
+$warning-darkened: var(--warning-darkened);
+$success: var(--success);
+$success-darkened: var(--success-darkened);
+
+// new tokens, previously hardcoded literals scattered through components.
+$border: var(--border);
+$muted: var(--muted);
+$grid-line: var(--grid-line);
+$card-shadow: var(--card-shadow);
+$focus-ring: var(--focus-ring);
+
+$radius-card: var(--radius-card);
+$radius-control: var(--radius-control);
+$radius-pill: var(--radius-pill);
+
+$font-display: var(--font-display);
+$font-body: var(--font-body);
+$font-mono: var(--font-mono);

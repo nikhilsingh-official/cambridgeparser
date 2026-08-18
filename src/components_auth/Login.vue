@@ -6,15 +6,17 @@
 // field values (see the note in the commit - those credentials are in git
 // history and should be rotated).
 //
-// Visual language matches LoadingScreen/EndScreen: the gridded
-// $secondary-background backdrop, a $secondary-background card at 20px radius,
-// Lexend for headings, Inter for body, Kode Mono for the technical line, and
-// the pill button with a $secondary-color border and an $accent glow on hover.
+// Every colour, font, radius and shadow below comes from a THEME TOKEN, so
+// this one screen renders correctly under soluer-dark (teal, rounded),
+// exam-paper (warm paper, oxblood, square) and cambridge-dark (amber, square)
+// with no per-theme rules. That is the whole point of the token layer: the
+// same login screen serves SmartSolver and the Cambridge IDE.
 // ==========================================================================
 import { computed, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { Mail, Lock, Eye, EyeOff, LoaderCircle, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-vue-next';
 import { useAuthStore, authErrorMessage, type OAuthProvider } from '@/stores/useAuth';
+import ThemeSwitcher from '@/components/ThemeSwitcher.vue';
 
 const { login, signUp, sendPasswordReset } = useAuthStore();
 const router = useRouter();
@@ -251,6 +253,12 @@ const providers: { id: OAuthProvider; label: string; path: string }[] = [
         </button>
       </div>
 
+      <!-- theme choice lives on the login screen because it is the one
+           page every user sees before anything else. -->
+      <div class="theme-row">
+        <ThemeSwitcher />
+      </div>
+
       <p class="switch">
         <template v-if="mode === 'signin'">
           New here?
@@ -281,8 +289,8 @@ const providers: { id: OAuthProvider; label: string; path: string }[] = [
   color: $text;
   background-color: $secondary-background;
   background-image:
-    linear-gradient(to right, $background 1px, transparent 1px),
-    linear-gradient(to bottom, $background 1px, transparent 1px);
+    linear-gradient(to right, $grid-line 1px, transparent 1px),
+    linear-gradient(to bottom, $grid-line 1px, transparent 1px);
   background-size: 30px 30px;
 }
 
@@ -290,10 +298,10 @@ const providers: { id: OAuthProvider; label: string; path: string }[] = [
   width: 100%;
   max-width: 420px;
   background-color: $secondary-background;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 20px;
+  border: 1px solid $border;
+  border-radius: $radius-card;
   padding: 2.2rem 2rem;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+  box-shadow: $card-shadow;
 }
 
 /* ---- brand ---------------------------------------------------------- */
@@ -309,22 +317,24 @@ const providers: { id: OAuthProvider; label: string; path: string }[] = [
     color: $text;
     svg { color: $accent; }
     h1 {
-      font-family: 'Inter';
+      font-family: $font-body;
       font-size: 1.6rem;
       font-weight: 500;
       margin: 0;
     }
   }
   h2 {
-    font-family: 'Lexend';
+    font-family: $font-display;
     font-weight: 400;
     font-size: 1.15rem;
     margin: 1.1rem 0 0;
   }
   .brand-sub {
-    font-family: 'Inter';
+    font-family: $font-body;
     font-size: 0.8rem;
-    opacity: 0.5;
+    // $muted rather than opacity - opacity on a light theme washes text
+    // to unreadable grey, whereas the token is tuned per theme.
+    color: $muted;
     margin: 6px 0 0;
   }
 }
@@ -336,9 +346,9 @@ const providers: { id: OAuthProvider; label: string; path: string }[] = [
   display: flex;
   align-items: flex-start;
   column-gap: 8px;
-  font-family: 'Inter';
+  font-family: $font-body;
   font-size: 0.78rem;
-  border-radius: 10px;
+  border-radius: $radius-control;
   padding: 8px 10px;
   margin: 0;
 
@@ -356,7 +366,7 @@ const providers: { id: OAuthProvider; label: string; path: string }[] = [
   row-gap: 6px;
 
   .field-label {
-    font-family: 'Lexend';
+    font-family: $font-display;
     font-size: 0.72rem;
     opacity: 0.55;
   }
@@ -366,14 +376,14 @@ const providers: { id: OAuthProvider; label: string; path: string }[] = [
     column-gap: 10px;
     background-color: $tertiary-background;
     border: 1px solid transparent;
-    border-radius: 10px;
+    border-radius: $radius-control;
     padding: 0 12px;
     transition: border-color 0.25s ease, box-shadow 0.25s ease;
 
     // :focus-within so the whole field lights up, not just the bare input.
     &:focus-within {
       border-color: $secondary-color;
-      box-shadow: 0 0 0 3px rgba(98, 187, 193, 0.12);
+      box-shadow: 0 0 0 3px $focus-ring;
     }
     input {
       flex: 1;
@@ -381,7 +391,7 @@ const providers: { id: OAuthProvider; label: string; path: string }[] = [
       border: none;
       outline: none;
       color: $text;
-      font-family: 'Inter';
+      font-family: $font-body;
       font-size: 0.9rem;
       padding: 11px 0;
       &::placeholder { color: $text; opacity: 0.25; }
@@ -414,7 +424,7 @@ const providers: { id: OAuthProvider; label: string; path: string }[] = [
 .primary {
   margin-top: 0.3rem;
   cursor: pointer;
-  font-family: 'Lexend';
+  font-family: $font-display;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -423,7 +433,7 @@ const providers: { id: OAuthProvider; label: string; path: string }[] = [
   background-color: transparent;
   color: $text;
   padding: 11px 20px;
-  border-radius: 50px;
+  border-radius: $radius-pill;
   font-size: 0.88rem;
   transition: background 1s ease, box-shadow 0.5s ease, opacity 0.2s ease;
 
@@ -447,7 +457,7 @@ const providers: { id: OAuthProvider; label: string; path: string }[] = [
   align-items: center;
   column-gap: 12px;
   margin: 1.2rem 0 1rem;
-  font-family: 'Kode Mono';
+  font-family: $font-mono;
   font-size: 0.65rem;
   opacity: 0.35;
 
@@ -455,7 +465,7 @@ const providers: { id: OAuthProvider; label: string; path: string }[] = [
     content: '';
     flex: 1;
     height: 1px;
-    background-color: rgba(255, 255, 255, 0.1);
+    background-color: $border;
   }
 }
 
@@ -471,10 +481,10 @@ const providers: { id: OAuthProvider; label: string; path: string }[] = [
   justify-content: center;
   column-gap: 7px;
   background-color: $tertiary-background;
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 10px;
+  border: 1px solid $border;
+  border-radius: $radius-control;
   color: $text;
-  font-family: 'Inter';
+  font-family: $font-body;
   font-size: 0.76rem;
   padding: 10px 6px;
   transition: border-color 0.3s ease, background-color 0.3s ease;
@@ -492,15 +502,21 @@ const providers: { id: OAuthProvider; label: string; path: string }[] = [
   padding: 0;
   cursor: pointer;
   color: $accent;
-  font-family: 'Inter';
+  font-family: $font-body;
   font-size: 0.75rem;
   &:hover:not(:disabled) { text-decoration: underline; }
   &:disabled { opacity: 0.5; cursor: not-allowed; }
 }
 
+.theme-row {
+  display: flex;
+  justify-content: center;
+  margin-top: 1.2rem;
+}
+
 .switch {
   text-align: center;
-  font-family: 'Inter';
+  font-family: $font-body;
   font-size: 0.75rem;
   opacity: 0.65;
   margin: 1.2rem 0 0;

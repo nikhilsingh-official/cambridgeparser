@@ -215,28 +215,17 @@ onBeforeUnmount(() => {
   top: 0;
   left: 0;
   transform: none;
-  background-color: rgba(
-    red($tertiary-background),
-    green($tertiary-background),
-    blue($tertiary-background),
-    0.75
-  );
+  // was rgba(red($tertiary-background), green(...), blue(...), 0.75).
+  // Sass's channel functions need a real colour literal, and these tokens are
+  // now var() references so the palette can change at runtime. color-mix() is
+  // the CSS-native equivalent and stays theme-reactive.
+  background-color: color-mix(in srgb, $tertiary-background 75%, transparent);
   backdrop-filter: blur(3.75px);
   border-radius: 16px;
   z-index: 999;
   box-shadow:
-    0 12px 36px rgba(
-      red($secondary-background),
-      green($secondary-background),
-      blue($secondary-background),
-      0.65
-    ),
-    0 0 40px rgba(
-      red($secondary-background),
-      green($secondary-background),
-      blue($secondary-background),
-      0.10
-    );
+    0 12px 36px color-mix(in srgb, $secondary-background 65%, transparent),
+    0 0 40px color-mix(in srgb, $secondary-background 10%, transparent);
   user-select: none;
   transition: box-shadow 160ms ease, transform 64ms linear;
   will-change: transform, box-shadow;
@@ -273,8 +262,8 @@ onBeforeUnmount(() => {
   pointer-events: none;
   filter: blur(32px);
   opacity: 0.85;
-  background: radial-gradient(48% 48% at 20% 10%, rgba(red($accent), green($accent), blue($accent), 0.40), transparent 28%),
-              radial-gradient(40% 40% at 80% 90%, rgba(red($accent), green($accent), blue($accent), 0.30), transparent 30%);
+  background: radial-gradient(48% 48% at 20% 10%, color-mix(in srgb, $accent 40%, transparent), transparent 28%),
+              radial-gradient(40% 40% at 80% 90%, color-mix(in srgb, $accent 30%, transparent), transparent 30%);
   z-index: -1;
   transform: translateZ(0);
 }
@@ -290,7 +279,7 @@ onBeforeUnmount(() => {
 }
 
 .tools-container:focus {
-  outline: 2px solid rgba(red($accent), green($accent), blue($accent), 0.80);
+  outline: 2px solid color-mix(in srgb, $accent 80%, transparent);
 }
 
 @media (max-width: 420px) {
