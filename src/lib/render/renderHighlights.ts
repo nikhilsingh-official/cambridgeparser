@@ -19,6 +19,19 @@ export function renderHighlights(highlightMode: Ref<"correct" | "eliminated">, e
     const pages = viewer?.querySelectorAll('.page');
     const page = pages?.[pageIndex]!;
 
+    // BUG FIX - resizes stacked duplicate highlights.
+    //
+    // This function only ever created elements and appended them; nothing
+    // removed the previous set. It is called again on every `scalechanging`
+    // event, which pdf.js fires whenever the viewport changes - including when
+    // DevTools opens. So each resize doubled the highlights, and because they
+    // are translucent the overlap darkened.
+    //
+    // Re-rendering a page now replaces that page's highlights rather than
+    // adding to them. Scoped to `page` so pages not being re-rendered keep
+    // theirs, matching the pageIndexes filter above.
+    page?.querySelectorAll('.highlight').forEach(el => el.remove());
+
     for(let segmentIndex = 0; segmentIndex < pageHighlights.length; segmentIndex++) {
       
       const segmentHighlights: SegmentHighlights = pageHighlights[segmentIndex]!;

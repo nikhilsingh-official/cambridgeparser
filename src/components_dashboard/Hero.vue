@@ -1,4 +1,8 @@
 <script setup>
+// the four `.cta-img` sources in this file were changed from .png to .webp.
+// The images were 1024x1024 RGBA PNGs totalling 2.29 MB; as WebP they are
+// 341 kB at the same dimensions with no visible difference. The original PNGs
+// remain in src/assets/images/ as the source for regenerating them.
 import { onMounted } from 'vue';
 
 onMounted(() => {

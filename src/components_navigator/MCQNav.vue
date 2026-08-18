@@ -35,6 +35,8 @@ import { registerExamSession } from './composable';
 import router from '@/router/router';
 // types for the vendored pdf.js viewer and the fetch-pdf contract.
 import { asPdfViewerWindow, type PdfPageView } from '@/lib/types/pdfViewer';
+// drives the paper's dark mode and the mirrored token values.
+import { currentTheme, isLightTheme } from '@/lib/theme';
 import type { FetchPdfResponse, LoadedPaper } from '@/lib/types/fetchPdf';
 // local summary computation for the end screen.
 import { buildExamSummary, type ExamSummary } from '@/lib/types/examSummary';
@@ -272,23 +274,164 @@ function handleBeforeUnload() {
   void abandonExam();
 }
 
+// the pdf.js viewer is a separate document, so it inherits none of the
+// app's CSS custom properties. This copies the resolved values across under an
+// --ss- prefix (prefixed to avoid colliding with pdf.js's own variables), and
+// stamps data-page-mode so the injected stylesheet knows whether to invert the
+// paper. Re-run whenever the theme changes.
+const MIRRORED_TOKENS: Record<string, string> = {
+  '--ss-accent': '--accent',
+  '--ss-success': '--success',
+  '--ss-danger': '--danger',
+  '--ss-warning': '--warning',
+  '--ss-muted': '--muted',
+  '--ss-border': '--border',
+  '--ss-text': '--text',
+  '--ss-bg': '--background',
+  '--ss-panel': '--secondary-background',
+  '--ss-radius-pill': '--radius-pill',
+  '--ss-font-mono': '--font-mono',
+};
+
+function syncIframeTheme(doc: Document) {
+  const source = getComputedStyle(document.documentElement);
+  const target = doc.documentElement;
+
+  for (const [into, from] of Object.entries(MIRRORED_TOKENS)) {
+    target.style.setProperty(into, source.getPropertyValue(from).trim());
+  }
+
+  // exam-paper is the only light theme; the other two want an inverted
+  // page. Driven off the shared theme state rather than sniffing colours, so
+  // adding a theme is one edit in theme.ts.
+  target.dataset.pageMode = isLightTheme.value ? 'light' : 'dark';
+}
+
 function injectStyles(doc: Document) {
+  syncIframeTheme(doc);
+
   const style = doc.createElement('style');
   style.type = 'text/css';
+  style.id = 'smartsolver-overlay-styles';
+  // fully restyled. The previous rules painted focus areas in
+  // rgba(0,255,0,0.3) and timers in rgba(255,0,0,0.7) - saturated primaries
+  // that read as debug output. Everything is now driven by the theme tokens
+  // mirrored into this iframe by syncIframeTheme(), so the paper matches the
+  // rest of the app in all three themes.
   style.textContent = `
-      .highlight { 
-        position: absolute; 
-        cursor: pointer; 
-        z-index: 10; 
+      /* ---- dark paper -------------------------------------------------
+         The PDF is a white raster. Inverting the CANVAS ONLY flips paper to
+         near-black and ink to near-white; hue-rotate(180deg) puts coloured
+         diagrams back to roughly their original hue rather than a negative.
+         Scoped to the canvas deliberately: our overlays are siblings, so they
+         are not inverted and keep their true theme colours. */
+      /* Descendant selector, not '.page > canvas': pdf.js nests the canvas
+         inside a .canvasWrapper, so the child combinator matched nothing and
+         dark mode silently did nothing at all. Verified against the real DOM:
+         .pdfViewer > .page > .canvasWrapper > canvas */
+      [data-page-mode="dark"] .page canvas {
+        filter: invert(1) hue-rotate(180deg);
       }
+      /* The selection layer sits above the inverted canvas and must not be
+         inverted with it, or highlighted text reads as a hole in the page. */
+      [data-page-mode="dark"] .textLayer ::selection {
+        background-color: color-mix(in srgb, var(--ss-accent) 45%, transparent);
+      }
+      [data-page-mode="dark"] .page {
+        background-color: var(--ss-bg) !important;
+      }
+
+      /* ---- option highlights ----------------------------------------- */
+      .highlight {
+        position: absolute;
+        cursor: pointer;
+        z-index: 10;
+        border-radius: 3px;
+        background-color: transparent;
+        transition: background-color 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+      }
+      /* Neutral is invisible until pointed at - an untouched paper should look
+         like a paper, not like a grid of yellow boxes. */
+      .highlight.is-neutral:hover {
+        background-color: color-mix(in srgb, var(--ss-accent) 20%, transparent);
+      }
+      .highlight.is-correct {
+        background-color: color-mix(in srgb, var(--ss-success) 24%, transparent);
+        box-shadow: inset 0 -2px 0 var(--ss-success);
+      }
+      .highlight.is-correct:hover {
+        background-color: color-mix(in srgb, var(--ss-success) 34%, transparent);
+      }
+      .highlight.is-eliminated {
+        background-color: color-mix(in srgb, var(--ss-danger) 14%, transparent);
+        opacity: 0.6;
+      }
+      .highlight.is-eliminated:hover { opacity: 0.85; }
+      /* Struck through rather than just tinted: "I ruled this out" is a
+         different idea from "I chose this", and should not rely on colour
+         alone to be legible. */
+      .highlight.is-eliminated::after {
+        content: '';
+        position: absolute;
+        left: 0; right: 0; top: 50%;
+        height: 1.5px;
+        transform: translateY(-50%);
+        background-color: var(--ss-danger);
+        opacity: 0.85;
+      }
+
+      /* ---- focus area -------------------------------------------------
+         Was a full-width flat green block. Now a soft left-anchored wash with
+         an accent rule, so it marks the question you are on without competing
+         with the text you are reading. */
       .focus-area {
         width: 100%;
-        background-color: rgba(0, 255, 0, 0.3) !important;
         position: absolute;
         pointer-events: none;
         z-index: 9;
+        border-left: 3px solid color-mix(in srgb, var(--ss-accent) 45%, transparent);
+        background: linear-gradient(
+          90deg,
+          color-mix(in srgb, var(--ss-accent) 14%, transparent) 0%,
+          transparent 55%
+        );
+        transition: background 0.25s ease, border-color 0.25s ease;
       }
-      .focus-area-timer { position: absolute; top: 0; right: 0; background-color: rgba(255, 0, 0, 0.7); }
+      /* The question currently under the reader's viewport. */
+      .focus-area.is-active {
+        border-left-color: var(--ss-accent);
+        background: linear-gradient(
+          90deg,
+          color-mix(in srgb, var(--ss-accent) 24%, transparent) 0%,
+          transparent 65%
+        );
+      }
+
+      /* ---- per-question timer ---------------------------------------- */
+      .focus-area-timer {
+        position: absolute;
+        top: 6px;
+        right: 8px;
+        padding: 3px 8px;
+        border-radius: var(--ss-radius-pill);
+        border: 1px solid var(--ss-border);
+        background-color: var(--ss-panel);
+        color: var(--ss-muted);
+        font-family: var(--ss-font-mono);
+        font-size: 10px;
+        line-height: 1;
+        letter-spacing: 0.04em;
+        font-variant-numeric: tabular-nums;
+        opacity: 0.5;
+        transition: opacity 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+      }
+      /* The timer for the question you are actually on. */
+      .focus-area-timer.timer-active {
+        opacity: 1;
+        color: var(--ss-accent);
+        border-color: color-mix(in srgb, var(--ss-accent) 55%, transparent);
+      }
+
       html, :root, body { background: transparent !important; background-image: none !important; }
   `;
 
@@ -309,6 +452,22 @@ function injectStyles(doc: Document) {
   // reaches a fixed point after one pass and the writes stop.
   const removeInlineBackground = (el: Element) => {
       if (!(el instanceof HTMLElement)) return;
+
+      // BUG FIX - highlights rendered but were invisible.
+      //
+      // This observer exists to strip the white page backgrounds pdf.js paints
+      // inline. But highlights and focus areas ARE inline background colours:
+      // markNeutral()/markCorrect()/markEliminated() set style.backgroundColor,
+      // and renderHighlights appends the div into the page, which the observer
+      // sees as a childList mutation and immediately strips. Every highlight
+      // was created correctly and then wiped a microtask later.
+      //
+      // Long-standing, not new: the same filter and the same markNeutral() call
+      // are present in the original merge commit. It was previously masked by
+      // the runaway-observer bug, which pinned the thread so hard that
+      // rendering often never completed at all.
+      if (OWNED_CLASSES.some(c => el.classList.contains(c))) return;
+
       const current = el.getAttribute('style');
       if (!current) return;
 
@@ -346,6 +505,12 @@ function injectStyles(doc: Document) {
       attributeFilter: ['style'],
   });
 }
+
+// elements this app creates inside the pdf.js iframe. Their inline
+// background IS the feature, so the background-stripping observer must leave
+// them alone. Kept next to the observer rather than inline so adding a new
+// decorated element is one edit in one place.
+const OWNED_CLASSES = ['highlight', 'focus-area', 'focus-area-timer'] as const;
 
 const pageLoadedState: Map<number, boolean> = new Map();
 
@@ -546,6 +711,15 @@ onBeforeUnmount(() => {
 
   unregister(window);
   if (iframeWindow) unregister(iframeWindow);
+});
+
+// re-mirror the palette when the user switches theme mid-exam. Without
+// this the paper would keep the old theme's colours (and stay inverted or not)
+// until the page reloaded. Also puts the previously-unused `watch` import to
+// work - it was one of the standing TS6133 warnings.
+watch(currentTheme, () => {
+  const doc = iframeRef.value?.contentDocument;
+  if (doc) syncIframeTheme(doc);
 });
 
 onMounted(async () => {

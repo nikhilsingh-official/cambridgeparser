@@ -7,39 +7,43 @@ import type { EventLogs } from "@/lib/utils/utilsTypes";
 import { logHighlight } from "../utils/addEventLog";
 import { HighlightAction, type HighlightMode } from "@/lib/types/enums";
 
-function setHighlightColor(
-  elements: HTMLElement | HTMLElement[],
-  r: number,
-  g: number,
-  b: number,
-  alpha = 0.3
-) {
-  const color = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+// highlights used to be painted with inline `style.backgroundColor` set to
+// raw rgba(0,255,0) / rgba(255,0,0) / rgba(255,255,0) - saturated primaries that
+// looked like debug output and ignored the theme entirely.
+//
+// They are now CSS classes, styled in the stylesheet MCQNav injects into the
+// pdf.js iframe. Three things fall out of that:
+//   - they follow the active theme, because the injected CSS uses the theme
+//     tokens that are mirrored into the iframe;
+//   - they can have hover/transition/border treatment, which inline colours
+//     could not express;
+//   - they no longer set an inline background at all, so the observer that
+//     strips inline backgrounds from pdf.js elements can never wipe them. That
+//     was the cause of "no highlights are rendered anymore".
+const STATE_CLASS: Record<OptionState, string> = {
+  correct: "is-correct",
+  eliminated: "is-eliminated",
+  neutral: "is-neutral",
+};
 
-  if (Array.isArray(elements)) {
-    elements.forEach(el => el.style.backgroundColor = color);
-  } else {
-    elements.style.backgroundColor = color;
+const ALL_STATE_CLASSES = Object.values(STATE_CLASS);
+
+function applyState(elements: HTMLElement | HTMLElement[], state: OptionState) {
+  const list = Array.isArray(elements) ? elements : [elements];
+  for (const el of list) {
+    el.classList.remove(...ALL_STATE_CLASSES);
+    el.classList.add(STATE_CLASS[state]);
   }
 }
 
-function markCorrect(elements: HTMLElement[] | HTMLElement) {
-  setHighlightColor(elements, 0, 255, 0);
-}
-
-function markEliminated(elements: HTMLElement[] | HTMLElement) {
-  setHighlightColor(elements, 255, 0, 0);
-}
-
+/** kept as a named export - renderHighlights uses it to seed new elements. */
 export function markNeutral(elements: HTMLElement[] | HTMLElement) {
-  setHighlightColor(elements, 255, 255, 0);
+  applyState(elements, "neutral");
 }
 
 function updateOptionState(optionHighlights: Highlight[], domElements: HTMLElement[], state: OptionState) {
   optionHighlights.forEach(h => h.state = state);
-  if (state === "correct") markCorrect(domElements);
-  else if (state === "eliminated") markEliminated(domElements);
-  else markNeutral(domElements);
+  applyState(domElements, state);
 }
 
 // was `Record<string, string>`, which meant the compiler knew nothing about

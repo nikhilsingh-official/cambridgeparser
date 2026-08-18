@@ -16,6 +16,24 @@ export function renderFocusAreas(documentFocusAreas: DocumentFocusAreas, totalSc
 
     const pageElement: Element | null = viewer.querySelector(`[data-page-number="${pageIndex + 1}"]`);
 
+    // BUG FIX - every resize appended ANOTHER set of focus areas over the
+    // old ones. They are translucent green, so each overlap read as darker.
+    //
+    // Nothing here ever removed the previous elements, and MCQNav re-invokes
+    // this on `scalechanging`, which pdf.js fires on any viewport change -
+    // opening DevTools is enough. Re-rendering a page now replaces that page's
+    // focus areas instead of adding to them.
+    pageElement?.querySelectorAll('.focus-area').forEach(el => el.remove());
+
+    // and stop the watchers those elements owned. See stopTimeWatcher in
+    // focusAreasTypes.ts - these are created outside a component scope, so
+    // without this they accumulate one per re-render, forever, each writing
+    // into a node that has just been removed.
+    for (const fa of pageFocusAreas) {
+      fa.stopTimeWatcher?.();
+      fa.stopTimeWatcher = undefined;
+    }
+
     for(let segmentIndex = 0; segmentIndex < pageFocusAreas.length; segmentIndex++) {
 
       const questionNum = computeGlobalIndex(documentFocusAreas, pageIndex, segmentIndex);
@@ -49,17 +67,26 @@ export function renderFocusAreas(documentFocusAreas: DocumentFocusAreas, totalSc
         return `${pad(hrs)}:${pad(mins)}:${pad(secs)}`;
       }
 
-      watch(
+      // keep the stop handles so the next render can dispose these.
+      const stopTime = watch(
         () => focusArea.time,
         (newVal) => {
           focusTimerArea.innerText = formatTime(newVal);
         }
       );
 
+      // `active` is toggled reactively by eventListenersInit as the reader
+      // scrolls, but nothing propagated it to the DOM after the initial render -
+      // so the highlighted "current question" was frozen on whichever question
+      // happened to be active when the page was drawn. Now it follows.
+      const applyActive = (isActive: boolean) => {
+        focusAreaEl.classList.toggle('is-active', isActive);
+        focusTimerArea.classList.toggle('timer-active', isActive);
+      };
+      applyActive(focusArea.active);
+      const stopActive = watch(() => focusArea.active, applyActive);
 
-      if (focusArea.active) {
-        focusTimerArea.classList.add('timer-active');
-      }
+      focusArea.stopTimeWatcher = () => { stopTime(); stopActive(); };
     }
   }
 }
