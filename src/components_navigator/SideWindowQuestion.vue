@@ -1,36 +1,46 @@
 <script setup lang="ts">
-import { Flag, Star, Save, Circle } from 'lucide-vue-next';
-import { ref } from 'vue';
+// this row was entirely placeholder - correctOption = ref(1),
+// eliminatedOptions = ref([0,2,3]) and all three flags hardcoded to true, so
+// every question in the Overview claimed the same invented answers. It now
+// renders the real state for one question.
+import { Flag, Star, Save } from 'lucide-vue-next';
+import { computed } from 'vue';
+import { OPTION_LETTERS } from '@/lib/types/enums';
+import type { QuestionState } from '@/lib/state/examState';
 
-const props = defineProps<{
-  questionNum: number;
-}>();
+const props = defineProps<{ question: QuestionState }>();
 
-type OptionLetter = "A" | "B" | "C" | "D";
-const OPTIONS_LETTER_MAP: OptionLetter[] = ["A", "B", "C", "D"];
-const correctOption = ref(1);
-const eliminatedOptions = ref([0, 2, 3]);
-const isFlagged = ref(true);
-const isDifficult = ref(true);
-const isSaved = ref(true);
-
+// option count comes from the parsed paper rather than assuming four -
+// paper_answers.option_count exists precisely because it is not always 4.
+const letters = computed(() =>
+  OPTION_LETTERS.slice(0, props.question.optionCount),
+);
 </script>
 
 <template>
-  <div class="side-window-question-wrapper">
-    <span class="question-number">{{ props.questionNum }}</span>
+  <div class="side-window-question-wrapper" :class="{ answered: question.selected !== null }">
+    <span class="question-number">{{ question.questionNumber }}</span>
     <div class="indicators-wrapper">
-      <button class="option-btn" v-for="i in 4" :class="{ correct: correctOption == i - 1, eliminated: eliminatedOptions.includes(i - 1) }">{{ OPTIONS_LETTER_MAP[i - 1] }}</button>
+      <button
+        v-for="(letter, i) in letters"
+        :key="letter"
+        class="option-btn"
+        :class="{
+          correct: question.selected === i,
+          eliminated: question.eliminated.includes(i),
+        }"
+        :aria-label="`Question ${question.questionNumber} option ${letter}`"
+      >{{ letter }}</button>
     </div>
     <div class="indicators-wrapper">
       <div class="indicator-wrapper">
-        <div class="icon flag-icon" :class="{ 'active': isFlagged }"><Flag /></div>
+        <div class="icon flag-icon" :class="{ 'active': question.flagged }"><Flag /></div>
       </div>
       <div class="indicator-wrapper">
-        <div class="icon star-icon" :class="{ 'active': isDifficult }"><Star /></div>
+        <div class="icon star-icon" :class="{ 'active': question.difficult }"><Star /></div>
       </div>
       <div class="indicator-wrapper">
-        <div class="icon save-icon" :class="{ 'active': isSaved }"><Save /></div>
+        <div class="icon save-icon" :class="{ 'active': question.saved }"><Save /></div>
       </div>
     </div>
   </div>

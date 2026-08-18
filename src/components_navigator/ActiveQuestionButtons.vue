@@ -6,7 +6,9 @@ import { Copy, Flag, Star, Save } from 'lucide-vue-next';
 // and markSaveScore at 1.0. Those carry 0.4 of confidence, 0.4 of difficulty and
 // 0.35 of interest, so three headline metrics were effectively constant.
 // Wired here to the existing handleButtonClick -> addEventLog path.
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
+// per-question flag state shared with the Overview panel.
+import { QuestionFlag, getQuestion, toggleFlag } from '@/lib/state/examState';
 import { handleButtonClick, type Button, type ButtonType } from '@/lib/buttons';
 // event log and active question come from the shared exam session rather
 // than props, so ToolsContainer (which sits in between and has no reason to
@@ -25,19 +27,45 @@ const buttons = ref<Record<ButtonType, Button>>({
   Save: { type: 'Save', state: false },
 });
 
+// BUG FIX - these four button states were global, not per question. Flagging
+// question 3 left the Flag button lit when the student moved to question 4, so
+// the panel asserted a flag that did not exist on that question. State now lives
+// per question in examState, and the buttons render the ACTIVE question's flags.
+const FLAG_FOR_BUTTON: Partial<Record<ButtonType, QuestionFlag>> = {
+  Flag: QuestionFlag.Flagged,
+  Star: QuestionFlag.Difficult,
+  Save: QuestionFlag.Saved,
+};
+
+const activeFlags = computed(() => {
+  const q = getQuestion(activeQuestionNumber());
+  return {
+    Flag: q?.flagged ?? false,
+    Star: q?.difficult ?? false,
+    Save: q?.saved ?? false,
+    Copy: false,
+  } as Record<ButtonType, boolean>;
+});
+
 function onButtonClick(type: ButtonType) {
+  const questionNum = activeQuestionNumber();
   const button = buttons.value[type];
-  button.parent = { y: 0, questionNum: activeQuestionNumber(), buttons: [] };
+  button.parent = { y: 0, questionNum, buttons: [] };
   handleButtonClick(button, eventLogs());
+
+  // Copy is an action, not a toggle, so it has no per-question flag.
+  const flag = FLAG_FOR_BUTTON[type];
+  if (flag) toggleFlag(questionNum, flag);
 }
 </script>
 <template>
 <div class="flex-wrapper">
-    <!-- added @click and the active-state class binding; markup otherwise unchanged. -->
-    <button class="copy-question-btn" :class="{ 'btn-active': buttons.Copy.state }" @click="onButtonClick('Copy')"><Copy></Copy></button>
-    <button class="flag-question-btn" :class="{ 'btn-active': buttons.Flag.state }" @click="onButtonClick('Flag')"><Flag></Flag></button>
-    <button class="star-question-btn" :class="{ 'btn-active': buttons.Star.state }" @click="onButtonClick('Star')"><Star></Star></button>
-    <button class="save-question-btn" :class="{ 'btn-active': buttons.Save.state }" @click="onButtonClick('Save')"><Save></Save></button>
+    <!-- bound to activeFlags, which is per question. These previously read
+         buttons.X.state, a single global toggle that stayed lit across questions. -->
+    <button class="copy-question-btn" @click="onButtonClick('Copy')"><Copy></Copy></button>
+    <button class="flag-question-btn" :class="{ 'btn-active': activeFlags.Flag }" @click="onButtonClick('Flag')"><Flag></Flag></button>
+    <button class="star-question-btn" :class="{ 'btn-active': activeFlags.Star }" @click="onButtonClick('Star')"><Star></Star></button>
+    <button class="save-question-btn" :class="{ 'btn-active': activeFlags.Save }" @click="onButtonClick('Save')"><Save></Save></button>
 </div>
 </template>
 <style lang="scss" scoped>

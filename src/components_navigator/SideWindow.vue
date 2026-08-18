@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref } from 'vue';
 import { ChevronLeft, ChevronRight, LayoutGrid } from 'lucide-vue-next';
 import SideWindowQuestion from './SideWindowQuestion.vue';
 import { getShowStates } from './composable';
+// the real per-question state, replacing the hardcoded 40 rows.
+import { answeredCount, questionList } from '@/lib/state/examState';
 
 const { showOverview } = getShowStates();
 </script>
@@ -23,20 +24,49 @@ const { showOverview } = getShowStates();
             <LayoutGrid></LayoutGrid>
             <h1> Overview</h1>
         </div>
+        <!-- a live progress read-out; the panel previously showed no
+             indication of how much of the paper was done. -->
+        <p v-if="questionList.length" class="overview-progress">
+          {{ answeredCount }} / {{ questionList.length }} answered
+        </p>
         <div class="subheading-wrapper">
             <h3>No.</h3>
             <h3>Actions</h3>
         </div>
       </div>
+      <!-- was `v-for="i in 40"` - a fixed 40 rows regardless of the paper,
+           each rendering invented answers. Now driven by the parsed paper. -->
       <SideWindowQuestion
-        v-for="i in 40"
-        :key="i"
-        :question-num="i"
+        v-for="q in questionList"
+        :key="q.questionNumber"
+        :question="q"
       />
+
+      <!-- the panel used to look identical before and after the paper had
+           been parsed. An explicit empty state says which it is. -->
+      <p v-if="questionList.length === 0" class="overview-empty">
+        Waiting for the paper to finish loading&hellip;
+      </p>
     </div>
 </template>
 
 <style lang="scss" scoped>
+/* overview progress read-out + empty state */
+.overview-progress {
+  font-family: $font-mono;
+  font-size: 11px;
+  color: $accent;
+  opacity: 0.8;
+  margin: 4px 0 0;
+}
+.overview-empty {
+  font-family: $font-body;
+  font-size: 12px;
+  color: $muted;
+  padding: 1rem;
+  text-align: center;
+}
+
 
 .overview-drawer__toggle {
   position: absolute;

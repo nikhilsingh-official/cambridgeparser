@@ -16,8 +16,11 @@ import { createHighlights, type DocumentHighlights } from '@/lib/highlights';
 import { extractText, identifyQuestionNumbers, segmentQuestions, getOptions } from '@/lib/pdf';
 // extracted so its idempotence can be unit-tested without a DOM.
 import { stripInlineBackground } from '@/lib/pdf/stripInlineBackground';
-import type { HighlightMode, EventLogs } from '@/lib/utils/utilsTypes';
+import type { EventLogs } from '@/lib/utils/utilsTypes';
 import { enrichAnalytics } from '@/lib/processing/enrichAnalytics';
+// reactive per-question state behind the Overview panel.
+import { resetExamState, seedQuestions } from '@/lib/state/examState';
+import { computeGlobalIndex } from '@/lib/utils/computeGlobalIndex';
 import { getQuestionsAnalytics } from '@/lib/processing/getQuestionAnalytics';
 // pushQuestionMetrics added - the weighted scores now live in their own
 // versioned table rather than inline on question_attempts.
@@ -31,7 +34,7 @@ import { cacheAnswerKey } from '@/lib/supabase/cacheAnswerKey';
 import { setEventEpoch } from '@/lib/utils/addEventLog';
 // the attempt_status values, so 'completed'/'abandoned' are not bare strings.
 import { AttemptStatus } from '@/lib/types/enums';
-import { registerExamSession } from './composable';
+import { registerExamSession, registerExamHighlights, getHighlightMode } from './composable';
 import router from '@/router/router';
 // types for the vendored pdf.js viewer and the fetch-pdf contract.
 import { asPdfViewerWindow, type PdfPageView } from '@/lib/types/pdfViewer';
@@ -56,7 +59,10 @@ const props = defineProps<{
   schema: string
 }>();
 
-const highlightMode: Ref<HighlightMode> = ref("correct");
+// was a local `ref("correct")` that only MCQNav and the keybinds could see.
+// It now comes from the shared session so the Tools slider and the bottom-bar
+// indicator track the same value - see the note in composable.ts.
+const { highlightMode } = getHighlightMode();
 let eventLogs: EventLogs = [];
 let highlights: DocumentHighlights = [];
 let focusAreas: DocumentFocusAreas = [];
@@ -663,6 +669,21 @@ const onLoad = async (pdfBytes: Uint8Array) => {
     const optionsText = await getOptions(pdf, text, segmentedQuestions);
 
     highlights = createHighlights(optionsText);
+    // hand the parsed tree to the shared session so the Overview panel can
+    // show real per-question state instead of placeholder rows.
+    registerExamHighlights(highlights);
+
+    // seed one Overview row per question, with that question's real option
+    // count. The panel previously rendered `v-for="i in 40"` - a hardcoded 40
+    // rows regardless of the paper, each showing invented answers.
+    seedQuestions(
+      highlights.flatMap((page, pageIndex) =>
+        page.map((segment, segmentIndex) => ({
+          questionNumber: computeGlobalIndex(highlights, pageIndex, segmentIndex),
+          optionCount: segment.length,
+        })),
+      ),
+    );
     focusAreas = createFocusAreas(segmentedQuestions);
 
     dataReady = true;
@@ -723,6 +744,11 @@ watch(currentTheme, () => {
 });
 
 onMounted(async () => {
+  // clear any state left by a previously opened paper - this module-level
+  // store outlives the component, so without it question 4's flags would carry
+  // into the next paper.
+  resetExamState();
+
   if (!session) {
     router.push("/login");
     return;

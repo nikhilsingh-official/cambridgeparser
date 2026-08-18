@@ -6,6 +6,8 @@ import type { EventLogs } from "@/lib/utils/utilsTypes";
 // HighlightMode come from the central enum module.
 import { logHighlight } from "../utils/addEventLog";
 import { HighlightAction, type HighlightMode } from "@/lib/types/enums";
+// keeps the Overview panel in step with the paper.
+import { setOptionState } from "@/lib/state/examState";
 
 // highlights used to be painted with inline `style.backgroundColor` set to
 // raw rgba(0,255,0) / rgba(255,0,0) / rgba(255,255,0) - saturated primaries that
@@ -88,6 +90,13 @@ export function selectOption(highlightMode: Ref<"correct" | "eliminated">, event
       if (elements.length) {
         markNeutral(elements);
         highlights[pageIndex]![segmentIndex]![currentCorrectIndex]?.forEach(h => h.state = "neutral");
+        // choosing a new option clears the old one in the DOM; mirror that
+        // in the store too, or the Overview would show two selected options.
+        setOptionState(
+          computeGlobalIndex(highlights, pageIndex, segmentIndex),
+          currentCorrectIndex,
+          "neutral",
+        );
       }
     }
   }
@@ -120,4 +129,9 @@ export function selectOption(highlightMode: Ref<"correct" | "eliminated">, event
   // missing entry is a compile error rather than a dropped event.
   const key: TransitionKey = `${highlightMode.value}_${optionState}`;
   logHighlight(eventLogs, logMap[key], questionNumber, optionIndex);
+
+  // mirror the change into the reactive overview store. Done here rather
+  // than in updateOptionState so it fires once per user action, with the
+  // question number already resolved.
+  setOptionState(questionNumber, optionIndex, nextState);
 }
