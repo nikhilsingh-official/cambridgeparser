@@ -27,6 +27,8 @@ import { pushEventLogs } from '@/lib/supabase/pushEventLogs';
 import { cacheAnswerKey } from '@/lib/supabase/cacheAnswerKey';
 // exam-relative event timing, and the shared session the flag buttons read.
 import { setEventEpoch } from '@/lib/utils/addEventLog';
+// the attempt_status values, so 'completed'/'abandoned' are not bare strings.
+import { AttemptStatus } from '@/lib/types/enums';
 import { registerExamSession } from './composable';
 import router from '@/router/router';
 // types for the vendored pdf.js viewer and the fetch-pdf contract.
@@ -148,7 +150,14 @@ async function endExam() {
   saveError.value = null;
 
   try {
-    if(!answers) return;
+    // BUG FIX. This was a bare `return`, which left summary null and
+    // saveError null - so the end screen sat on "Marking your paper..."
+    // forever with no indication that anything had gone wrong. Without the
+    // mark scheme there is nothing to mark against, so say so.
+    if (!answers) {
+      saveError.value = 'Mark scheme unavailable - the paper could not be marked.';
+      return;
+    }
     const questionsData = getQuestionsAnalytics(highlights, focusAreas, answers);
     const enrichedData = enrichAnalytics(questionsData, eventLogs);
 
@@ -158,7 +167,15 @@ async function endExam() {
 
     // marked locally from data already in hand, so the score paints even if
     // every write below fails. The database remains authoritative.
-    summary.value = buildExamSummary(props.schema, questionsData, answers, elapsedMs);
+    //
+    // BUG FIX: this was passed `questionsData` (pre-enrichment). explorationDepth
+    // is produced by enrichAnalytics, not getQuestionsAnalytics, so it was always
+    // undefined here - the guess rule's `(q.explorationDepth ?? 0) <= 1` term was
+    // therefore always true and the heuristic silently collapsed to "fast" alone.
+    // That both over-reported lucky guesses and diverged from v_question_flags,
+    // which uses the real stored exploration_depth. enrichAnalytics returns
+    // `{ ...q, ... }`, so enrichedData is a strict superset and nothing is lost.
+    summary.value = buildExamSummary(props.schema, enrichedData, answers, elapsedMs);
 
     // fall back to opening one now if startExam() could not.
     if (!examAttemptId) {
@@ -167,6 +184,19 @@ async function endExam() {
       examAttemptId = await startExamAttempt(supabase, props, session, answers.length);
     }
 
+    // the answer key MUST be cached before question_attempts are written.
+    // set_question_correctness() fires per row on insert and reads
+    // paper_answers; if the key is not there yet the trigger sets is_correct to
+    // null for every question and the attempt is permanently unmarked until
+    // someone re-runs remark_attempt() by hand.
+    //
+    // startExam() normally does this, but not always: if startExamAttempt()
+    // threw, cacheAnswerKey() on the line after it never ran, and the fallback
+    // open just above did not cache either. The upsert is idempotent and keyed
+    // on (paper_id, question_number), so repeating it here costs one no-op
+    // round trip in the common case and rescues correctness in the uncommon one.
+    await cacheAnswerKey(supabase, props.schema, answers);
+
     const answeredCount = questionsData.filter(q => q.selectedOption != null).length;
 
     const insertedQuestions = await pushToAttemptsTable(supabase, examAttemptId, enrichedData);
@@ -174,7 +204,9 @@ async function endExam() {
     await pushQuestionMetrics(supabase, insertedQuestions ?? [], enrichedData);
     // persist the raw stream - previously discarded at this exact point.
     await pushEventLogs(supabase, examAttemptId, eventLogs);
-    await finishExamAttempt(supabase, examAttemptId, elapsedMs, answeredCount, 'completed');
+    await finishExamAttempt(
+      supabase, examAttemptId, elapsedMs, answeredCount, AttemptStatus.Completed,
+    );
 
     return { examAttemptId, insertedCount: Array.isArray(insertedQuestions) ? insertedQuestions.length : 0 };
   } catch (err) {
@@ -197,6 +229,45 @@ function goToDashboard() {
 // is already closed, so nothing further is recorded.
 function reviewPaper() {
   examFinished.value = false;
+}
+
+// NEW - closes an attempt the student walks away from.
+//
+// The lifecycle had only two of its three exits implemented: startExamAttempt()
+// opened the row and finishExamAttempt() closed it on End Exam, but leaving the
+// page mid-paper left status pinned at 'in_progress' forever. Those rows are
+// indistinguishable from an exam still being sat, so every dashboard query has
+// to either count half-finished papers or exclude live ones.
+//
+// Best-effort by nature: on a route change (below) the update reliably lands,
+// on a tab close it is racing teardown. Marking it 'abandoned' late is still
+// better than never, and duration_ms is recorded so a paper closed after two
+// minutes is distinguishable from one closed after an hour.
+async function abandonExam() {
+  if (!examAttemptId || examFinished.value) return;
+  const id = examAttemptId;
+  // cleared first so a route change racing beforeunload cannot send twice.
+  examAttemptId = null;
+
+  const elapsedMs = perfStart == null ? null : Math.round(performance.now() - perfStart);
+  const answeredCount = answers
+    ? getQuestionsAnalytics(highlights, focusAreas, answers)
+        .filter(q => q.selectedOption != null).length
+    : 0;
+
+  try {
+    await finishExamAttempt(
+      supabase, id, elapsedMs, answeredCount, AttemptStatus.Abandoned,
+    );
+  } catch (err) {
+    // nothing useful to do - the page is going away regardless.
+    console.error('abandonExam: could not close attempt', err);
+  }
+}
+
+// fires on tab close / reload, where onBeforeUnmount does not run.
+function handleBeforeUnload() {
+  void abandonExam();
 }
 
 function injectStyles(doc: Document) {
@@ -441,6 +512,13 @@ async function setup() {
 }
 
 onBeforeUnmount(() => {
+  // close an attempt the student navigated away from. Deliberately FIRST -
+  // the original body starts with `if (!iframeRef.value) return`, so anything
+  // placed after that guard is skipped whenever the iframe is already gone,
+  // which is exactly the teardown case this needs to cover.
+  window.removeEventListener('beforeunload', handleBeforeUnload);
+  void abandonExam();
+
   if(!iframeRef.value) return;
   iframeRef.value.removeEventListener('load', () => onLoad);
   if (observer) {
@@ -459,6 +537,9 @@ onMounted(async () => {
     router.push("/login");
     return;
   }
+
+  // catches tab close / reload, which onBeforeUnmount never sees.
+  window.addEventListener('beforeunload', handleBeforeUnload);
 
   setup();
 });

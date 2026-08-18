@@ -67,6 +67,50 @@ used `highlightMode.value`; the dashboard prong regressed it. Restored, and the
 key is now a template-literal type so the lookup is total and a missing entry is
 a compile error rather than a dropped event.
 
+### 1b.3 The end-screen guess rule was reading a field that did not exist yet — **fixed**
+`endExam()` passed `questionsData` (the output of `getQuestionsAnalytics`) into
+`buildExamSummary`, but `explorationDepth` is produced by `enrichAnalytics`, one
+step later. So `(q.explorationDepth ?? 0) <= GUESS_MAX_DEPTH` was
+`0 <= 1` — **always true** — and the guess heuristic quietly degenerated to "was
+it fast?", ignoring both interaction depth and eliminations.
+
+That over-reported lucky guesses on the end screen *and* silently disagreed with
+`v_question_flags`, which uses the real stored `exploration_depth` — the two were
+written to be kept in step. Now passes `enrichedData`, which is `{ ...q, ... }`
+over the same rows, so nothing is lost.
+
+### 1b.4 The answer key could be missing when correctness was decided — **fixed**
+`set_question_correctness()` fires per row **on insert** and reads
+`paper_answers`. If the key was not cached by then, every question got
+`is_correct = null` and the attempt stayed permanently unmarked until someone ran
+`remark_attempt()` by hand.
+
+`startExam()` cached the key on the line *after* `startExamAttempt()`, so any
+failure to open the attempt skipped the caching too — and `endExam()`'s fallback
+open did not cache either. `cacheAnswerKey()` is now also called in `endExam()`
+immediately before `pushToAttemptsTable()`. The upsert is idempotent on
+`(paper_id, question_number)`, so it costs one no-op round trip normally and
+rescues correctness in exactly the case that used to lose it.
+
+### 1b.5 Abandoned attempts were never closed — **fixed**
+The lifecycle had three exits and only two were implemented: open, and close on
+End Exam. Leaving the page mid-paper left `status` pinned at `'in_progress'`
+forever, making a walked-away paper indistinguishable from one still being sat —
+so every dashboard query would have had to either count half-finished attempts or
+exclude live ones.
+
+`abandonExam()` now closes the row with `AttemptStatus.Abandoned` and the elapsed
+duration, from `onBeforeUnmount` (route change — reliable) and `beforeunload`
+(tab close — best-effort, racing teardown). It clears `examAttemptId` before
+awaiting so the two paths cannot double-send. **A late or missed abandon is still
+possible**; if that matters, sweep `in_progress` rows older than N hours
+server-side rather than trusting the client.
+
+### 1b.6 A failed mark silently hung the end screen — **fixed**
+`endExam()` opened with a bare `if (!answers) return;` inside the `try`, which
+left both `summary` and `saveError` null — so the screen sat on "Marking your
+paper…" indefinitely with nothing to indicate failure. It now sets `saveError`.
+
 ---
 
 ## 2. Blocking — do before building the stats page
