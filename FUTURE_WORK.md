@@ -111,6 +111,36 @@ server-side rather than trusting the client.
 left both `summary` and `saveError` null — so the screen sat on "Marking your
 paper…" indefinitely with nothing to indicate failure. It now sets `saveError`.
 
+### 1b.7 The Paper Solver pinned the tab at 100% CPU — **fixed**
+`injectStyles()` in `MCQNav.vue` installed a MutationObserver watching the
+`style` attribute across the whole pdf.js iframe, and its handler wrote that
+same attribute back via `setAttribute`. **`setAttribute` emits a mutation
+record even when the value is unchanged**, so every styled element re-triggered
+the observer, which rewrote it, forever.
+
+pdf.js puts an inline style on every text-layer span — hundreds per page — so
+this became a perpetual microtask loop that never yielded.
+
+Measured, before and after (`tests/perf/solver-cpu.mjs`):
+
+| | CPU | style recalcs |
+|---|---|---|
+| Before, during the exam | **100% of one core** | **0/s** |
+| After | 5% of one core | 0/s |
+
+The `0/s` is the tell: the thread was so saturated it could not even paint.
+CDP's `RecalcStyleCount` covers only the main frame, which is why the main
+frame looked idle while the iframe burned.
+
+Fixed by extracting `stripInlineBackground()` (idempotent, unit-tested in
+`tests/stripInlineBackground.test.ts`) and only writing when the value actually
+changes.
+
+**Still outstanding:** the loading screen costs **~50% of one core** on its own,
+from the lottie animation. It is correctly destroyed on unmount so it does not
+leak into the exam, but half a core for a spinner is worth revisiting — either a
+lighter animation or `renderer: 'canvas'`.
+
 ---
 
 ## 2. Blocking — do before building the stats page

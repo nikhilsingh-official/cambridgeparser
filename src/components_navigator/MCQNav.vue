@@ -14,6 +14,8 @@ import { useAuthStore, supabase } from '@/stores/useAuth';
 import { type DocumentFocusAreas, createFocusAreas, eventListenersInit, startFocusAreaTimer } from '@/lib/focusAreas';
 import { createHighlights, type DocumentHighlights } from '@/lib/highlights';
 import { extractText, identifyQuestionNumbers, segmentQuestions, getOptions } from '@/lib/pdf';
+// extracted so its idempotence can be unit-tested without a DOM.
+import { stripInlineBackground } from '@/lib/pdf/stripInlineBackground';
 import type { HighlightMode, EventLogs } from '@/lib/utils/utilsTypes';
 import { enrichAnalytics } from '@/lib/processing/enrichAnalytics';
 import { getQuestionsAnalytics } from '@/lib/processing/getQuestionAnalytics';
@@ -292,16 +294,30 @@ function injectStyles(doc: Document) {
 
   (doc.head || doc.documentElement).appendChild(style);
 
+  // PERFORMANCE BUG FIX - this pinned the main thread at 100% CPU.
+  //
+  // The observer below watches the `style` attribute across the whole iframe
+  // subtree, and this handler wrote that same attribute back. setAttribute()
+  // emits a mutation record EVEN WHEN THE VALUE IS UNCHANGED, so every styled
+  // element re-triggered the observer, which rewrote it, forever. pdf.js puts
+  // an inline style on every text-layer span - hundreds per page - so the
+  // result was a perpetual microtask loop that never yielded: the tab burned a
+  // full core and could not even paint (0 style recalcs while it ran).
+  //
+  // The fix is the `next !== current` guard. stripInlineBackground() is
+  // idempotent (locked by tests/stripInlineBackground.test.ts), so the value
+  // reaches a fixed point after one pass and the writes stop.
   const removeInlineBackground = (el: Element) => {
       if (!(el instanceof HTMLElement)) return;
-      const s = el.getAttribute('style');
-      if (!s) return;
-      const parts = s
-        .split(';')
-        .map(p => p.trim())
-        .filter(p => p.length && !/^\s*(background|background-image|background-color)\s*:/i.test(p));
-      if (parts.length) el.setAttribute('style', parts.join('; '));
-      else el.removeAttribute('style');
+      const current = el.getAttribute('style');
+      if (!current) return;
+
+      const next = stripInlineBackground(current);
+      if (next === null) {
+        el.removeAttribute('style');
+        return;
+      }
+      if (next !== current) el.setAttribute('style', next);
   };
 
   doc.querySelectorAll<HTMLElement>('*[style]').forEach(removeInlineBackground);
