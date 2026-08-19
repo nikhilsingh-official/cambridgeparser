@@ -1,6 +1,6 @@
 // ==========================================================================
 // Reads for the FOCUS section: calibration, the time/correctness scatter, and
-// the six-tile metric bar. See STATS_PAGE_DESIGN.md §3.1.
+// the six-tile metric bar. See docs/stats_page_design.md §3.1.
 // ==========================================================================
 
 import type {
@@ -47,7 +47,7 @@ export async function fetchQuestionFlags(
  *
  * `buckets` re-bins the 10 deciles v_calibration_curve produces. At a few
  * hundred questions most deciles hold fewer than five rows and the curve is
- * noise dressed as insight - STATS_PAGE_DESIGN.md §6. Re-binning client-side
+ * noise dressed as insight - docs/stats_page_design.md §6. Re-binning client-side
  * keeps the view stable while letting the UI choose a resolution its sample
  * size can support.
  */

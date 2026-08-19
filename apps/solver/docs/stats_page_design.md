@@ -1,6 +1,6 @@
 <!-- ==========================================================================
-     Documentation only. Third in the series: DATABASE_DESIGN.md specifies what
-     is stored, FUTURE_WORK.md tracks what is missing, this one specifies how
+     Documentation only. Third in the series: database_design.md specifies what
+     is stored, future_work.md tracks what is missing, this one specifies how
      the stored data becomes the stats page.
      ========================================================================== -->
 
@@ -50,7 +50,7 @@ Two consequences to hold onto:
 - It is **weight-dependent**, which is exactly why `question_metrics` is
   versioned by `metrics_version`. Retuning the weights in `enrichAnalytics.ts`
   without inserting a new version silently makes old and new attempts
-  incomparable on this axis. See `FUTURE_WORK.md` §6.4.
+  incomparable on this axis. See `future_work.md` §6.4.
 
 ### 0.3 Two view bugs fixed while settling the above
 
@@ -135,7 +135,7 @@ calendar heatmap, sankey, boxplot, polar — are exactly its strong suit.
 
 ### Bundle discipline is non-negotiable here
 
-`FUTURE_WORK.md` §5 already flags a **1.4 MB single JS chunk**. Importing
+`future_work.md` §5 already flags a **1.4 MB single JS chunk**. Importing
 ECharts wholesale adds ~1 MB and roughly doubles the problem. Always tree-shake:
 
 ```ts
@@ -334,7 +334,7 @@ missing charts.
 
 ## 5. The charts that need `attempt_events` (highest value, not yet buildable)
 
-`FUTURE_WORK.md` §4 calls answer-change quality "the highest-value unbuilt
+`future_work.md` §4 calls answer-change quality "the highest-value unbuilt
 metric". Now that the event stream persists, these become possible — they need a
 query layer, not new recording.
 
@@ -380,7 +380,7 @@ papers to see a trend"* — not a blank card.
 
 1. ~~Settle §0.1~~ — **done**, accuracy is marks/total everywhere (§0).
 2. **Query layer.** `src/lib/supabase/queries/` — the app still performs zero
-   reads (`FUTURE_WORK.md` §2.3). Typed against `database.ts`, one function per
+   reads (`future_work.md` §2.3). Typed against `database.ts`, one function per
    view. Nothing below is possible first.
 3. **Chart plumbing.** `useChart()`, the CSS-variable theme, the tree-shaken
    ECharts entry point, route-level `import()`.

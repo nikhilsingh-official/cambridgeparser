@@ -26,7 +26,7 @@ export async function fetchSubjectStats(
  * returns [] until topics and paper_answers.topic_id are populated from
  * src/constants/topicMap.ts. That is content, not code - the caller should
  * HIDE the topic section on an empty result rather than render an empty radar,
- * which reads as broken. See STATS_PAGE_DESIGN.md §6.
+ * which reads as broken. See docs/stats_page_design.md §6.
  */
 export async function fetchTopicMastery(
   supabase: Db,

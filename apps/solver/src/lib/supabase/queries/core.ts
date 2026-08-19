@@ -6,7 +6,7 @@
 // Two rules hold for everything in queries/:
 //
 //   1. Every query takes an explicit `userId` and filters on it. RLS is
-//      deliberately deferred until production (FUTURE_WORK.md §3.2), which
+//      deliberately deferred until production (docs/future_work.md §3.2), which
 //      means Postgres will happily return every user's rows to anyone who
 //      asks. Until RLS lands, the user predicate here is the ONLY thing
 //      scoping the data, so it is never optional and never inferred.

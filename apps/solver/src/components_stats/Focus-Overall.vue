@@ -15,7 +15,7 @@
 // Chart canvases are left as empty, correctly-sized containers on purpose:
 // the app performs zero reads until the query layer lands, and a chart drawn
 // over placeholder data is worse than an honest empty state.
-// See STATS_PAGE_DESIGN.md §3.1.
+// See docs/stats_page_design.md §3.1.
 // ==========================================================================
 import { Target, ScatterChart, Shuffle } from 'lucide-vue-next';
 
@@ -51,7 +51,7 @@ const tiles: FocusTile[] = [
             <h4>Calibration</h4>
             <!-- labelled "behavioural" deliberately - this is inferred from
                  timing and eliminations, not a confidence the student stated.
-                 See STATS_PAGE_DESIGN.md §0.2. -->
+                 See docs/stats_page_design.md §0.2. -->
             <p class="panel-sub">behavioural confidence vs actual accuracy</p>
           </div>
         </div>

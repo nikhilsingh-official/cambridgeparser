@@ -15,7 +15,7 @@
 // viewer is v3. They are used for different things (v5 for Util/OPS and types,
 // v3 for the actual document in the iframe), so these declarations describe the
 // v3 viewer and must not be confused with pdfjs-dist's own types.
-// See FUTURE_WORK.md for the version-mismatch risk this creates.
+// See docs/future_work.md for the version-mismatch risk this creates.
 // ==========================================================================
 
 import type { PDFDocumentProxy } from 'pdfjs-dist';
@@ -94,7 +94,7 @@ export interface PdfViewerWindow extends Window {
     // what the rest of the pipeline (extractText, getOptions) consumes. Note
     // this asserts a v3 document satisfies a v5 type - true for the small
     // surface used here (getPage/getTextContent/getOperatorList/numPages), but
-    // see the version-mismatch note in FUTURE_WORK.md.
+    // see the version-mismatch note in docs/future_work.md.
     getDocument(src: Uint8Array | { data: Uint8Array }): { promise: Promise<PDFDocumentProxy> };
   };
 }

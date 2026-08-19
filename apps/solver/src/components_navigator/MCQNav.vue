@@ -140,7 +140,7 @@ async function startExam() {
     // `session` is Session | null - typing startExamAttempt surfaced that it
     // was being passed unchecked. It is also captured once at setup (Pinia
     // destructuring is not reactive), so a session that arrives later leaves
-    // this null; see FUTURE_WORK.md.
+    // this null; see docs/future_work.md.
     if (!session) throw new Error('No Supabase session; attempt not persisted');
     examAttemptId = await startExamAttempt(supabase, props, session, answers?.length);
     // cache the mark-scheme key so the DB can decide correctness itself.

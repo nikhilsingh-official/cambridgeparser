@@ -18,7 +18,7 @@ import type { TableRow } from '@/lib/processing/processingTypes';
  *
  * `qp` is the question-paper PDF as a byte array. It is JSON, so the bytes
  * arrive as a plain number[] - which inflates a ~1 MB PDF to ~4 MB of text.
- * That inefficiency is pre-existing and tracked in FUTURE_WORK.md; the type
+ * That inefficiency is pre-existing and tracked in docs/future_work.md; the type
  * documents it rather than hiding it.
  *
  * The Record form is tolerated because JSON transports of typed arrays

@@ -274,7 +274,7 @@ export interface AttemptSummaryView {
 
   // marks-based scoring. `accuracy` is marks_awarded / marks_total over the
   // WHOLE answer key, so unanswered questions count against it - the same
-  // definition the end screen uses. See STATS_PAGE_DESIGN.md §0.1.
+  // definition the end screen uses. See docs/stats_page_design.md §0.1.
   marks_awarded: number;
   marks_total: number;
   /** 0..1, or null when the answer key is missing (never 0 in that case). */

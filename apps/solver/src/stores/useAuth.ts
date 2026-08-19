@@ -6,7 +6,7 @@ import type { Ref } from 'vue'
 
 // was hardcoded to the local emulator. Moved to env with the emulator kept
 // as the fallback so `npm run dev` still works with no .env present, but a
-// deploy can point at the real project. Tracked in FUTURE_WORK.md §5.
+// deploy can point at the real project. Tracked in docs/future_work.md §5.
 const SUPABASE_URL =
   import.meta.env.VITE_SUPABASE_URL ?? 'http://127.0.0.1:54321'
 const SUPABASE_ANON_KEY =

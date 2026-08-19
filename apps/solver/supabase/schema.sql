@@ -1,7 +1,7 @@
 -- ==========================================================================
 --
 -- SmartSolver schema, rewritten from the original three-table version.
--- Implements the fixes agreed in DATABASE_DESIGN.md:
+-- Implements the fixes agreed in ../docs/database_design.md:
 --   D1  correctness is stored, and computed server-side from a cached key
 --   D2  time columns are genuinely milliseconds
 --   D3  marked_* are real counts
@@ -14,7 +14,7 @@
 --   D12 option count is per-question, not hardcoded to 4
 --
 -- DELIBERATELY NOT INCLUDED: row-level security. Running on local emulators
--- for now; RLS lands before production. See FUTURE_WORK.md.
+-- for now; RLS lands before production. See ../docs/future_work.md.
 --
 -- Apply with:  supabase db reset   (then psql -f supabase/seed_subjects.sql)
 -- ==========================================================================

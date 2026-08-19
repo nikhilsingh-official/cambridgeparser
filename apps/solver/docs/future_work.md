@@ -1,5 +1,5 @@
 <!-- ==========================================================================
-     Documentation only. Companion to DATABASE_DESIGN.md: that file specifies
+     Documentation only. Companion to database_design.md: that file specifies
      the target, this one tracks what is still outstanding after the data-layer
      pass, and why each item was deferred rather than done.
      ========================================================================== -->
@@ -220,7 +220,7 @@ Two rules hold across it, both worth preserving:
 
 **Still unconsumed by the UI** — the components in `components_stats/` do not
 call these yet, and no charting library is installed (see
-`STATS_PAGE_DESIGN.md` §2 and §8: Apache ECharts, tree-shaken).
+`stats_page_design.md` §2 and §8: Apache ECharts, tree-shaken).
 
 ### 2.4 Replace the placeholder data in `components_stats/`
 - `StatsPage.vue:10–17` — filters hardcoded to `['Wade Cooper','Arlene Mccoy',…]`,
@@ -249,7 +249,7 @@ and it is a **prerequisite for any shared, class or leaderboard view**.
 ### 3.2 RLS
 Deferred deliberately — local emulators for now. **Nothing works in production
 without it**, since Supabase default-denies. Policies are already drafted in
-`DATABASE_DESIGN.md` §3.5. Do not deploy without them; also decide there whether
+`database_design.md` §3.5. Do not deploy without them; also decide there whether
 `paper_answers` stays client-readable (it currently must be, which means a
 determined user can read the key before answering).
 
@@ -283,7 +283,7 @@ speed, not guessing.
 
 ---
 
-## 5. Application-level (unchanged from `MERGE_NOTES.md` §6)
+## 5. Application-level (unchanged from `merge_notes.md` §6)
 
 | Item | Note |
 |---|---|

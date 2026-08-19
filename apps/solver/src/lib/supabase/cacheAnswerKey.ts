@@ -15,7 +15,7 @@
 // trustworthy as the browser that sent it. That is fine for single-user
 // self-study and is the smallest change that unblocks correctness. Moving the
 // write into the edge function (which already parses the key server-side) is
-// tracked in FUTURE_WORK.md and is a prerequisite for any shared/class view.
+// tracked in docs/future_work.md and is a prerequisite for any shared/class view.
 // ==========================================================================
 
 import type { TableRow } from "@/lib/processing/processingTypes";
