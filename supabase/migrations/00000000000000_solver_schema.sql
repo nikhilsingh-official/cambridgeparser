@@ -527,3 +527,48 @@ group by ea.user_id, t.subject_code, t.id, t.name;
 -- Drop the table that nothing ever referenced.
 -- --------------------------------------------------------------------------
 drop table if exists attempts;
+
+-- --------------------------------------------------------------------------
+-- Table privileges.
+--
+-- ADDED AFTER FIRST EXECUTION. This file was written and reviewed without ever
+-- being run; applying it revealed that `authenticated` held only
+-- REFERENCES/TRIGGER/TRUNCATE on every table here. `exam_attempts` had no
+-- INSERT, so the entire end-of-exam write path would have failed with
+-- "permission denied for table exam_attempts" the first time anyone finished a
+-- paper. Verified by running it, not by reading it.
+--
+-- RLS decides WHICH ROWS a caller may touch. It does not grant the right to
+-- touch the table at all - that is this, and both are required.
+--
+-- >>> THESE TABLES HAVE NO RLS YET (docs/roadmap.md B2). <<<
+-- Until they do, these grants mean any signed-in user can read and write any
+-- other user's rows. That is the accepted local-development posture, and it is
+-- exactly why B2 blocks production.
+-- --------------------------------------------------------------------------
+grant select, insert, update, delete on
+  exam_attempts, question_attempts, attempt_events, question_metrics, goals
+  to authenticated;
+
+-- Reference data the client reads, and the two tables the topic seeding and
+-- answer-key caching write.
+grant select on subjects, metrics_versions, profiles to authenticated;
+grant select, insert, update on paper_answers, paper_answer_keys, topics to authenticated;
+
+-- Views. security_invoker matters here for the same reason it matters on
+-- v_ide_stats: without it a view reads its base tables as the view's owner and
+-- bypasses RLS entirely. These views have no RLS to bypass *yet*, so setting it
+-- changes nothing today - but B2 would silently fail to cover them otherwise,
+-- which is the worst way for a security control to not work.
+alter view v_attempt_summary   set (security_invoker = true);
+alter view v_daily_activity    set (security_invoker = true);
+alter view v_hour_of_day       set (security_invoker = true);
+alter view v_subject_stats     set (security_invoker = true);
+alter view v_question_flags    set (security_invoker = true);
+alter view v_calibration_curve set (security_invoker = true);
+alter view v_topic_mastery     set (security_invoker = true);
+
+grant select on
+  v_attempt_summary, v_daily_activity, v_hour_of_day, v_subject_stats,
+  v_question_flags, v_calibration_curve, v_topic_mastery
+  to authenticated;

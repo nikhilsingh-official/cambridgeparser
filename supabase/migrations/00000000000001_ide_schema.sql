@@ -73,7 +73,14 @@ create policy ide_progress_update_own on public.ide_progress
 -- The RTDB `stats/` subtree held denormalised {attempted, solved} counters
 -- because RTDB cannot aggregate. Postgres can, so it is a view: one fewer
 -- thing that can disagree with the rows it summarises.
-create or replace view public.v_ide_stats as
+--
+-- security_invoker is ESSENTIAL and not the default. Without it a view runs
+-- with its owner's privileges, which means it reads ide_progress as postgres
+-- and RLS never applies - every user would see every user's counters through
+-- it. Verified: the view returns only the caller's row with this set, and all
+-- rows without it.
+create or replace view public.v_ide_stats
+  with (security_invoker = true) as
 select
   user_id,
   count(*) filter (where status in ('attempted', 'solved')) as attempted,
@@ -237,3 +244,24 @@ revoke all on function public.consume_grading_quota() from public;
 grant execute on function public.consume_grading_quota() to authenticated;
 revoke all on function public.record_ide_attempt(text, integer, integer, text) from public;
 grant execute on function public.record_ide_attempt(text, integer, integer, text) to authenticated;
+
+-- --------------------------------------------------------------------------
+-- Table privileges.
+--
+-- RLS decides WHICH ROWS a caller may touch; it does not grant the right to
+-- touch the table at all. Both are required, and this project's default
+-- privileges grant `authenticated` only REFERENCES/TRIGGER/TRUNCATE - so
+-- without the grants below, every statement fails with "permission denied for
+-- table" before a policy is ever consulted. Verified by running it.
+--
+-- No grants to `anon`: nothing here is readable signed out.
+-- --------------------------------------------------------------------------
+grant select, insert, update on public.ide_profiles to authenticated;
+grant select, insert, update on public.ide_progress to authenticated;
+grant select on public.v_ide_stats to authenticated;
+
+-- Deliberately SELECT only. record_ide_attempt() is `security invoker` and so
+-- needs the caller's own insert/update above, but consume_grading_quota() is
+-- `security definer` and runs as the owner - so the client needs no write
+-- privilege on the counter, and must not have one.
+grant select on public.grading_quotas to authenticated;

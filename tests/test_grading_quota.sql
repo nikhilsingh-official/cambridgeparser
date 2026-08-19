@@ -26,6 +26,16 @@ begin
 end;
 $$;
 
+-- Ageing a window is test scaffolding, not something a caller can do:
+-- `authenticated` has no UPDATE on grading_quotas, which is the point. Drop
+-- back to the owning role for those writes.
+create or replace function pg_temp.as_admin() returns void
+language plpgsql as $$
+begin
+  perform set_config('role', 'postgres', true);
+end;
+$$;
+
 do $$
 declare
   alice uuid := '11111111-1111-1111-1111-111111111111';
@@ -70,9 +80,11 @@ begin
 
   ------------------------------------------------- windows are independent
   -- Age the burst window past its 10 minutes; the daily count must survive it.
+  perform pg_temp.as_admin();
   update public.grading_quotas
      set burst_started_at = now() - interval '11 minutes'
    where user_id = alice;
+  perform pg_temp.act_as(alice);
 
   v := public.consume_grading_quota();
   if (v->>'allowed')::boolean is not true then
@@ -88,9 +100,11 @@ begin
   end if;
 
   ------------------------------------------------------------------ daily
+  perform pg_temp.as_admin();
   update public.grading_quotas
      set daily_count = 50, burst_count = 0, burst_started_at = now()
    where user_id = alice;
+  perform pg_temp.act_as(alice);
 
   v := public.consume_grading_quota();
   if (v->>'allowed')::boolean is not false then

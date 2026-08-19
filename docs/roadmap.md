@@ -57,16 +57,39 @@ credential** — the anon key and the caller's own token are the whole credentia
 set. And `authReady` still resolves without waiting on the profile write, so a
 hard refresh cannot stall behind a database round trip.
 
-**What is not done:**
+**Verified against a real database.** Both migrations were applied to a local
+stack, and the flow was exercised end to end: sign-up through GoTrue, profile
+upsert, `record_ide_attempt`, `v_ide_stats`, `consume_grading_quota`, and
+`handle_grade` rejecting anonymous and forged tokens and returning 429 with a
+retry once the burst window filled. The browser flow was driven too — protected
+routes bounce to `/login`, registration lands in the app, and the session
+survives a hard reload. `tests/test_grading_quota.sql` passes.
 
-- **The SQL has never run.** `supabase/migrations/00000000000001_ide_schema.sql`
-  was written without a `psql`, `supabase` CLI or database to execute it
-  against — the same caveat that already applies to the solver's schema (B1).
-  `tests/test_grading_quota.sql` covers the quota arithmetic and is likewise
-  unexecuted. **Run `supabase db reset` and read the errors before trusting any
-  of it.**
+Running it found three defects that reading it had not:
+
+1. **No table privileges for `authenticated`** on *any* table in either
+   migration. This project's default privileges grant only
+   REFERENCES/TRIGGER/TRUNCATE, so every statement failed with "permission
+   denied for table" before a policy was ever consulted. RLS decides which rows
+   a caller may touch; it does not grant the right to touch the table. This hit
+   the **solver's schema too** — `exam_attempts` had no INSERT, so the entire
+   end-of-exam write path would have failed the first time anyone finished a
+   paper.
+2. **`v_ide_stats` bypassed RLS.** A view runs with its owner's privileges
+   unless created `with (security_invoker = true)`, so it read `ide_progress`
+   as `postgres` and would have shown every user's counters to everyone. The
+   solver's seven views had the same gap; they have no RLS to bypass *yet*,
+   which is precisely why it would have gone unnoticed until B2 landed and
+   silently failed to cover them.
+3. `tests/test_grading_quota.sql` aged its windows with a direct `UPDATE` while
+   acting as `authenticated` — which correctly has no such privilege. A bug in
+   the test, but it proved the grant was right.
+
+**What is still not done:**
+
 - **Google OAuth needs configuring** in the Supabase dashboard. The client code
-  is wired; the provider is not enabled.
+  is wired; the provider is not enabled, so that button fails until it is.
+- The migrations have run against a *local* stack only, never a hosted project.
 - **`pseudocode_attempts` was not designed.** Per `future_work.md` §6.2 it
   should be a *sibling* of `exam_attempts`, not a reuse — marking-point-level
   results do not fit a per-question MCQ row. `ide_progress` records the outcome
