@@ -82,7 +82,6 @@ Coordinate assumption: most Python extraction/review code expects the normalized
 - `AGENTS.md`: repo instructions for coding style, tests, structure, and security.
 - `ast.rs`: root Rust AST definitions used by the parser crate through `#[path]`.
 - `parser.rs`: root Rust parser implementation used by the parser crate through `#[path]`.
-- `prompt.md`: prompt/reference material; not read by the main pipeline.
 - `docs/`: design and roadmap docs. This file belongs here.
 - `src/`: Python pipeline package.
 - `src/resources/`: shared filesystem defaults for source and generated resources.

@@ -1,7 +1,7 @@
 """Controlled syllabus-tag vocabulary for pseudocode-writing question records.
 
 Every tag maps to a numbered subsection of the Cambridge International AS & A
-Level Computer Science 9618 syllabus (``Computer Science Syllabus.pdf`` in the
+Level Computer Science 9618 syllabus (``docs/reference/computer-science-syllabus-9618.pdf`` in the
 repository root). Tagging against the syllabus rather than free-form keywords
 keeps the labels stable, lets the website group questions the way a teaching
 scheme does, and makes a wrong tag checkable: if no syllabus subsection covers

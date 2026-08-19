@@ -1,7 +1,5 @@
-// The AST and parser implementations live at the repository root; reference
-// them in place so the crate wrapper never forks their contents.
-#[path = "../../../ast.rs"]
+// `ast.rs` and `parser.rs` sit beside this module rather than being declared
+// inline so the two large files stay individually addressable; the crate
+// wrapper never forks their contents.
 pub mod ast;
-
-#[path = "../../../parser.rs"]
 pub mod parser;

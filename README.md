@@ -232,7 +232,7 @@ Every record carries a `syllabus_tags` list of 4-5 entries describing what the
 question asks the candidate to implement (`bubble-sort`, `text-files`,
 `records`, ...). Tags come from a controlled vocabulary in
 `src/pipeline/pseudocode_tools/syllabus_tags.py`, where each entry is bound to a
-numbered subsection of `Computer Science Syllabus.pdf` (9618, for exams from
+numbered subsection of `docs/reference/computer-science-syllabus-9618.pdf` (9618, for exams from
 2027). The per-question assignments were made by hand from the question, its
 context, and the mark scheme, and live in
 `src/pipeline/pseudocode_tools/question_tag_assignments.py`, keyed by

@@ -4,7 +4,7 @@ Research date: 2026-08-13.
 
 Primary sources checked:
 
-- Cambridge International AS & A Level Computer Science 9618 syllabus for 2027, 2028 and 2029, supplied in [`Computer Science Syllabus.pdf`](../Computer%20Science%20Syllabus.pdf).
+- Cambridge International AS & A Level Computer Science 9618 syllabus for 2027, 2028 and 2029, supplied in [`computer-science-syllabus-9618.pdf`](reference/computer-science-syllabus-9618.pdf).
 - The website's 176 unique published pseudocode-writing records (deduplicated from 194 source records) in [`pseudocode_question_records.json`](../src/website/frontend/public/resources/pseudocode_question_records.json).
 - The repository's controlled syllabus vocabulary in [`syllabus_tags.py`](../src/pipeline/pseudocode_tools/syllabus_tags.py) and hand-assigned record tags in [`question_tag_assignments.py`](../src/pipeline/pseudocode_tools/question_tag_assignments.py).
 
