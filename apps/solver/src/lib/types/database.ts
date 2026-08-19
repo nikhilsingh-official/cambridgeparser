@@ -300,6 +300,7 @@ export interface QuestionFlagsView {
   is_correct: boolean | null;
   confidence: number | null;
   time_spent_ms: number;
+  hesitation_ms: number | null;
   median_time_ms: number;
   /** Fast, no eliminations, essentially no interaction. */
   is_guess: boolean;

@@ -5,22 +5,95 @@ import FocusOverall from './Focus-Overall.vue';
 import CardStrip from './CardStrip.vue';
 import Multiselect from '@vueform/multiselect';
 import Sidebar from '@/components/Sidebar.vue';
-import { ref } from 'vue';
+import EChart from './EChart.vue';
+import { computed } from 'vue';
+import { useStats } from '@/lib/stats/useStats';
+import { baseTooltip, type ChartTheme } from '@/lib/charts/echarts';
+import { pct } from '@/lib/stats/format';
+import type { ExamSeries } from '@/lib/types/enums';
 
-const options = ['Wade Cooper', 'Arlene Mccoy', 'Devon Webb', 'Tom Cook']
-const selected = ref([])
+// the filters were ['Wade Cooper', 'Arlene Mccoy', ...] and bound to
+// nothing. They now write straight into the query filter, so changing one
+// re-reads the page.
+const { filter, state, loading, error, hasData, totals, streaks, focus } = useStats();
 
-const options1 = ['Apple', 'Banana', 'Cherry']
-const selected1 = ref(null)
+// Options come from what the user has actually sat - an exam year with no
+// attempts behind it is a dead end, and offering it makes the filter feel
+// broken.
+const yearOptions = computed(() => state.options?.examYears ?? []);
+const seriesOptions = computed(() => state.options?.series ?? []);
+const subjectOptions = computed(() =>
+  (state.options?.subjectCodes ?? []).map(code => ({
+    value: code,
+    label: state.options?.subjectNames.get(code) ?? code,
+  })));
 
-const options2 = ['Red', 'Green', 'Blue']
-const selected2 = ref(null)
+// Multiselect binds v-model directly; writing through computed setters keeps
+// `filter` the single source of truth rather than mirroring state into refs
+// that then have to be kept in step.
+const selectedSubjects = computed({
+  get: () => filter.subjectCodes ?? [],
+  set: v => { filter.subjectCodes = v.length ? v : undefined; },
+});
+const selectedYears = computed({
+  get: () => filter.examYears ?? [],
+  set: v => { filter.examYears = v.length ? v : undefined; },
+});
+const selectedSeries = computed({
+  get: () => filter.series ?? [],
+  set: v => { filter.series = v.length ? (v as ExamSeries[]) : undefined; },
+});
+
+const subtitle = computed(() => {
+  if (loading.value) return 'Reading your attempt history…';
+  if (error.value) return 'Could not load your statistics.';
+  if (!hasData.value) return 'No completed papers yet. Sit one and this page fills in.';
+  const acc = pct(totals.value.accuracy) ?? '—';
+  return `${totals.value.papers} papers · ${totals.value.questions} questions · ${acc} overall accuracy.`;
+});
+
+// The header pie: how the marks split across subjects. Categorical, fixed
+// order, capped at six - past six slots the palette stops being separable and
+// the answer belongs in the subject table instead.
+const subjectSplitOption = (theme: ChartTheme) => ({
+  tooltip: {
+    ...baseTooltip(theme), trigger: 'item',
+    formatter: (p: { name: string; value: number; percent: number }) =>
+      `${p.name}<br/>${p.value} marks · ${p.percent}%`,
+  },
+  legend: {
+    orient: 'vertical', right: 0, top: 'middle', icon: 'circle',
+    itemWidth: 8, itemHeight: 8,
+    textStyle: { color: theme.muted, fontFamily: theme.fontBody, fontSize: 11 },
+  },
+  series: [{
+    type: 'pie',
+    radius: ['52%', '76%'],
+    center: ['32%', '50%'],
+    itemStyle: { borderColor: theme.surface, borderWidth: 2, borderRadius: 3 },
+    label: { show: false },
+    labelLine: { show: false },
+    data: [...state.subjects]
+      .sort((a, b) => (b.marks_awarded ?? 0) - (a.marks_awarded ?? 0))
+      .slice(0, 6)
+      .map((s, i) => ({
+        name: s.subject_name ?? s.subject_code,
+        value: s.marks_awarded ?? 0,
+        itemStyle: { color: theme.series[i] },
+      })),
+  }],
+});
 </script>
 <template>
     <Sidebar></Sidebar>
     <div class="grid-container">
         <div class="top-card-strip-container">
-            <CardStrip :bottom="false"></CardStrip>
+            <CardStrip
+              :bottom="false"
+              :attempts="state.attempts"
+              :subjects="state.subjects"
+              :streaks="streaks"
+              :totals="totals" />
         </div>
         <!--<div class="questions-list-container">
             <QuestionsList></QuestionsList>
@@ -31,30 +104,34 @@ const selected2 = ref(null)
                     <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-bar-chart-2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
                     <h1>Statistics</h1>
                 </div>
-                <p class="subtext">Lorem ipsum dolor sit amet consectetur adipisicing elit. Quisquam optio ab delectus, dolore voluptatem, error rem ipsa ullam sapiente possimus natus excepturi! Incidunt nostrum sit modi libero harum commodi saepe!</p>
+                <p class="subtext">{{ subtitle }}</p>
+                <p v-if="error" class="stats-error" role="alert">{{ error }}</p>
                 <div class="flex-container">
-                    <Multiselect 
-                      v-model="selected" 
-                      :options="options" 
+                    <Multiselect
+                      v-model="selectedSubjects"
+                      :options="subjectOptions"
+                      mode="multiple"
                       :searchable="true"
-                      placeholder="Years..." 
+                      placeholder="Subjects..."
                     />
-                    <Multiselect 
-                      v-model="selected1" 
-                      :options="options1" 
+                    <Multiselect
+                      v-model="selectedYears"
+                      :options="yearOptions"
+                      mode="multiple"
                       :searchable="true"
-                      placeholder="Seasons..." 
+                      placeholder="Years..."
                     />
-                    <Multiselect 
-                      v-model="selected2" 
-                      :options="options2" 
+                    <Multiselect
+                      v-model="selectedSeries"
+                      :options="seriesOptions"
+                      mode="multiple"
                       :searchable="true"
-                      placeholder="Variants..." 
+                      placeholder="Series..."
                     />
                 </div>
             </div>
             <div class="pie-container">
-
+                <EChart :option="subjectSplitOption" :has-data="hasData" label="marks by subject" />
             </div>
         </div>
         <div class="section-container progress-container">
@@ -65,7 +142,7 @@ const selected2 = ref(null)
                 </div>
             </div>
             <div class="section-body">
-                <ProgressOverall></ProgressOverall>
+                <ProgressOverall :attempts="state.attempts" :subjects="state.subjects" :totals="totals" />
             </div>
         </div>
         <div class="section-container engagement-container">
@@ -76,7 +153,7 @@ const selected2 = ref(null)
                 </div>
             </div>
             <div class="section-body">
-                <EngagementOverall></EngagementOverall>
+                <EngagementOverall :attempts="state.attempts" :daily="state.daily" :hours="state.hours" :streaks="streaks" :totals="totals" />
             </div>
         </div>
         <div class="section-container focus-container">
@@ -87,12 +164,22 @@ const selected2 = ref(null)
                 </div>
             </div>
             <div class="section-body">
-                <FocusOverall></FocusOverall>
+                <FocusOverall :calibration="state.calibration" :flags="state.flags" :focus="focus" />
             </div>
         </div>
     </div>
 </template>
 <style lang="scss" scoped>
+    .stats-error { margin: 0.25rem 0 0; color: var(--danger); font-family: var(--font-body); font-size: 0.8rem; }
+    // the chart host fills its container, and this grid cell is large, so
+    // an unconstrained pie rendered several hundred pixels across and dwarfed
+    // the header text beside it. Bound it.
+    .pie-container {
+        min-height: 180px;
+        max-height: 240px;
+        align-self: center;
+    }
+
 .flex-container {
   display: flex;
   padding: 10px;

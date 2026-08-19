@@ -65,6 +65,34 @@
   --hero-background: #1a1a1a;
   --paper: #ffffff;
   --paper-ink: #171717;
+
+  // ------------------------------------------------------------------ charts
+  // categorical series colours for the stats page. Validated as a SET
+  // against this theme's surface, not chosen by eye - `dataviz` skill,
+  // scripts/validate_palette.js, dark mode, surface #1a1a1a:
+  //   lightness band PASS · chroma floor PASS · adjacent CVD dE 8.4 PASS
+  //   adjacent normal-vision dE 19.3 PASS · contrast vs surface all >= 3:1 PASS
+  // Slots are assigned in FIXED ORDER and never cycled: a subject keeps its
+  // colour when a filter removes another subject, so the eye can follow one
+  // series across a re-filter.
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --series-6: #008300;
+
+  // Sequential ramp for the activity heatmap: ONE hue, light to dark. Never a
+  // rainbow - magnitude is an ordered quantity and only lightness reads as
+  // ordered.
+  --seq-0: #1f242b;
+  --seq-1: #1c4f45;
+  --seq-2: #1a7a63;
+  --seq-3: #21a37e;
+  --seq-4: #4fd1a5;
+
+  --chart-grid: rgba(255, 255, 255, 0.06);
+  --chart-axis: #8a93a0;
 }
 
 // --------------------------------------------------------------------------
@@ -112,6 +140,29 @@
   --hero-background: #f7f3eb;
   --paper: #ffffff;
   --paper-ink: #191714;
+
+  // ------------------------------------------------------------------ charts
+  // validated for the LIGHT surface (#faf8f3) as its own set - a dark
+  // palette is never reused by flipping it. Same validator, --mode light:
+  //   lightness band PASS · chroma floor PASS · adjacent CVD dE 9.1 PASS
+  //   adjacent normal-vision dE 19.6 PASS
+  //   contrast WARN on three slots -> the charts carry visible direct labels
+  //   and a table view, which is the documented relief for that warning.
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-6: #008300;
+
+  --seq-0: #efe9dc;
+  --seq-1: #cfe0d5;
+  --seq-2: #9cc7b3;
+  --seq-3: #5da88a;
+  --seq-4: #1f4d3d;
+
+  --chart-grid: rgba(25, 23, 20, 0.08);
+  --chart-axis: #6b655c;
 }
 
 // --------------------------------------------------------------------------
@@ -160,6 +211,27 @@
   --hero-background: #11161d;
   --paper: #ffffff;
   --paper-ink: #171a1f;
+
+  // ------------------------------------------------------------------ charts
+  // same validated dark set as soluer-dark. The surfaces differ slightly
+  // (#161b22 vs #1a1a1a) but both sit in the dark band the set was stepped
+  // for, and re-stepping per theme would mean a subject changes colour when
+  // you change theme - worse than a fractional contrast difference.
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --series-6: #008300;
+
+  --seq-0: #1a2029;
+  --seq-1: #4a3616;
+  --seq-2: #7d5a1d;
+  --seq-3: #bd7920;
+  --seq-4: #f2a93b;
+
+  --chart-grid: rgba(230, 233, 238, 0.07);
+  --chart-axis: #8a93a0;
 }
 
 // global baseline. body must repaint on theme change, and previously

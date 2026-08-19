@@ -11,13 +11,25 @@ const { category, text, metricData } = defineProps<{
   metricData: string;
 }>();
 
-let finalText: string = categoryIsSubjectSpecific[category] ? codeToSubject[text] + " " + text : text;
+// these three were plain `let`/`const` evaluated ONCE at setup, from
+// destructured props. That was invisible while CardStrip rendered a fixed
+// `testStats` array - the props never changed - but the strip is now computed
+// from live attempts, and v-for reuses component instances across a data
+// change. The result was cards showing one card's heading over another card's
+// value: whatever each slot held on the very first render, when the query had
+// not resolved and every total was zero.
+//
+// `computed` re-derives when the props do. The same reason bgPositionStyle
+// below was already a computed.
+const finalText = computed(() =>
+  categoryIsSubjectSpecific[category] ? codeToSubject[text] + " " + text : text);
 
-let header: string = categoryToText[category];
+const header = computed(() => categoryToText[category]);
 
 const scienceSubjects: string[] = ["0620", "0625", "0610", "0654", "0653", "0680", "0697"];
 
-const background = categoryIsSubjectSpecific[category] ? codeToBg[text] : codeToBg["default"];
+const background = computed(() =>
+  categoryIsSubjectSpecific[category] ? codeToBg[text] : codeToBg["default"]);
 
 const bgPositionStyle = computed<CSSProperties>(() => ({
   left: scienceSubjects.includes(text) ? '50%' : '0%'

@@ -32,14 +32,33 @@ export async function fetchQuestionFlags(
     to: filter.to,
   };
 
-  return unwrap<QuestionFlagsView>(
-    'fetchQuestionFlags',
-    applyAttemptFilter(
-      supabase.from('v_question_flags').select('*'),
-      userId,
-      narrowed,
-    ),
-  );
+  // PAGINATED, deliberately. PostgREST caps a response at `max_rows`
+  // (1000 in supabase/config.toml) and truncates SILENTLY - no error, no
+  // header the client checks, just fewer rows. This view is one row per
+  // question answered, so a user passes 1000 after about 25 papers, and every
+  // number in the focus section then quietly describes a subset. It read 1000
+  // of 1840 rows before this fix and reported the shortfall as fact.
+  //
+  // One row per question is also why this is the only query that needs it: the
+  // others read aggregated views that return one row per day, subject or
+  // bucket.
+  const PAGE = 1000;
+  const rows: QuestionFlagsView[] = [];
+  for (let offset = 0; ; offset += PAGE) {
+    const page = await unwrap<QuestionFlagsView>(
+      'fetchQuestionFlags',
+      applyAttemptFilter(
+        supabase.from('v_question_flags').select('*'),
+        userId,
+        narrowed,
+      ).range(offset, offset + PAGE - 1),
+    );
+    rows.push(...page);
+    // A short page is the last page. Guard the pathological case where the
+    // server returns a full page forever rather than looping without end.
+    if (page.length < PAGE || offset > 200_000) break;
+  }
+  return rows;
 }
 
 /**
@@ -118,6 +137,14 @@ export interface FocusTotals {
   medianHesitationMs: number | null;
 }
 
+/** Median of an unsorted list, or null when empty. */
+function median(values: number[]): number | null {
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0 ? (sorted[mid - 1]! + sorted[mid]!) / 2 : sorted[mid]!;
+}
+
 export function summariseFlags(flags: QuestionFlagsView[]): FocusTotals {
   const guesses = flags.filter(f => f.is_guess);
   const guessedCorrect = guesses.filter(f => f.is_correct === true).length;
@@ -128,9 +155,10 @@ export function summariseFlags(flags: QuestionFlagsView[]): FocusTotals {
     underconfident: flags.filter(f => f.is_underconfident === true).length,
     guesses: guesses.length,
     guessAccuracy: guesses.length > 0 ? guessedCorrect / guesses.length : null,
-    // hesitation is not on this view; the tile is wired when the scatter
-    // query below supplies it. Null keeps the tile honestly empty meanwhile.
-    medianHesitationMs: null,
+    // median, not mean - hesitation has a long right tail (one question
+    // stared at for four minutes would drag a mean somewhere no question
+    // actually was).
+    medianHesitationMs: median(flags.map(f => f.hesitation_ms).filter((n): n is number => n != null)),
   };
 }
 

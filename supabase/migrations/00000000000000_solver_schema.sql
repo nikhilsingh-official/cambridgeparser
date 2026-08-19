@@ -387,6 +387,12 @@ select
   qa.is_correct,
   qm.confidence,
   qa.time_spent_ms,
+  -- added. hesitation_ms lives on question_attempts and this view already
+  -- joins it, but it was not selected - so the "median hesitation" tile on the
+  -- stats page had no column to read and was hardcoded to null with a comment
+  -- saying so. Exposing it is a one-line fix; leaving a permanently blank tile
+  -- on the page is not.
+  qa.hesitation_ms,
   pa.median_time_ms,
   -- Fast, no eliminations, essentially no interaction: a guess rather than a
   -- decision. Correct guesses inflate accuracy and hide real gaps, so they are

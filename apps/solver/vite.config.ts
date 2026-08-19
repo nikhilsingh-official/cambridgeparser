@@ -23,6 +23,10 @@ export default defineConfig({
           pdfjs: ['pdfjs-dist'],
           supabase: ['@supabase/supabase-js'],
           lottie: ['lottie-web'],
+          // ECharts is ~690 kB raw. Left in the route chunk it made
+          // StatsPage the largest bundle in the app and re-downloaded on every
+          // deploy that touched the page; split out it caches independently.
+          echarts: ['echarts/core', 'echarts/charts', 'echarts/components', 'echarts/renderers', 'echarts/features'],
         },
       },
     },

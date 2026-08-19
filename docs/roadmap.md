@@ -97,6 +97,19 @@ Running it found three defects that reading it had not:
 - Old Firebase accounts were **not migrated** — a deliberate choice; there was
   nothing worth keeping. Anyone who had an account signs up again.
 
+### A4. The stats page covers Soluer only
+
+The page reads `exam_attempts` and friends. `ide_progress` is not on it, so a
+user's pseudocode work is invisible beside their MCQ work, and "accuracy" there
+silently means "MCQ accuracy".
+
+Two things are needed. The smaller is queries and tiles. The larger is that **the
+IDE keeps no attempt history**: `record_ide_attempt` upserts, so a 3/6 followed by
+a 6/6 leaves one row and nothing to plot over time. An append-only `ide_attempts`
+log - a sibling of the solver's `attempt_events` - is the prerequisite for any IDE
+trend line, and that history is unrecoverable for every submission made before it
+exists.
+
 ### A2. One deployment
 
 `apps/solver/` has **no deployment configuration at all** — no `vercel.json`, no
@@ -165,22 +178,45 @@ readable.
 One decision to make there: `paper_answers` must be client-readable today, which
 means a determined user can read the answer key before answering.
 
-### B3. The stats page is still placeholder data
+### B3. The stats page — **built and verified against real data**
 
-The whole read layer exists (`src/lib/supabase/queries/` — `attempts`, `activity`,
-`focus`, `subjects`, `goals`; every view has a typed reader) and **the UI calls
-none of it**. `components_stats/` still renders:
+The read layer built in `aec4e13` finally has a consumer: `lib/stats/useStats.ts`.
+The page reads seven views in parallel, the filters write straight into the query
+filter, and every placeholder is gone — no Lorem ipsum, no `['Wade Cooper', ...]`,
+no `testStats` array of `Math.random()` values.
 
-- `StatsPage.vue:10–17` — filters hardcoded to `['Wade Cooper', 'Arlene Mccoy', …]`,
-  `['Apple','Banana','Cherry']`, `['Red','Green','Blue']`. Should be years,
-  series and variants from `v_attempt_summary`.
-- `StatsPage.vue:33` — Lorem ipsum subtitle.
-- `StatsPage.vue:56` — `.pie-container` is an empty `div`.
-- `CardStrip.vue:4` — a generated `testStats` array.
+Charts are ECharts, registered piecemeal in `lib/charts/echarts.ts` and split into
+their own bundle chunk (StatsPage is 33 kB; ECharts caches separately at 658 kB).
+Colours are validated palettes in `themes.scss` - one set per theme surface,
+checked with the dataviz validator rather than by eye, in fixed order so a subject
+keeps its colour across a re-filter.
 
-**No charting library is installed.** `apps/solver/docs/stats_page_design.md` §2
-and §8 settled on Apache ECharts, tree-shaken. That decision still stands; the
-install has not happened.
+`supabase/seeds/02_dev_sample_data.sql` generates ~5 months of plausible history
+for `dev@local.test` / `devpassword123` so the page is worth looking at locally.
+It runs on `db reset` only, refuses to run where non-dev accounts exist, and is
+deterministic.
+
+Four defects surfaced only by rendering it with real data:
+
+1. **PostgREST truncated silently at `max_rows = 1000`.** `v_question_flags` is
+   one row per question, so the focus section computed every number from 1000 of
+   1840 rows - no error, no warning. `fetchQuestionFlags` now paginates.
+2. **`StatsCard` derived its heading with `let` from destructured props**, so the
+   value was captured once at setup. Invisible against a fixed test array;
+   against live data `v-for` reused instances and cards showed one card's
+   heading over another's value. Now `computed`, and keyed by category.
+3. **The heatmap's `visualMap` defaulted to the wrong dimension.** Rows are
+   `[week, weekday, minutes, date]` and visualMap maps the *last* dimension, so
+   colour came off the date string and all 161 cells rendered in the darkest
+   step - a populated calendar that looked empty.
+4. **The accuracy chart invented plateaus.** A shared category axis of all dates
+   plus `connectNulls` drew flat runs between each subject's sparse attempts,
+   asserting steady accuracy across days holding no measurement. Now a time axis
+   with each series carrying only its own points.
+
+**Still open:** "Answer changes" is the one panel with no metric behind it (B6)
+and says so on the page rather than rendering an empty box. The IDE contributes
+nothing to this page yet - see A4.
 
 ### B4. Scores are still forgeable
 
@@ -368,8 +404,9 @@ Grouped by what unblocks the most, not by size.
    other Soluer item is downstream of this.
 2. **B5** — the three UI items and the seven `vue-tsc` errors. Small, and they get
    `npm run build` passing, so type errors start being caught instead of skipped.
-3. **B3** — install ECharts and wire `components_stats/` to the query layer that
-   has been sitting unconsumed since `aec4e13`.
+3. ~~**B3** — install ECharts and wire `components_stats/`~~ — **done**. Next on
+   that page is **A4**: put the IDE's work on it, which needs `ide_attempts`
+   first.
 
 **2 — Make the corpus gradeable.** Independent of the above; can run in parallel.
 
