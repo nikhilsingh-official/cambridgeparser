@@ -8,6 +8,8 @@ import threading
 import unittest
 from pathlib import Path
 
+from src.resources.paths import PSEUDOCODE_QUESTION_RECORDS_JSON
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FRONTEND_ROOT = REPO_ROOT / "src" / "website" / "frontend"
@@ -168,7 +170,7 @@ class StaticVueWebsiteTests(unittest.TestCase):
                 thread.join(timeout=2)
 
     def test_static_records_json_is_copied_into_vue_public_resources(self):
-        source_path = REPO_ROOT / "pseudocode_writing_hits" / "pseudocode_question_records.json"
+        source_path = REPO_ROOT / PSEUDOCODE_QUESTION_RECORDS_JSON
         public_path = (
             FRONTEND_ROOT / "public" / "resources" / "pseudocode_question_records.json"
         )

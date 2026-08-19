@@ -12,18 +12,12 @@ from src.resources.paths import PSEUDOCODE_QUESTION_RECORDS_JSON
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-# The canonical records still live at the legacy root-level path in this
-# checkout; fall back to it when the generated tree has not been built.
-RECORDS_CANDIDATES = (
-    PSEUDOCODE_QUESTION_RECORDS_JSON,
-    REPO_ROOT / "pseudocode_writing_hits/pseudocode_question_records.json",
-)
 
 
 def load_records():
-    for path in RECORDS_CANDIDATES:
-        if path.is_file():
-            return json.loads(path.read_text())["records"]
+    path = REPO_ROOT / PSEUDOCODE_QUESTION_RECORDS_JSON
+    if path.is_file():
+        return json.loads(path.read_text())["records"]
     return None
 
 

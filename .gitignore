@@ -28,15 +28,13 @@ node_modules/
 resources/pdfs/
 resources/ocr/
 
-# Generated pipeline outputs
-legacy/
-normalize/
-qp_output/
-ms_output/
-pseudocode_writing_hits/
+# Generated pipeline outputs. src/resources/paths.py is the single source of
+# truth for where these live; everything below resources/generated/ and
+# resources/legacy/ is produced by the pipeline or kept as historical data.
 output/
 resources/generated/*
 !resources/generated/README.md
+resources/legacy/
 
 # Debug and rendered image artifacts
 *.png
@@ -56,11 +54,9 @@ Cargo.lock
 
 # Firebase
 .firebase/
-functions/
 firebase-debug.log
 *-debug.log
 .runtimeconfig.json
-functions/question_records.json
 # Local env overrides (public web config lives in firebase.js, not here)
 .env
 .env.local

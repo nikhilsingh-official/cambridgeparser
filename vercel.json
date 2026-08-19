@@ -7,7 +7,7 @@
     "api/grade.py": {
       "maxDuration": 120,
       "includeFiles": "src/website/server_resources/grading_question_records.json.gz",
-      "excludeFiles": "{tests/**,functions/**,resources/**,pseudocode_writing_hits/**,qp_output/**,ms_output/**,normalize/**,src/website/frontend/public/resources/images/**}"
+      "excludeFiles": "{tests/**,apps/**,resources/**,src/website/frontend/public/resources/images/**}"
     }
   },
   "headers": [

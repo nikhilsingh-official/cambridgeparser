@@ -1,7 +1,26 @@
-# Pseudocode Solving Pipeline
+# CambridgeParser
 
-Python tools for turning Cambridge CS question-paper PDFs, OCR output, Marker
-layout JSON, and mark schemes into structured question/answer artifacts.
+Everything behind **cambridgeparser.com**: a deterministic pipeline that turns
+Cambridge CS question-paper PDFs, OCR output, Marker layout JSON, and mark
+schemes into structured question/answer artifacts, and the two web apps built
+on top of them.
+
+## Repository layout
+
+| Path | What it is |
+|---|---|
+| `src/pipeline/` | the extraction pipeline — question splitting, mark-scheme parsing, pseudocode selection, grading |
+| `src/website/` | the pseudocode IDE: Flask-ish server helpers plus the Vue frontend under `frontend/` |
+| `src/resources/paths.py` | **the** source of truth for where source and generated data live |
+| `pseudocode-parser/` | the Rust pseudocode parser — CLI, `rlib`, and the wasm module the IDE loads |
+| `api/` | Vercel Python Functions (`/api/grade`) |
+| `apps/solver/` | **Soluer**, the MCQ paper solver (Vue 3 + TypeScript + Supabase) — its own app, own `package.json`, own [README](apps/solver/README.md) |
+| `resources/` | `pdfs/` and `ocr/` inputs, `generated/` pipeline output, `legacy/` superseded output |
+| `docs/` | planning documents; **[`docs/roadmap.md`](docs/roadmap.md) is the outstanding-work list for both apps** |
+| `tests/` | `unittest` suite for the pipeline and website, plus `node:test` frontend checks |
+
+The two apps are deployed separately and do not share a `package.json`. The
+root one belongs to the IDE.
 
 ## Install
 
