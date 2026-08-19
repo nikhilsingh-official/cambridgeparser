@@ -24,7 +24,7 @@ async function onLogout() {
     <div class="topbar-actions">
       <ThemeToggle />
       <div v-if="currentUser" class="account">
-        <span class="who">{{ currentUser.email || currentUser.displayName }}</span>
+        <span class="who">{{ currentUser.email || currentUser.user_metadata?.full_name }}</span>
         <button type="button" class="signout" @click="onLogout">Sign out</button>
       </div>
     </div>

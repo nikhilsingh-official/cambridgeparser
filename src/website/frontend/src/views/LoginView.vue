@@ -1,8 +1,8 @@
 <script setup>
 // Login screen, shared in design with SmartSolver's. Both apps render the same
-// layout, spacing and states; only the auth backend differs (Firebase here,
-// Supabase there) and each styles itself entirely from the shared CSS custom
-// properties, so this screen follows whichever theme is active.
+// layout, spacing and states. Both now run on the same Supabase project, so a
+// sign-in here is a sign-in there. Each styles itself entirely from the shared
+// CSS custom properties, so this screen follows whichever theme is active.
 import { ref, computed } from 'vue'
 import { RouterLink, useRouter, useRoute } from 'vue-router'
 import {
@@ -41,22 +41,33 @@ function destination() {
   return target.startsWith('/') && !target.startsWith('//') ? target : '/ide'
 }
 
-// Firebase auth errors are codes like "auth/invalid-credential"; map the common
-// ones to something a person can read.
+// Supabase AuthError carries a stable `code` on recent versions and a prose
+// `message` on all of them, so match on the code where there is one and fall
+// back to matching the message. The messages are deliberately vague about
+// whether an account exists: "Invalid login credentials" covers both a wrong
+// password and an unknown address, and repeating that vagueness here keeps the
+// form from becoming an account-enumeration oracle.
 function friendlyError(err) {
   const code = err?.code || ''
-  const map = {
-    'auth/invalid-credential': 'Incorrect email or password.',
-    'auth/invalid-email': 'That email address is not valid.',
-    'auth/user-not-found': 'No account exists for that email.',
-    'auth/wrong-password': 'Incorrect email or password.',
-    'auth/email-already-in-use': 'An account already exists for that email.',
-    'auth/weak-password': 'Password should be at least 6 characters.',
-    'auth/popup-closed-by-user': 'Sign-in was cancelled.',
-    'auth/too-many-requests': 'Too many attempts. Wait a moment and try again.',
-    'auth/network-request-failed': 'Cannot reach the server. Check your connection.',
+  const byCode = {
+    invalid_credentials: 'Incorrect email or password.',
+    email_address_invalid: 'That email address is not valid.',
+    user_already_exists: 'An account already exists for that email.',
+    email_exists: 'An account already exists for that email.',
+    weak_password: 'Password should be at least 6 characters.',
+    over_request_rate_limit: 'Too many attempts. Wait a moment and try again.',
+    email_not_confirmed: 'Confirm your email address first - check your inbox.',
   }
-  return map[code] || err?.message || 'Something went wrong. Please try again.'
+  if (byCode[code]) return byCode[code]
+
+  const message = err?.message || ''
+  if (/invalid login credentials/i.test(message)) return 'Incorrect email or password.'
+  if (/already registered|already exists/i.test(message)) return 'An account already exists for that email.'
+  if (/password should be at least/i.test(message)) return 'Password should be at least 6 characters.'
+  if (/email not confirmed/i.test(message)) return 'Confirm your email address first - check your inbox.'
+  if (/rate limit|too many/i.test(message)) return 'Too many attempts. Wait a moment and try again.'
+  if (/fetch|network/i.test(message)) return 'Cannot reach the server. Check your connection.'
+  return message || 'Something went wrong. Please try again.'
 }
 
 async function submitEmail() {
@@ -82,11 +93,12 @@ async function submitGoogle() {
   notice.value = ''
   busy.value = true
   try {
-    await loginWithGoogle()
-    router.replace(destination())
+    // Navigates the page away to Google, so there is nothing to route to here
+    // and `busy` stays true until the browser leaves. The destination travels
+    // with the request and is applied when the redirect returns.
+    await loginWithGoogle(destination())
   } catch (err) {
     error.value = friendlyError(err)
-  } finally {
     busy.value = false
   }
 }

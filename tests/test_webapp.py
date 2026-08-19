@@ -290,24 +290,47 @@ class StaticVueWebsiteTests(unittest.TestCase):
         }
         self.assertTrue(defined & {"handler", "app"})
 
-    def test_production_grading_uses_firebase_auth_and_vercel_secret(self):
+    def test_production_grading_uses_supabase_auth_and_vercel_secret(self):
         function_source = (REPO_ROOT / "api" / "grade.py").read_text()
-        self.assertIn("accounts:lookup", function_source)
+        # The token is resolved by Supabase rather than verified locally, so the
+        # function needs no JWT secret - only the public anon key.
+        self.assertIn("/auth/v1/user", function_source)
+        self.assertIn("SUPABASE_ANON_KEY", function_source)
+        self.assertNotIn("SERVICE_ROLE", function_source)
         # Both provider keys are read server-side only: Google AI Studio is the
         # primary grader, OpenRouter the rate-limit fallback.
         self.assertIn('os.environ.get("GOOGLE_AI_STUDIO_API_KEY")', function_source)
         self.assertIn('os.environ.get("OPENROUTER_API_KEY")', function_source)
         self.assertIn("grade_request(request_payload, timeout=", function_source)
-        self.assertIn("consume_quota(uid, token)", function_source)
+        # No uid is passed: the database derives it from the token, so this
+        # function cannot spend another user's quota even if it wanted to.
+        self.assertIn("consume_quota(token)", function_source)
         self.assertNotIn('request_payload.get("record")', function_source)
 
-    def test_grading_quota_rules_are_user_scoped(self):
-        rules = json.loads((REPO_ROOT / "database.rules.json").read_text())["rules"]
-        quota = rules["gradingQuotas"]["$uid"]
-        self.assertIn("auth.uid === $uid", quota[".read"])
-        self.assertIn("auth.uid === $uid", quota[".write"])
-        self.assertIn("<= 8", quota["burst"][".validate"])
-        self.assertIn("<= 50", quota["daily"][".validate"])
+    def test_grading_quota_is_user_scoped_and_unwritable_by_clients(self):
+        """The counter must not be forgeable by the client that it limits.
+
+        Firebase enforced this with security-rule expressions. Postgres enforces
+        it by giving grading_quotas a select-only policy and no insert or update
+        policy at all, so the only writer is the security definer function.
+        """
+        schema = (REPO_ROOT / "supabase" / "migrations"
+                  / "00000000000001_ide_schema.sql").read_text()
+        quota = schema[schema.index("create table if not exists public.grading_quotas"):]
+
+        self.assertIn("alter table public.grading_quotas enable row level security", quota)
+        self.assertIn("for select using (auth.uid() = user_id)", quota)
+        # No client-writable policy on the counter.
+        self.assertNotIn("on public.grading_quotas\n  for insert", quota)
+        self.assertNotIn("on public.grading_quotas\n  for update", quota)
+
+        self.assertIn("security definer", quota)
+        self.assertIn("for update", quota)          # row lock before the read
+        self.assertIn("burst_limit  constant integer  := 8", quota)
+        self.assertIn("daily_limit  constant integer  := 50", quota)
+        # Executable only by a signed-in caller.
+        self.assertIn("revoke all on function public.consume_grading_quota() from public", quota)
+        self.assertIn("grant execute on function public.consume_grading_quota() to authenticated", quota)
 
     def test_public_landing_page_only_links_into_login(self):
         landing = (FRONTEND_ROOT / "src" / "views" / "LandingView.vue").read_text()
@@ -382,8 +405,20 @@ class StaticVueWebsiteTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 0, completed.stderr)
 
     def test_auth_ready_does_not_wait_for_profile_database_write(self):
+        """Routing must not be held hostage to a profile upsert.
+
+        `authReady` resolves from the initial getSession(); the profile write
+        happens in a separate onAuthStateChange subscription and is never
+        awaited on the path that resolves the promise. A guard that waited for
+        a database round trip would stall every hard refresh.
+        """
         source = (FRONTEND_ROOT / "src" / "services" / "auth.js").read_text()
-        self.assertLess(source.index("resolve(user)"), source.index("await ensureUserRecord(user)"))
+        auth_ready = source[source.index("export const authReady"):source.index("supabase.auth.onAuthStateChange")]
+        self.assertIn("resolve(", auth_ready)
+        self.assertNotIn("ensureUserRecord", auth_ready)
+        # And when it is called, its failure is caught rather than thrown into
+        # the auth listener.
+        self.assertIn("ensureUserRecord(session.user).catch(", source)
 
     def test_mark_scheme_hidden_in_question_panel_until_submit(self):
         question = (FRONTEND_ROOT / "src" / "components" / "QuestionPanel.vue").read_text()
@@ -523,7 +558,7 @@ class VercelGradeFunctionTests(unittest.TestCase):
         from api import grade
 
         with (
-            mock.patch.object(grade, "_verify_firebase_token", return_value="user-1"),
+            mock.patch.object(grade, "_verify_supabase_token", return_value="user-1"),
             mock.patch.dict(os.environ, {}, clear=False),
         ):
             os.environ.pop("OPENROUTER_API_KEY", None)
@@ -550,7 +585,7 @@ class VercelGradeFunctionTests(unittest.TestCase):
         }
         request = {"record_id": 23, "source": "OUTPUT 1", "parse": {}}
         with (
-            mock.patch.object(grade, "_verify_firebase_token", return_value="user-1"),
+            mock.patch.object(grade, "_verify_supabase_token", return_value="user-1"),
             mock.patch.object(grade, "consume_quota", return_value=7),
             mock.patch.object(grade, "grade_request", return_value=expected) as grader,
             mock.patch.dict("os.environ", {"OPENROUTER_API_KEY": "test-key"}),
@@ -571,7 +606,7 @@ class VercelGradeFunctionTests(unittest.TestCase):
         from api import grade
 
         with (
-            mock.patch.object(grade, "_verify_firebase_token", return_value="user-1"),
+            mock.patch.object(grade, "_verify_supabase_token", return_value="user-1"),
             mock.patch.object(
                 grade,
                 "consume_quota",
@@ -595,7 +630,7 @@ class VercelGradeFunctionTests(unittest.TestCase):
         from api import grade
 
         with (
-            mock.patch.object(grade, "_verify_firebase_token", return_value="user-1"),
+            mock.patch.object(grade, "_verify_supabase_token", return_value="user-1"),
             mock.patch.object(grade, "consume_quota", return_value=7),
             mock.patch.object(grade, "grade_request", side_effect=FileNotFoundError),
             mock.patch.dict("os.environ", {"OPENROUTER_API_KEY": "test-key"}),
@@ -622,7 +657,7 @@ class VercelGradeFunctionTests(unittest.TestCase):
             "parse": {},
         }
         with (
-            mock.patch.object(grade, "_verify_firebase_token", return_value="user-1"),
+            mock.patch.object(grade, "_verify_supabase_token", return_value="user-1"),
             mock.patch.object(grade, "consume_quota", return_value=7),
             mock.patch.dict("os.environ", {"OPENROUTER_API_KEY": "test-key"}),
         ):

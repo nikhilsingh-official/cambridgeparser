@@ -4,6 +4,10 @@ import path from 'path'
 
 export default defineConfig({
   plugins: [vue()],
+  // both apps talk to the same Supabase project, so the VITE_SUPABASE_*
+  // values live in one .env at the repository root rather than being duplicated
+  // per app and drifting apart. Vite would otherwise look in apps/solver.
+  envDir: path.resolve(__dirname, '../../'),
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src')

@@ -26,7 +26,7 @@ is the actual backlog, ordered by what blocks the most.
 | D10 local time lost | `client_timezone` + `local_date` on the attempt | `schema.sql`, `pushToExamTable.ts` |
 | D11 dead `attempts` table | dropped | `schema.sql` |
 | D12 four options hardcoded | `paper_answers.option_count` | `schema.sql` |
-| — subject code → name | 196 subjects scraped from Cambridge, deterministic parse | `supabase/seed_subjects.sql`, `src/constants/subjectCodes.ts` |
+| — subject code → name | 196 subjects scraped from Cambridge, deterministic parse | `supabase/seeds/seed_subjects.sql`, `src/constants/subjectCodes.ts` |
 | — over/underconfidence, guessing, calibration | added as views (they need `is_correct`, which did not exist before) | `schema.sql` |
 
 **Verified:** `npx vite build` passes; `vue-tsc` errors went 22 → 20.
@@ -203,7 +203,7 @@ DDL typos. Specific things to check first:
 ### 2.2 Seed the reference data
 ```bash
 supabase db reset
-psql "$DB_URL" -f supabase/seed_subjects.sql     # 196 subjects
+npm run supabase:reset    # applies migrations + the 196-subject seed
 ```
 
 ### 2.3 ~~The query layer does not exist~~ — **built**

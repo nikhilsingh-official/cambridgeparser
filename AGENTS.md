@@ -14,6 +14,7 @@ This repository holds everything behind **cambridgeparser.com**: a Python pipeli
 - `src/website/` contains the website frontend for browsing and grading generated resources.
 - `tests/` and `src/pipeline/msplitter/tests/` contain `unittest` test modules.
 - `resources/pdfs/cs_papers/` stores source PDFs and `resources/ocr/` the OCR exports. `resources/generated/` holds every parser-created artifact — `qp_output/`, `ms_output/`, `normalized_marker_output/`, `pseudocode_writing_hits/` — and `resources/legacy/` holds superseded historical output. `src/resources/paths.py` is the single source of truth for these locations; never hardcode a path that it already names.
+- `supabase/` is the one Supabase project both apps share: `migrations/` (applied in filename order), `seeds/`, the `fetch-pdf` edge function, and `config.toml`. Connection details for both apps live in a single `.env` at the repository root — see `.env.example`.
 - `docs/` holds the planning documents; `docs/roadmap.md` is the combined outstanding-work list for both apps and `docs/reference/` the syllabus and pseudocode-guide PDFs.
 
 Use package paths under `src.pipeline` for parser imports and CLIs, `src.resources.paths` for filesystem defaults, and `src.website` for frontend imports and CLIs. Do not add root-level symlinks back as module shortcuts.
@@ -22,6 +23,7 @@ Use package paths under `src.pipeline` for parser imports and CLIs, `src.resourc
 
 - `python -m unittest discover -s tests -p 'test_*.py'` runs the main test suite (257 tests).
 - `npm run test:frontend` runs the IDE frontend tests; `cd apps/solver && npm test` runs the solver's.
+- `npm run supabase:start` brings up the local stack and `npm run supabase:reset` applies `supabase/migrations/` plus the seeds. The `.sql` files under `tests/` are assertion scripts run with `psql` against that stack; they are not part of the `unittest` suite.
 - `python -m unittest src.pipeline.msplitter.tests.test_markers` runs the msplitter package test currently outside `tests/`.
 - `python -m src.pipeline.parser.qsplitter --paper 9618_w25_qp_12 --pdf-dir resources/pdfs/cs_papers --ocr-dir <ocr_dir> --marker-dir <marker_dir> --output-dir resources/generated/qp_output` processes one paper.
 - `python -m src.pipeline.parser.qsplitter --all --pdf-dir resources/pdfs/cs_papers --ocr-dir <ocr_dir> --marker-dir <marker_dir> --output-dir resources/generated/qp_output` processes all available marker inputs.

@@ -10,9 +10,9 @@
     "dev:website": "npm run build:website:wasm && npm run build:website:resources && vite --config src/website/frontend/vite.config.js",
     "build:website": "npm run build:website:wasm && npm run build:website:resources && npm run build",
     "preview:website": "vite preview --config src/website/frontend/vite.config.js",
-    "dev:website:emulator": "VITE_USE_FIREBASE_EMULATORS=true npm run dev:website",
-    "build:website:emulator": "VITE_USE_FIREBASE_EMULATORS=true npm run build:website",
-    "emulate": "firebase emulators:exec --only auth,database 'npm run dev:website:emulator'"
+    "supabase:start": "supabase start",
+    "supabase:reset": "supabase db reset",
+    "supabase:stop": "supabase stop"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.18.7",
@@ -23,8 +23,8 @@
     "@codemirror/view": "^6.38.1",
     "@fontsource/ibm-plex-mono": "^5.3.0",
     "@lezer/highlight": "^1.2.1",
+    "@supabase/supabase-js": "^2.112.3",
     "codemirror": "^6.0.2",
-    "firebase": "^12.16.0",
     "vue": "^3.5.40",
     "vue-router": "^5.2.0"
   },

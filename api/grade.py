@@ -1,7 +1,7 @@
 """Vercel Function for authenticated AI grading.
 
-The Vue client sends a Firebase ID token and a compact answer payload to this
-same-origin endpoint.  The function validates the token with Firebase Auth,
+The Vue client sends a Supabase access token and a compact answer payload to
+this same-origin endpoint.  The function validates the token with Supabase Auth,
 loads the trusted question by id, and calls the shared grading pipeline.
 
 Grading runs on Google AI Studio (``GOOGLE_AI_STUDIO_API_KEY``) and falls back
@@ -25,13 +25,13 @@ from src.website.grade_one import grade_request, load_record
 GRADING_RESULT_SCHEMA = "grading-result/v1"
 MAX_REQUEST_BYTES = 256_000
 OPENROUTER_TIMEOUT_SECONDS = 50
-FIREBASE_WEB_API_KEY = os.environ.get(
-    "FIREBASE_WEB_API_KEY",
-    "AIzaSyAur3mTM0xxxFj5GSvLm3RCisbjmkYLroU",
-)
-FIREBASE_AUTH_LOOKUP_URL = os.environ.get(
-    "FIREBASE_AUTH_LOOKUP_URL",
-    "https://identitytoolkit.googleapis.com/v1/accounts:lookup",
+# Both are public project identifiers, not secrets: the anon key grants only
+# what Row Level Security allows.  Kept as environment variables so a preview
+# deployment can point at a different project without a code change.
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "http://127.0.0.1:54321").rstrip("/")
+SUPABASE_ANON_KEY = os.environ.get(
+    "SUPABASE_ANON_KEY",
+    "sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH",
 )
 
 
@@ -69,22 +69,34 @@ def _bearer_token(headers: Mapping[str, str]) -> str:
     return token
 
 
-def _verify_firebase_token(token: str) -> str:
-    """Return the Firebase uid for a valid current-user ID token."""
+def _verify_supabase_token(token: str) -> str:
+    """Return the Supabase user id for a valid access token.
 
-    url = f"{FIREBASE_AUTH_LOOKUP_URL}?key={FIREBASE_WEB_API_KEY}"
+    Asking Supabase to resolve the token, rather than verifying the JWT
+    signature here, keeps this function free of any secret: it needs only the
+    public anon key and the caller's own token.  That is the same property the
+    Firebase version had, and it means a leak of this function's environment
+    exposes no ability to mint or impersonate a session.  The cost is one
+    network round trip per grading request, which is negligible beside the
+    model call that follows.
+
+    It also means a revoked or signed-out session is rejected immediately,
+    which local signature verification would not catch until expiry.
+    """
+
     request = urllib.request.Request(
-        url,
-        data=json.dumps({"idToken": token}).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-        method="POST",
+        f"{SUPABASE_URL}/auth/v1/user",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "apikey": SUPABASE_ANON_KEY,
+        },
+        method="GET",
     )
     with urllib.request.urlopen(request, timeout=10) as response:
         payload = json.loads(response.read().decode("utf-8"))
-    users = payload.get("users") if isinstance(payload, dict) else None
-    uid = users[0].get("localId") if isinstance(users, list) and users else None
+    uid = payload.get("id") if isinstance(payload, dict) else None
     if not isinstance(uid, str) or not uid:
-        raise ValueError("token did not resolve to a Firebase user")
+        raise ValueError("token did not resolve to a Supabase user")
     return uid
 
 
@@ -102,7 +114,11 @@ def handle_grade(
 
     try:
         token = _bearer_token(headers)
-        uid = _verify_firebase_token(token)
+        # The uid is not needed here any more - consume_grading_quota() derives
+        # it from the token inside the database - but verifying up front still
+        # earns its round trip: it turns an unauthenticated call into a clean
+        # 401 before the record load and the model call.
+        _verify_supabase_token(token)
     except (ValueError, urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError):
         return 401, _error("Sign in is required to use AI grading.")
 
@@ -125,7 +141,7 @@ def handle_grade(
         )
 
     try:
-        remaining = consume_quota(uid, token)
+        remaining = consume_quota(token)
     except RateLimitExceeded as error:
         payload = _error_for_record(
             "AI grading limit reached. Try again later.",

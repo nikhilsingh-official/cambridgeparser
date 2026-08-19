@@ -15,17 +15,19 @@
 
 - **The pseudocode IDE** (`src/website/`) — landing, login, problem explorer,
   CodeMirror editor over a wasm build of the Rust parser, and model grading via
-  `/api/grade` on Vercel. Deployed. Firebase Auth, Firebase Realtime Database.
+  `/api/grade` on Vercel. Deployed. Now on Supabase Auth and Postgres, sharing
+  one project with Soluer (A1).
 - **Soluer** (`apps/solver/`) — the MCQ paper solver. Highlight and eliminate
   options directly on the PDF, timed focus areas, full event recording, an
   end-of-exam summary that writes to Supabase. Runs locally only.
 - **The pipeline** (`src/pipeline/`) — 118 segmented question papers, 119 mark
   schemes, 176 assembled records, all deterministic and tested (257 tests).
 
-**What does not exist yet is a *site*.** The two apps share a name, a palette,
-and a login *design* — and nothing else. They have separate identity providers,
-separate databases, separate deploy targets, and no routing between them. Part A
-is that gap. Parts B and C are each app's own backlog.
+**What does not exist yet is a *site*.** The two apps now share a name, a
+palette, a login design and — as of A1 — one Supabase project, so an account is
+the same account in both. What they still lack is a shared deployment and any
+routing between them, and none of the new SQL has been run against a real
+database. Part A is that gap. Parts B and C are each app's own backlog.
 
 Ordering is at the end (Part E). Read that first if you want to know what to do next.
 
@@ -33,32 +35,44 @@ Ordering is at the end (Part E). Read that first if you want to know what to do 
 
 ## Part A — What blocks a unified cambridgeparser.com
 
-### A1. One identity. *This is the whole merge.*
+### A1. One identity — **done in code, unverified against a database**
 
-The IDE authenticates with **Firebase Auth** and stores progress in the Firebase
-Realtime Database under `users/$uid/`. Soluer authenticates with **Supabase Auth**
-and stores attempts in Postgres keyed on `auth.uid()`. A user who signs into both
-today is two different people with two different progress histories.
+Both apps now run on one Supabase project. The IDE's Firebase Auth and Realtime
+Database are gone: `services/supabase.js` replaces `services/firebase.js`,
+`auth.js` keeps its exported names but calls `supabase.auth`, and the RTDB
+subtree at `users/$uid/` became two tables.
 
-The login *pages* were unified (commit `2d43044`), which makes them look like one
-product and hides that they are not. That cosmetic fix has bought time, not a
-solution.
-
-`apps/solver/docs/future_work.md` §6.2 already records the decision that the IDE
-moves to Supabase. That is the right call — Postgres is where the analytical work
-already lives, and Firebase RTDB cannot express any of the stats views — but it
-has not started. It requires:
-
-| Step | Notes |
+| Was | Is |
 |---|---|
-| Port `services/auth.js` and `LoginView.vue` to `@supabase/supabase-js` | The solver's `stores/useAuth.ts` is the model; it already handles `authReady`, OAuth, and password reset |
-| Design `pseudocode_attempts` | Per §6.2, a **sibling** of `exam_attempts`, not a reuse of it. Marking-point-level results do not fit a per-question MCQ row |
-| Migrate the RTDB `users/$uid/progress/` subtree | Small and shallow by design; a one-off script, but the uid mapping is the hard part — Firebase uids do not survive |
-| Re-point `/api/grade`'s token check | It validates a Firebase ID token today (`api/grade.py`) and enforces quotas via `gradingQuotas/$uid` in RTDB. Both move to Supabase JWT + a Postgres quota table |
-| Retire `firebase.json`, `database.rules.json`, `.firebaserc` | Note the hosting site is still named `smartsolver`, from before the rename |
+| Firebase Auth | Supabase Auth, PKCE flow (implicit-flow tokens land in the fragment, which collides with hash routing) |
+| RTDB `users/$uid/profile` | `ide_profiles` |
+| RTDB `users/$uid/progress/$recordId` | `ide_progress`, with the best-score / never-un-solve rule moved from a client `runTransaction` into `record_ide_attempt()` |
+| RTDB `users/$uid/stats` | `v_ide_stats`, a view — counters that cannot drift from the rows they count |
+| RTDB `gradingQuotas/$uid` + rule expressions | `grading_quotas` + `consume_grading_quota()`, `security definer`, no client-writable policy |
+| Firebase ID token verified via `accounts:lookup` | Supabase access token resolved via `/auth/v1/user` |
+| `firebase.json`, `database.rules.json`, `.firebaserc` | deleted |
 
-**Do not deploy Soluer publicly before this.** Two live auth systems on one
-domain is a much worse problem to unwind than one un-deployed app.
+Two properties were deliberately preserved. Vercel still holds **no admin
+credential** — the anon key and the caller's own token are the whole credential
+set. And `authReady` still resolves without waiting on the profile write, so a
+hard refresh cannot stall behind a database round trip.
+
+**What is not done:**
+
+- **The SQL has never run.** `supabase/migrations/00000000000001_ide_schema.sql`
+  was written without a `psql`, `supabase` CLI or database to execute it
+  against — the same caveat that already applies to the solver's schema (B1).
+  `tests/test_grading_quota.sql` covers the quota arithmetic and is likewise
+  unexecuted. **Run `supabase db reset` and read the errors before trusting any
+  of it.**
+- **Google OAuth needs configuring** in the Supabase dashboard. The client code
+  is wired; the provider is not enabled.
+- **`pseudocode_attempts` was not designed.** Per `future_work.md` §6.2 it
+  should be a *sibling* of `exam_attempts`, not a reuse — marking-point-level
+  results do not fit a per-question MCQ row. `ide_progress` records the outcome
+  of a submission but keeps no per-marking-point history.
+- Old Firebase accounts were **not migrated** — a deliberate choice; there was
+  nothing worth keeping. Anyone who had an account signs up again.
 
 ### A2. One deployment
 
@@ -95,14 +109,15 @@ current status and the ordering.
 
 ### B1. The schema has never been executed — **blocks everything below it**
 
-`apps/solver/supabase/schema.sql` is 25 kB of DDL that has never run against a
-database. No `psql`, `docker`, or `supabase` CLI was available while it was
-written. Every view, trigger, and generated column downstream of it is unverified.
+`supabase/migrations/00000000000000_solver_schema.sql` is 25 kB of DDL that has
+never run against a database. Neither has the IDE's
+`00000000000001_ide_schema.sql` (A1). No `psql` or `supabase` CLI was available
+while either was written, so every table, view, trigger, generated column and
+function in both is unverified.
 
 ```bash
-cd apps/solver
-supabase db reset
-psql "$SUPABASE_DB_URL" -f supabase/seed_subjects.sql   # 196 subjects
+npm run supabase:start
+npm run supabase:reset    # applies both migrations and the 196-subject seed
 ```
 
 Expect to fix DDL errors. Check in this order:
@@ -344,10 +359,12 @@ Grouped by what unblocks the most, not by size.
 
 **3 — Make it one site.** Only worth starting once Soluer is worth deploying.
 
-7. **A1** — port the IDE to Supabase Auth. The largest single piece of work in
-   this document; everything about a unified product waits on it.
-8. **B4 → B2** — server-side answer key, then RLS. Together these are the gate to
-   deploying Soluer publicly at all.
+7. **A1 follow-through** — the port is written but unverified. Run
+   `supabase db reset`, then `tests/test_grading_quota.sql`, and enable Google
+   OAuth in the dashboard. Cheap, and it is load-bearing for everything else.
+8. **B4 → B2** — server-side answer key, then RLS on the solver's tables. The
+   IDE's new tables already have RLS; the solver's do not. Together these are
+   the gate to deploying Soluer publicly at all.
 9. **A2** — pick the URL shape, add CORS to `fetch-pdf`, write the solver's deploy
    config (it has none).
 10. **A3** — extract the shared design tokens so the two apps stop drifting.

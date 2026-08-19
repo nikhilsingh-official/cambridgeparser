@@ -16,11 +16,21 @@ on top of them.
 | `api/` | Vercel Python Functions (`/api/grade`) |
 | `apps/solver/` | **Soluer**, the MCQ paper solver (Vue 3 + TypeScript + Supabase) — its own app, own `package.json`, own [README](apps/solver/README.md) |
 | `resources/` | `pdfs/` and `ocr/` inputs, `generated/` pipeline output, `legacy/` superseded output |
+| `supabase/` | the one project both apps share — `migrations/`, `seeds/`, edge functions, local CLI config |
 | `docs/` | planning documents; **[`docs/roadmap.md`](docs/roadmap.md) is the outstanding-work list for both apps** |
 | `tests/` | `unittest` suite for the pipeline and website, plus `node:test` frontend checks |
 
-The two apps are deployed separately and do not share a `package.json`. The
-root one belongs to the IDE.
+The two apps are deployed separately and do not share a `package.json` — the
+root one belongs to the IDE. They **do** share one Supabase project, so an
+account is the same account in both; the connection details live in a single
+`.env` at the root (see `.env.example`).
+
+## Local Supabase
+
+```bash
+npm run supabase:start     # brings up the local stack on :54321
+npm run supabase:reset     # applies supabase/migrations/ and seeds
+```
 
 ## Install
 
@@ -61,11 +71,15 @@ Function. Add `GOOGLE_AI_STUDIO_API_KEY` and `OPENROUTER_API_KEY` under Vercel
 Project Settings → Environment Variables for Production (and Preview if
 desired), then redeploy; environment changes do not affect an already-built
 deployment. The keys are read only inside the Function and are never included
-in the Vue bundle. The endpoint validates the browser's Firebase ID token
-before calling the model provider. Per-account quotas
-(8 submissions per 10 minutes and 50 per day) are stored under the
-rules-protected `gradingQuotas/$uid` Realtime Database path using that same
-token, so Vercel needs no Firebase Admin credential.
+in the Vue bundle. It also needs `SUPABASE_URL` and `SUPABASE_ANON_KEY`, which
+are public project identifiers rather than secrets.
+
+The endpoint validates the browser's Supabase access token by asking Supabase to
+resolve it, then consumes one unit of the per-account quota (8 submissions per
+10 minutes, 50 per day) through the `consume_grading_quota()` database function.
+That function is `security definer` and `grading_quotas` has no client-writable
+policy, so the counter cannot be forged by the client it limits — and Vercel
+still holds no admin credential, only the anon key and the caller's own token.
 
 ### Grading providers
 
@@ -156,12 +170,12 @@ harness before shipping, which routes exactly as production does:
 python -m src.pipeline.grading.eval --output-json eval.json
 ```
 
-Quota enforcement also requires the repository's Realtime Database rules. They
-are deployed separately from Vercel; deploy them once whenever
-`database.rules.json` changes:
+Quota enforcement also requires the database schema. Apply the migrations to the
+Supabase project once, and again whenever `supabase/migrations/` changes:
 
 ```bash
-firebase deploy --only database --project pseudocode-parser
+supabase link --project-ref <your-project-ref>
+supabase db push
 ```
 
 The frontend uses the official Fontshare stylesheet for General Sans and bundles

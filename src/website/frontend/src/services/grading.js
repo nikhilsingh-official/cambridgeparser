@@ -3,7 +3,7 @@
 // (Vite plugin) and a Vercel Python Function in production. The wasm parse
 // result travels with the request so the endpoint needs no Rust binary.
 
-import { auth } from './firebase'
+import { supabase } from './supabase'
 
 const GRADE_URL = '/api/grade'
 
@@ -14,9 +14,14 @@ const GRADE_URL = '/api/grade'
  * @returns {Promise<object>} a grading-result/v1 payload
  */
 export async function gradeSubmission(record, source, parse, answerKind = 'pseudocode') {
-  const user = auth.currentUser
-  if (!user) throw new Error('Sign in is required to use AI grading.')
-  const token = await user.getIdToken()
+  // The Supabase access token is a JWT the endpoint verifies against the
+  // project; getSession() refreshes it first if it is close to expiry, so a
+  // long editing session cannot submit with a stale token.
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+  if (sessionError || !sessionData.session) {
+    throw new Error('Sign in is required to use AI grading.')
+  }
+  const token = sessionData.session.access_token
   let response
   try {
     response = await fetch(GRADE_URL, {

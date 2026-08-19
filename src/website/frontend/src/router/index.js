@@ -46,10 +46,10 @@ const router = createRouter({
 })
 
 // Route protection. Every route requires auth except those flagged public.
-// Awaiting `authReady` makes a hard reload wait for Firebase's initial auth
-// check before deciding, so a signed-in user is never bounced to /login.
+// Awaiting `authReady` makes a hard reload wait for the initial session
+// restore before deciding, so a signed-in user is never bounced to /login.
 router.beforeEach(async (to) => {
-  // Public pages do not depend on Firebase and should paint even when auth is
+  // Public pages do not depend on auth and should paint even when it is
   // slow or unavailable. A signed-in user can still choose to visit Log in;
   // submitting there simply refreshes their session and opens the IDE.
   if (to.meta.public) return true

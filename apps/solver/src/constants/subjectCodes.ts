@@ -1,6 +1,6 @@
 // ==========================================================================
 // Cambridge subject code -> name, for client-side display without a round trip.
-// Mirrors supabase/seed_subjects.sql; both come from the same scrape of the
+// Mirrors supabase/seeds/seed_subjects.sql; both come from the same scrape of the
 // official Cambridge International subject indexes (parsed by regex, no LLM).
 // The `subjects` table is the source of truth; this is a display convenience.
 // ==========================================================================

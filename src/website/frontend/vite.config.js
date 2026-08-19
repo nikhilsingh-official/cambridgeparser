@@ -72,6 +72,10 @@ function gradingApiPlugin() {
 
 export default defineConfig({
   root: fileURLToPath(new URL('.', import.meta.url)),
+  // Both apps talk to the same Supabase project, so the VITE_SUPABASE_* values
+  // live in one .env at the repository root rather than being duplicated per
+  // app and drifting apart. Vite would otherwise look beside `root`.
+  envDir: repoRoot,
   base: './',
   plugins: [vue(), gradingApiPlugin()],
   resolve: {

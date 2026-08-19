@@ -12,18 +12,18 @@ repository with full history — see `docs/merge_notes.md` for what came from wh
 
 ```bash
 npm install
-cp .env.example .env      # fill in the Supabase URL and anon key
-npm run dev               # http://localhost:5173
+cp ../../.env.example ../../.env   # one .env at the repo root serves both apps
+npm run dev                        # http://localhost:5173
 ```
 
-Every route requires authentication. `supabase start` brings up the local stack;
-apply the schema with `supabase db reset`, then seed subjects:
+Every route requires authentication. From the repository root, `npm run supabase:start` brings up the local stack
+and `npm run supabase:reset` applies the migrations and seeds:
 
 ```bash
-psql "$SUPABASE_DB_URL" -f supabase/seed_subjects.sql
+psql "$SUPABASE_DB_URL" -f ../../supabase/seeds/seed_subjects.sql
 ```
 
-> The DDL in `supabase/schema.sql` has never been executed against a live
+> The DDL in `supabase/migrations/` has never been executed against a live
 > database — see `docs/future_work.md` §2.1 before trusting it.
 
 ## Checks
@@ -45,7 +45,7 @@ npx vite build    # production bundle
 | `src/lib/supabase/` | writes (`push*.ts`) and the read layer (`queries/`) |
 | `src/lib/state/examState.ts` | the reactive per-question projection the Overview panel reads |
 | `src/styles/themes.scss` | the three selectable themes, shared with the pseudocode IDE |
-| `supabase/` | `schema.sql`, subject seed, edge functions, local CLI config |
+| `../../supabase/` | shared with the IDE: migrations, seeds, edge functions, CLI config |
 | `corpus/`, `legacy/` | scraped syllabus reference data, and the superseded pre-merge apps |
 
 ## Conventions
