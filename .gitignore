@@ -26,3 +26,6 @@ dist-ssr
 # never commit real keys
 .env
 .env.local
+
+# local Supabase CLI scratch state, including emulator service-role keys.
+supabase/.temp/
