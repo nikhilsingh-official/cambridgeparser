@@ -1,0 +1,18 @@
+be entered for Paper 1, Paper 3 and either Paper 5 or Paper 6. These candidates will be eligible for grades 5 to 1, 
+achieve a grade 4 or above, should be entered for Paper 2, Paper 4 and either Paper 5 or Paper 6. These candidates 
+Core candidates take Paper 1 and Paper 3. The questions are based on the Core subject content only: 
+Paper 1: Multiple Choice (Core)
+Paper 3: Theory (Core)
+Extended candidates take Paper 2 and Paper 4. The questions are based on the Core and Supplement subject 
+Paper 2: Multiple Choice (Extended)
+Paper 4: Theory (Extended)
+Paper 5: Practical Test
+Paper 6: Alternative to Practical
+be entered for Paper 1, Paper 3 and either Paper 5 or Paper 6. These candidates will be eligible for grades 5 to 1, 
+achieve a grade 4 or above should be entered for Paper 2, Paper 4 and either Paper 5 or Paper 6. These candidates 
+Paper 1: Multiple Choice (Core) 
+Paper 3: Theory (Core)
+Paper 2: Multiple Choice (Extended)  
+Paper 4: Theory (Extended)
+Paper 5: Practical Test
+Paper 6: Alternative to Practical

@@ -1,0 +1,5 @@
+export { createFocusAreas } from './createFocusAreas'
+export { eventListenersInit } from './eventListenersInit'
+export { getActiveFocusArea } from './getActiveFocusArea'
+export { startFocusAreaTimer } from './startFocusAreaTimer'
+export * from './focusAreasTypes'

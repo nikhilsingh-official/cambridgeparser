@@ -1,0 +1,34 @@
+// PERFORMANCE. These were raw .ttf, which is the uncompressed desktop
+// format - 1084K across the three faces, downloaded on every route. WOFF2 is
+// the same outlines with Brotli-based compression built into the format: 434K,
+// a 650K saving, with no visual difference whatsoever.
+//
+// The .ttf is kept as a second src so any browser without WOFF2 support still
+// gets a font. Every browser released since ~2016 takes the WOFF2 and never
+// requests the .ttf, so this costs nothing.
+@font-face {
+  font-family: 'Inter';
+  src: url('@/assets/fonts/Inter/Inter.woff2') format('woff2'),
+       url('@/assets/fonts/Inter/Inter.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Lexend';
+  src: url('@/assets/fonts/Lexend/Lexend.woff2') format('woff2'),
+       url('@/assets/fonts/Lexend/Lexend.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Kode Mono';
+  src: url('@/assets/fonts/Kode Mono/KodeMono.woff2') format('woff2'),
+       url('@/assets/fonts/Kode Mono/KodeMono.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}

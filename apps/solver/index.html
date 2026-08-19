@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en" data-theme-storage="cambridgeparser-theme">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#171717" />
+
+    <!-- runs before CSS paints so there is no wrong-theme flash. The app's
+         initializeTheme() adopts whatever this stamps rather than re-deciding.
+         The storage key comes from data-theme-storage above so this script and
+         src/lib/theme.ts cannot drift apart. -->
+    <script>
+      (function () {
+        var THEMES = ['soluer-dark', 'exam-paper', 'cambridge-dark'];
+        var fallback = 'soluer-dark';
+        try {
+          var saved = localStorage.getItem(document.documentElement.dataset.themeStorage);
+          document.documentElement.dataset.theme =
+            THEMES.indexOf(saved) !== -1 ? saved : fallback;
+        } catch (e) {
+          // Private mode / blocked storage: the default still applies.
+          document.documentElement.dataset.theme = fallback;
+        }
+      })();
+    </script>
+
+    <!-- General Sans for the two Cambridge themes, same source the IDE
+         uses. Falls back to Inter when the CDN is unreachable. -->
+    <link rel="preconnect" href="https://api.fontshare.com" />
+    <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap"
+    />
+    <!-- IBM Plex Mono is referenced by the IDE's dark theme but never
+         actually loaded there, so it silently fell back to ui-monospace.
+         Loading it here makes cambridge-dark look the way it was designed. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+    />
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <title>CambridgeParser</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

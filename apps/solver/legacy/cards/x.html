@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Render OBJ with Transparent Background</title>
+    <style>
+        body { margin: 0; }
+        canvas { display: none; } /* Hide the canvas since we only want the image */
+    </style>
+</head>
+<body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/loaders/OBJLoader.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/loaders/MTLLoader.min.js"></script>
+
+    <script>
+        // Set up the scene, camera, and renderer with transparent background
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ alpha: true }); // Enable transparency
+        renderer.setSize(500, 500);  // You can adjust the size of the canvas
+        document.body.appendChild(renderer.domElement);
+
+        // Set up background transparency (black is default background, but it's transparent)
+        renderer.setClearColor(0x000000, 0); // The second argument sets alpha to 0 (transparent)
+
+        // Add ambient light to the scene
+        const light = new THREE.AmbientLight(0x404040); // Ambient light
+        scene.add(light);
+        const pointLight = new THREE.PointLight(0xFFFFFF, 1, 100);
+        pointLight.position.set(50, 50, 50);
+        scene.add(pointLight);
+
+        // Load the MTL file (materials)
+        const mtlLoader = new THREE.MTLLoader();
+        mtlLoader.load('/public/Gold.mtl', function (materials) {
+            materials.preload();  // Make sure materials are loaded first
+
+            // Load the OBJ file
+            const objLoader = new THREE.OBJLoader();
+            objLoader.setMaterials(materials); // Apply materials
+            objLoader.load('/public/gold-pedestal.obj', function (object) {
+                scene.add(object);  // Add the loaded object to the scene
+                object.scale.set(1, 1, 1); // Adjust the size if needed
+                object.position.set(0, -1, 0); // Adjust the position
+
+                // Render the scene with the camera
+                camera.position.z = 3;
+                animate();
+            });
+        });
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            renderer.render(scene, camera);
+        }
+
+        // Capture the image with transparent background and download it
+        function captureImage() {
+            const dataURL = renderer.toDataURL('image/png'); // Get the image as a PNG
+            const link = document.createElement('a');
+            link.href = dataURL;
+            link.download = 'podium_image.png';  // Specify file name
+            link.click();  // Trigger the download
+        }
+
+        // Wait for the object to load and then capture the image
+        window.onload = () => {
+            setTimeout(captureImage, 2000);  // Wait for 2 seconds to ensure the model is fully loaded
+        };
+    </script>
+</body>
+</html>
