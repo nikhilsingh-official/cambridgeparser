@@ -311,7 +311,7 @@ them as a record of anything.
 
 | Item | Severity | Action |
 |---|---|---|
-| **Leaked password** | High | `REMOVED_HISTORICAL_PASSWORD` was hardcoded in `Login.vue` at commit `1857cf2` and removed by `fa220df`. It is **still in git history**, and that history is now in this repository too. It is burned regardless of whether you rewrite history — **rotate the account password**. It also appears in `call_fetch_pdf.sh` in the archived pre-merge tree |
+| **Leaked password** | High | A Supabase account password was hardcoded in `Login.vue` at commit `1857cf2` and removed by `fa220df`. The literal value is deliberately not repeated here. It was scrubbed from this repository's history (see below), but the **same password is committed and pushed** in another project — so it must be treated as public: **rotate it**, and rotate anything that reuses it |
 | Emulator keys in history | Low | `supabase/.temp/` was tracked until `5943871`, carrying local service-role and JWT-secret values. They are Supabase's published local defaults, not secrets, but the directory is gitignored now |
 | RLS absent | High | Part B2. Blocks production, not development |
 | Answer key client-writable | Medium | Part B4 |
