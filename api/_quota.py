@@ -1,5 +1,6 @@
 """Persistent per-user grading quotas for the Vercel Function.
 
+
 The window arithmetic used to live here, in a compare-and-set loop against the
 Firebase Realtime Database: read with an ETag, compute the next state, write it
 back with ``If-Match``, retry on 412.  That design existed to avoid giving

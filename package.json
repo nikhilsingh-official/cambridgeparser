@@ -1,15 +1,13 @@
 {
-  "name": "pseudocode-solving",
+  "name": "cambridgeparser",
   "private": true,
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "build": "vite build --config src/website/frontend/vite.config.js",
-    "test:frontend": "node --test tests/frontend_*.test.mjs",
-    "build:website:resources": "python -m src.website.build_static_resources --records resources/generated/pseudocode_writing_hits/pseudocode_question_records.json --qp-dir resources/generated/qp_output --marker-root resources/generated/normalized_marker_output",
-    "build:website:wasm": "bash src/website/build_wasm_parser.sh",
-    "dev:website": "npm run build:website:wasm && npm run build:website:resources && vite --config src/website/frontend/vite.config.js",
-    "build:website": "npm run build:website:wasm && npm run build:website:resources && npm run build",
-    "preview:website": "vite preview --config src/website/frontend/vite.config.js",
+    "dev": "vite",
+    "build": "vue-tsc -b && vite build",
+    "preview": "vite preview",
+    "test": "node --test --experimental-strip-types \"tests/**/*.test.ts\" \"tests/**/*.test.mjs\"",
     "supabase:start": "supabase start",
     "supabase:reset": "supabase db reset",
     "supabase:stop": "supabase stop"
@@ -23,14 +21,30 @@
     "@codemirror/view": "^6.38.1",
     "@fontsource/ibm-plex-mono": "^5.3.0",
     "@lezer/highlight": "^1.2.1",
-    "@supabase/supabase-js": "^2.112.3",
+    "@supabase/supabase-js": "^2.84.0",
+    "@vueform/multiselect": "^2.6.11",
+    "@vueform/toggle": "^2.1.4",
     "codemirror": "^6.0.2",
-    "vue": "^3.5.40",
-    "vue-router": "^5.2.0"
+    "echarts": "^6.1.0",
+    "lottie-web": "^5.13.0",
+    "lucide": "^0.555.0",
+    "lucide-vue-next": "^0.555.0",
+    "pdfjs-dist": "^5.4.394",
+    "pinia": "^3.0.4",
+    "vue": "^3.5.13",
+    "vue-router": "^4.5.1",
+    "vue-slider-component": "^3.2.24",
+    "vue3-lottie": "^3.3.1"
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "^6.0.8",
-    "esbuild": "^0.28.1",
-    "vite": "^8.1.5"
+    "@types/node": "^22.15.24",
+    "@types/vue-select": "^2.5.0",
+    "@vitejs/plugin-vue": "^5.2.3",
+    "@vue/tsconfig": "^0.7.0",
+    "sass-embedded": "^1.89.0",
+    "supabase": "^2.115.0",
+    "typescript": "~5.8.3",
+    "vite": "^6.4.1",
+    "vue-tsc": "^2.2.8"
   }
 }

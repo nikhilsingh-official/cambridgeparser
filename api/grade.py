@@ -1,5 +1,8 @@
 """Vercel Function for authenticated AI grading.
 
+# the auth and quota halves of this module were rewritten for Supabase;
+# the grading pipeline call below is unchanged.
+
 The Vue client sends a Supabase access token and a compact answer payload to
 this same-origin endpoint.  The function validates the token with Supabase Auth,
 loads the trusted question by id, and calls the shared grading pipeline.
@@ -19,7 +22,7 @@ from http.server import BaseHTTPRequestHandler
 from typing import Any, Mapping
 
 from api._quota import QuotaUnavailable, RateLimitExceeded, consume_quota
-from src.website.grade_one import grade_request, load_record
+from api.grade_one import grade_request, load_record
 
 
 GRADING_RESULT_SCHEMA = "grading-result/v1"

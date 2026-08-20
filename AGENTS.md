@@ -2,48 +2,69 @@
 
 ## Project Structure & Module Organization
 
-This repository holds everything behind **cambridgeparser.com**: a Python pipeline that turns Cambridge CS past papers into structured records, a Rust pseudocode parser, the Vue pseudocode IDE served from that data, and the Soluer paper solver.
+This repository is **one application**: cambridgeparser.com, a Vue 3 +
+TypeScript app containing both the MCQ paper solver and the Cambridge pseudocode
+IDE. They were separate sites once; do not reintroduce that split.
 
-- `apps/solver/` is the Soluer MCQ paper solver (Vue 3 + TypeScript + Supabase). It has its own `README.md`, `package.json`, and `docs/`; it was merged in from a separate repository with full history and does not share the root `package.json`.
+- `src/` is the whole application. `main.ts` mounts it, `router/router.ts` is the
+  single router, `stores/useAuth.ts` is the single Supabase client and session.
+- `src/components_dashboard/`, `_browser/`, `_navigator/`, `_stats/` are the
+  solver's pages. `src/components_ide/` and `src/views/` are the IDE's, plus the
+  public landing page.
+- `src/lib/` holds non-component logic: the PDF annotation layer, Supabase reads
+  (`supabase/queries/`) and writes (`supabase/push*.ts`), chart setup, and the
+  IDE's services under `lib/ide/`.
+- `src/styles/themes.scss` is the **single source of design tokens** for all
+  three themes. `src/styles/ide.css` holds the IDE's component styles and must
+  not define tokens.
+- `api/` is the only Python: a self-contained Vercel Function for AI grading. It
+  imports nothing outside `api/`.
+- `supabase/` holds migrations (applied in filename order), seeds, the
+  `fetch-pdf` edge function and `config.toml`.
+- `public/` holds the wasm parser and the question corpus the IDE reads.
+- `pseudocode-parser/` is the Rust source for `public/wasm`.
 
-- `src/pipeline/parser/qsplitter/` contains question splitting, hierarchy building, segmentation, debug helpers, and the CLI.
-- `src/pipeline/msplitter/` contains mark-scheme parsing, marker extraction, JSON IO, and normalization scripts.
-- `src/pipeline/analysis/diagnostics/` contains diagnostics CLIs and pseudocode refinement rules.
-- `src/pipeline/pseudocode_tools/`, `src/pipeline/runners/`, and `src/pipeline/scripts/` contain batch and export utilities.
-- `src/resources/` contains shared path defaults for source inputs and parser-created generated artifacts.
-- `src/website/` contains the website frontend for browsing and grading generated resources.
-- `tests/` and `src/pipeline/msplitter/tests/` contain `unittest` test modules.
-- `resources/pdfs/cs_papers/` stores source PDFs and `resources/ocr/` the OCR exports. `resources/generated/` holds every parser-created artifact — `qp_output/`, `ms_output/`, `normalized_marker_output/`, `pseudocode_writing_hits/` — and `resources/legacy/` holds superseded historical output. `src/resources/paths.py` is the single source of truth for these locations; never hardcode a path that it already names.
-- `supabase/` is the one Supabase project both apps share: `migrations/` (applied in filename order), `seeds/`, the `fetch-pdf` edge function, and `config.toml`. Connection details for both apps live in a single `.env` at the repository root — see `.env.example`.
-- `docs/` holds the planning documents; `docs/roadmap.md` is the combined outstanding-work list for both apps and `docs/reference/` the syllabus and pseudocode-guide PDFs.
-
-Use package paths under `src.pipeline` for parser imports and CLIs, `src.resources.paths` for filesystem defaults, and `src.website` for frontend imports and CLIs. Do not add root-level symlinks back as module shortcuts.
+The corpus extraction pipeline that produced `public/resources` was Python and
+has been archived outside the repository; its output is committed and no longer
+regenerated here.
 
 ## Build, Test, and Development Commands
 
-- `python -m unittest discover -s tests -p 'test_*.py'` runs the main test suite (257 tests).
-- `npm run test:frontend` runs the IDE frontend tests; `cd apps/solver && npm test` runs the solver's.
-- `npm run supabase:start` brings up the local stack and `npm run supabase:reset` applies `supabase/migrations/` plus the seeds. The `.sql` files under `tests/` are assertion scripts run with `psql` against that stack; they are not part of the `unittest` suite.
-- `python -m unittest src.pipeline.msplitter.tests.test_markers` runs the msplitter package test currently outside `tests/`.
-- `python -m src.pipeline.parser.qsplitter --paper 9618_w25_qp_12 --pdf-dir resources/pdfs/cs_papers --ocr-dir <ocr_dir> --marker-dir <marker_dir> --output-dir resources/generated/qp_output` processes one paper.
-- `python -m src.pipeline.parser.qsplitter --all --pdf-dir resources/pdfs/cs_papers --ocr-dir <ocr_dir> --marker-dir <marker_dir> --output-dir resources/generated/qp_output` processes all available marker inputs.
-
-Python dependencies are pinned in `requirements.txt`; JavaScript for the IDE in the root `package-lock.json` and for the solver in `apps/solver/package-lock.json`. npm is the package manager — there is no pnpm workspace. Document new runtime dependencies when adding them; current code imports `fitz`/PyMuPDF and optionally Pillow for debug rendering.
+- `npm run dev` — the app on :5173.
+- `npm run supabase:start` then `npm run supabase:reset` — local stack,
+  migrations, subject seed and the dev sample data (`dev@local.test` /
+  `devpassword123`).
+- `npm test` — `node:test` over `tests/**` (15 tests).
+- `npx vue-tsc -b` — type check. `npm run build` runs it before building.
+- `psql "$SUPABASE_DB_URL" -f tests/test_grading_quota.sql` — the SQL assertions;
+  these are not part of `npm test`.
 
 ## Coding Style & Naming Conventions
 
-Use standard Python style: 4-space indentation, `snake_case` functions and variables, `PascalCase` classes, and lowercase module names with underscores. Prefer `pathlib.Path` for paths and local JSON helpers over ad hoc file handling. Keep CLI arguments explicit, matching names such as `--pdf-dir` and `--output-dir`.
+Two-space indent, `camelCase` values, `PascalCase` components and types. Vue SFCs
+use `<script setup>`; TypeScript where the file is new.
+
+`erasableSyntaxOnly` is on, so **no `enum`** — use a `const` object plus a
+same-named union type (`src/lib/types/enums.ts`).
+
+Chart colours come from the `--series-*` and `--seq-*` tokens, never hex in a
+component. Validate any new palette rather than choosing by eye.
 
 ## Testing Guidelines
 
-Tests use Python `unittest`; name files `test_*.py` and methods `test_<behavior>`. Add focused tests beside the affected area or in `tests/` for cross-module behavior. Parser and segmentation changes should cover marker hierarchy, page boundaries, and mark extraction.
+Name files `*.test.ts` or `*.test.mjs` under `tests/`. Prefer testing the seam
+that would silently produce a wrong number over testing a render.
 
 ## Commit & Pull Request Guidelines
 
-Use concise imperative subjects, optionally scoped — `solver: sync highlight mode across UI`, `Fix qsplitter secondary marker assignment`. Explain *why* in the body.
+Concise imperative subjects, optionally scoped — `stats: build the page`,
+`auth: move the IDE to Supabase`. Explain *why* in the body, and state what was
+verified and what was not.
 
-AI-generated code must be marked as such: a header block on wholly-generated files, an `// ` (or `# `) comment on generated lines inside hand-written ones. This is a hard requirement across both apps. Pull requests should include the problem, paper codes used for validation, commands run, and screenshots or debug output paths for bbox rendering changes.
+Do not add authorship-attribution headers or inline authorship markers to generated or edited files.
 
 ## Security & Configuration Tips
 
-Do not commit private OCR exports, credentials, or large generated batches unless they are intentional fixtures or reviewed production assets required under `src/website/frontend/public`. Prefer small JSON fixtures over whole PDF-derived output trees for tests.
+Neither Supabase value in `.env` is a secret; RLS is what grants access. The
+service-role key is deliberately absent — nothing here needs it, and `api/`
+is built to hold no admin credential. Never commit provider API keys.

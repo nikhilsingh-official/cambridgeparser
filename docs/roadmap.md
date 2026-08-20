@@ -23,7 +23,19 @@
 - **The pipeline** (`src/pipeline/`) — 118 segmented question papers, 119 mark
   schemes, 176 assembled records, all deterministic and tested (257 tests).
 
-**What does not exist yet is a *site*.** The two apps now share a name, a
+**Update (2026-08-20): the two apps are now one application.** `apps/solver` and
+`src/website/frontend` are gone; everything under `src/` is a single Vue app with
+one router, one shell, one sidebar and one session. The IDE is a page group
+(Pseudocode IDE / Problems / Learn) beside the solver's (Paper Browser / Paper
+Solver / Stats), and the landing page is the public front door. The Python
+corpus pipeline is archived outside the repository; `api/` is the only Python
+left and is self-contained. A1 and much of A3 are therefore done; A2 is now just
+the deploy config, which `vercel.json` carries.
+
+The paragraph below describes the state before that merge and is kept for the
+history.
+
+**What did not exist was a *site*.** The two apps now share a name, a
 palette, a login design and — as of A1 — one Supabase project, so an account is
 the same account in both. What they still lack is a shared deployment and any
 routing between them, and none of the new SQL has been run against a real

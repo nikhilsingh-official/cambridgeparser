@@ -4,7 +4,9 @@ import test from 'node:test'
 import {
   imageIsAvailable,
   rememberUnavailableImage,
-} from '../src/website/frontend/src/services/imageAvailability.js'
+// path updated - the IDE's services moved to src/lib/ide/ when the two
+// apps merged into one.
+} from '../src/lib/ide/imageAvailability.js'
 
 test('a failed optional question image is marked unavailable', () => {
   const unavailableImages = new Set()

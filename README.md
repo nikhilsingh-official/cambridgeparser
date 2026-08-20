@@ -1,497 +1,76 @@
 # CambridgeParser
 
-Everything behind **cambridgeparser.com**: a deterministic pipeline that turns
-Cambridge CS question-paper PDFs, OCR output, Marker layout JSON, and mark
-schemes into structured question/answer artifacts, and the two web apps built
-on top of them.
+**cambridgeparser.com** — one application with two halves: a **paper solver** for
+Cambridge multiple-choice papers, and a **pseudocode IDE** with mark-scheme
+feedback. They share a shell, a sidebar, a theme system, a Supabase project and
+an account.
 
-## Repository layout
+They used to be two separate sites. They are not any more: everything below
+`src/` is one Vue app, and the sidebar's page groups are how you move between
+them.
+
+## Run it
+
+```bash
+npm install
+npm run supabase:start     # local stack on :54321
+npm run supabase:reset     # migrations + subjects + dev sample data
+npm run dev                # http://localhost:5173
+```
+
+`npm run supabase:reset` seeds a development account — **dev@local.test /
+devpassword123** — with about five months of synthetic attempts, so the stats
+page has something to show. No `.env` is needed locally: both the client and the
+grading function fall back to the local stack's defaults. See `.env.example` for
+a deployed project.
+
+## Layout
 
 | Path | What it is |
 |---|---|
-| `src/pipeline/` | the extraction pipeline — question splitting, mark-scheme parsing, pseudocode selection, grading |
-| `src/website/` | the pseudocode IDE: Flask-ish server helpers plus the Vue frontend under `frontend/` |
-| `src/resources/paths.py` | **the** source of truth for where source and generated data live |
-| `pseudocode-parser/` | the Rust pseudocode parser — CLI, `rlib`, and the wasm module the IDE loads |
-| `api/` | Vercel Python Functions (`/api/grade`) |
-| `apps/solver/` | **Soluer**, the MCQ paper solver (Vue 3 + TypeScript + Supabase) — its own app, own `package.json`, own [README](apps/solver/README.md) |
-| `resources/` | `pdfs/` and `ocr/` inputs, `generated/` pipeline output, `legacy/` superseded output |
-| `supabase/` | the one project both apps share — `migrations/`, `seeds/`, edge functions, local CLI config |
-| `docs/` | planning documents; **[`docs/roadmap.md`](docs/roadmap.md) is the outstanding-work list for both apps** |
-| `tests/` | `unittest` suite for the pipeline and website, plus `node:test` frontend checks |
+| `src/` | **the application.** One Vue 3 + TypeScript app |
+| `src/components_dashboard/`, `_browser/`, `_navigator/`, `_stats/` | the paper solver: dashboard, paper browser, the MCQ exam runner, statistics |
+| `src/components_ide/`, `src/views/` | the Cambridge IDE: editor, problem explorer, question panel, results — plus the public landing page |
+| `src/lib/` | annotation layer, Supabase reads and writes, chart setup, IDE services |
+| `src/stores/useAuth.ts` | the one Supabase client and session for the whole app |
+| `src/styles/` | `themes.scss` owns every design token; `ide.css` holds the IDE's component styles |
+| `src/router/router.ts` | one router, path routing, one guard |
+| `api/` | the Vercel Python Function for AI grading. Self-contained — the only Python in the repository |
+| `supabase/` | migrations, seeds, edge functions, local CLI config |
+| `public/` | the wasm pseudocode parser, question images and record JSON |
+| `pseudocode-parser/` | the Rust parser that produces `public/wasm` |
+| `docs/` | **[`docs/roadmap.md`](docs/roadmap.md) is the outstanding-work list** |
 
-The two apps are deployed separately and do not share a `package.json` — the
-root one belongs to the IDE. They **do** share one Supabase project, so an
-account is the same account in both; the connection details live in a single
-`.env` at the root (see `.env.example`).
-
-## Local Supabase
+## Checks
 
 ```bash
-npm run supabase:start     # brings up the local stack on :54321
-npm run supabase:reset     # applies supabase/migrations/ and seeds
+npm test          # node:test — 15 tests
+npx vue-tsc -b    # type check
+npm run build     # production bundle
 ```
 
-## Install
+## Deployment
 
-```bash
-python -m pip install -r requirements.txt
-```
+Vercel builds `npm run build` to `dist/` and serves `api/grade.py` as
+`/api/grade`. Because the app uses path routing, `vercel.json` carries a
+catch-all rewrite to `index.html` — without it a deep link like `/ide` 404s
+before the app loads.
 
-`PyMuPDF` provides the `fitz` module used by parser and renderer entry points.
-`Pillow` is used for debug and review screenshots. `pylatexenc` is only needed
-when OCR lines contain `<math>...</math>` markers.
+Environment variables, set in the Vercel dashboard for Production and Preview:
 
-## Website deployment
+| Variable | Used by |
+|---|---|
+| `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` | the browser |
+| `SUPABASE_URL`, `SUPABASE_ANON_KEY` | `api/grade.py` (`VITE_` vars are client-only) |
+| `GOOGLE_AI_STUDIO_API_KEY`, `OPENROUTER_API_KEY` | the grading providers |
 
-The Vercel project uses the repository root as its Root Directory. Keep that
-dashboard setting blank: the root `package.json` owns the JavaScript
-dependencies, and `vercel.json` points Vite at
-`src/website/frontend/vite.config.js` and serves `src/website/static`.
+None of the Supabase values are secrets — Row Level Security is what grants
+access. Do not add the service-role key; nothing here needs it.
 
-```bash
-npm run build
-```
+## Conventions
 
-This deployment build bundles the browser-ready JSON and WASM snapshots already
-committed under `src/website/frontend/public`. It deliberately does not run the
-corpus-dependent resource generator or Rust compiler, because their source
-inputs and toolchains are not present in a clean Vercel checkout. After changing
-those inputs, run `npm run build:website` locally and commit the updated public
-artifacts and `src/website/server_resources/grading_question_records.json.gz`
-before deploying. The generated question PNGs are intentional website assets
-and are tracked so a clean Vercel checkout can display them. Each image
-has a transparent, positioned text layer above it for selection and copying;
-the reconstructed text is never offered as a separate visible question view.
-Mark-scheme answers remain outside the browser bundle and are returned by the
-grading endpoint only after an authenticated submission.
+AI-generated code is marked as such: a header block on wholly-generated files,
+an `// ` comment on generated lines inside hand-written ones.
 
-Vercel also deploys `api/grade.py` as the same-origin `/api/grade` Python
-Function. Add `GOOGLE_AI_STUDIO_API_KEY` and `OPENROUTER_API_KEY` under Vercel
-Project Settings → Environment Variables for Production (and Preview if
-desired), then redeploy; environment changes do not affect an already-built
-deployment. The keys are read only inside the Function and are never included
-in the Vue bundle. It also needs `SUPABASE_URL` and `SUPABASE_ANON_KEY`, which
-are public project identifiers rather than secrets.
-
-The endpoint validates the browser's Supabase access token by asking Supabase to
-resolve it, then consumes one unit of the per-account quota (8 submissions per
-10 minutes, 50 per day) through the `consume_grading_quota()` database function.
-That function is `security definer` and `grading_quotas` has no client-writable
-policy, so the counter cannot be forged by the client it limits — and Vercel
-still holds no admin credential, only the anon key and the caller's own token.
-
-### Grading providers
-
-Grading rotates across several free Google models, then falls back to
-OpenRouter once they are all exhausted. AI Studio meters **each model
-separately**, so the rotation multiplies the free allowance — note that
-rotating API *keys* would not, because Google applies rate limits per project,
-not per key.
-
-The rotation is ordered by a hash of the question id, so one question always
-lands on the same model. That matters because models differ in generosity (the
-eval put `gemma-4-31b-it` at 11 over-awards to 2 under, against 8/5 for
-`gemini-3.1-flash-lite`), and an unkeyed rotation would let luck decide marks.
-Different questions still spread across the whole list. The grading model is
-reported in the result's `model` field.
-
-A hop to the next model happens for exactly two failures, both Google's rather
-than ours:
-
-- `rate_limit` — HTTP 429, or a `RESOURCE_EXHAUSTED` body (Google sometimes
-  returns that as a 403).
-- `model_unavailable` — HTTP 404 / `NOT_FOUND`. This is not hypothetical:
-  `gemini-2.5-flash-lite` was retired for new API keys while OpenRouter kept
-  serving it, which took grading down until the fallback covered it.
-
-Every other failure (a 400, a schema violation) stays on Google: those are our
-bugs, and retrying them through a second vendor spends money to fail twice. A
-fallback result carries `fallback_from` — including the reason — so the switch
-is visible rather than silent.
-
-**Which models are in the rotation** was decided by probing every candidate
-with the real grading payload and keeping only those that returned HTTP 200
-*and* a reply passing `validate_grading_payload()`:
-
-| Model | Verdict | Latency |
-| --- | --- | --- |
-| `gemini-3.5-flash-lite` | in rotation | 2.0s |
-| `gemini-3.6-flash` | in rotation | 3.5s |
-| `gemma-4-31b-it` | in rotation | 10.3s |
-| `gemini-3.1-flash-lite` | in rotation | 13.7s |
-| `gemini-3.5-flash` | works, excluded — too slow | 35.3s |
-| `gemini-3.7-flash` | 503 | — |
-| `gemini-3-flash`, `gemini-2.5-flash`, `gemini-2.5-flash-lite` | 404, closed to new keys | — |
-| `gemma-4-26b-a4b-it` | timed out past 120s | — |
-
-Re-run `probe_models.py` before adding a model; a model that 404s or returns
-prose instead of JSON would otherwise burn a rotation slot on every request.
-
-**On model choice:** free-tier *capacity* decides the order, not per-token
-price. Measured at ~1.6K tokens per grade, AI Studio's free limits give:
-
-| Model | binding limit | grades/min | grades/day | users/day at the 50/day quota |
-| --- | --- | --- | --- | --- |
-| `gemma-4-31b-it` | 16K TPM | ~10 | 14,400 | ~288 |
-| `gemini-3.1-flash-lite` | 15 RPM | ~15 | 500 | ~10 |
-
-Flash-Lite is faster per minute but runs out after 500 requests a day — ten
-users at full quota — so Gemma leads and Flash-Lite is the second free hop.
-Note each model's *other* limit never binds: Gemma's 30 RPM is unreachable
-under 16K TPM, and Flash-Lite's 250K TPM is unreachable under 15 RPM.
-
-The eval harness put the two level on marks (exact 32/45 each; MAE 0.38 vs
-0.33), but Gemma skews generous — it over-awarded 11 times against 2
-under-awards, versus 8/5 for Flash-Lite — so re-check accuracy with the eval
-before changing this order. Paid alternatives, if the free tiers stop being
-enough: `gemini-3.1-flash-lite` at $0.25/$1.50 per 1M, or the retired
-`google/gemini-2.5-flash-lite` at $0.10/$0.40, reachable only via OpenRouter.
-
-Both providers enforce the same strict JSON contract and return the same
-`grading-result/v1` envelope, and `validate_grading_payload()` re-checks every
-response regardless of provider. Overrides:
-
-| Variable | Default |
-| --- | --- |
-| `GOOGLE_AI_STUDIO_API_KEY` | — (required for the primary path) |
-| `GOOGLE_AI_MODELS` | `gemini-3.5-flash-lite,gemini-3.6-flash,gemma-4-31b-it,gemini-3.1-flash-lite` |
-| `GOOGLE_AI_MODEL` | unset; pins one model and disables the rotation (the eval harness relies on this) |
-| `GOOGLE_AI_BASE_URL` | `https://generativelanguage.googleapis.com/v1beta` |
-| `GOOGLE_AI_THINKING_BUDGET` | unset (Flash-Lite does not think by default) |
-| `OPENROUTER_API_KEY` | — (required for the fallback path) |
-| `OPENROUTER_MODEL` | `google/gemini-2.5-flash` |
-
-If only one key is set, that provider is used alone; with neither, grading runs
-in deterministic dry-run mode. Model changes should be measured with the eval
-harness before shipping, which routes exactly as production does:
-
-```bash
-python -m src.pipeline.grading.eval --output-json eval.json
-```
-
-Quota enforcement also requires the database schema. Apply the migrations to the
-Supabase project once, and again whenever `supabase/migrations/` changes:
-
-```bash
-supabase link --project-ref <your-project-ref>
-supabase db push
-```
-
-The frontend uses the official Fontshare stylesheet for General Sans and bundles
-IBM Plex Mono from npm. The default Exam Paper theme uses General Sans with warm
-paper and oxblood ink; its saved dark-mode alternative, Terminal Blueprint,
-uses IBM Plex Mono for interface structure and amber on cold slate. Code and
-terminal content remain monospaced in both modes.
-
-## Main Workflows
-
-Source inputs live under `resources/pdfs/` and `resources/ocr/`. Parser-created
-artifacts live under `resources/generated/` so the website frontend can consume
-them without depending on parser package internals. Shared defaults are defined
-in `src.resources.paths`.
-
-Normalize Marker coordinates:
-
-```bash
-python -m src.pipeline.msplitter.normalize_marker_output \
-  --all \
-  --marker-output-dir resources/generated/marker_output \
-  --ocr-dir resources/ocr/surya_output \
-  --normalized-output-dir resources/generated/normalized_marker_output
-```
-
-Build question-paper hierarchy and segmented text:
-
-```bash
-python -m src.pipeline.runners.qsplitter_batch \
-  --pdf-dir resources/pdfs/cs_papers \
-  --ocr-dir resources/ocr/surya_output \
-  --marker-dir resources/generated/normalized_marker_output \
-  --output-dir resources/generated/qp_output
-```
-
-Parse mark schemes:
-
-```bash
-python -m src.pipeline.msplitter.ms_parser \
-  --pdf-dir resources/pdfs/cs_papers \
-  --marker-dir resources/generated/normalized_marker_output \
-  --output-dir resources/generated/ms_output
-```
-
-Select pseudocode-writing prompts:
-
-```bash
-python -m src.pipeline.pseudocode_tools.select_pseudocode_writing \
-  --segments resources/generated/qp_output \
-  --output-dir resources/generated/pseudocode_writing_hits \
-  --rules-file src/pipeline/analysis/diagnostics/pseudocode_custom_rules.json
-```
-
-Build canonical question records (joins selection with generated `qp_output` and
-`ms_output`, extracts structured marking points, reuses screenshots):
-
-```bash
-python -m src.pipeline.pseudocode_tools.build_final_records \
-  --selected-json resources/generated/pseudocode_writing_hits/pseudocode_writing_selected.json \
-  --qp-dir resources/generated/qp_output \
-  --ms-dir resources/generated/ms_output \
-  --output-json resources/generated/pseudocode_writing_hits/pseudocode_question_records.json
-```
-
-Validate generated artifacts (no model or network calls):
-
-```bash
-python -m src.pipeline.analysis.diagnostics.validate_extraction \
-  --qp-dir resources/generated/qp_output \
-  --ms-dir resources/generated/ms_output \
-  --final-json resources/generated/pseudocode_writing_hits/pseudocode_question_records.json \
-  --output-json resources/generated/pseudocode_writing_hits/extraction_validation.json
-```
-
-Audit marking-point quality (read-only; a severity-ranked scope baseline and
-regression gate for grading-safety of the extracted marking points):
-
-```bash
-python -m src.pipeline.analysis.diagnostics.validate_marking_points \
-  --records resources/generated/pseudocode_writing_hits/pseudocode_question_records.json \
-  --output-json resources/generated/pseudocode_writing_hits/marking_point_validation.json
-```
-
-### Syllabus tags
-
-Every record carries a `syllabus_tags` list of 4-5 entries describing what the
-question asks the candidate to implement (`bubble-sort`, `text-files`,
-`records`, ...). Tags come from a controlled vocabulary in
-`src/pipeline/pseudocode_tools/syllabus_tags.py`, where each entry is bound to a
-numbered subsection of `docs/reference/computer-science-syllabus-9618.pdf` (9618, for exams from
-2027). The per-question assignments were made by hand from the question, its
-context, and the mark scheme, and live in
-`src/pipeline/pseudocode_tools/question_tag_assignments.py`, keyed by
-`segment_key` so record renumbering cannot desynchronise them.
-
-`build_final_records` expands each slug into `{slug, label, syllabus_ref,
-description}` on the record and reports coverage in the run summary
-(`records_with_syllabus_tags`, `syllabus_tag_counts`). A segment with no entry
-gets an empty list plus a `no_syllabus_tags` diagnostic rather than a guess.
-
-To retag a question, edit its tuple in `question_tag_assignments.py` and rerun
-`build_final_records`; `tags_for_segment` validates against the vocabulary and
-the 4-5 tag rule on the way out, so a typo fails the build instead of shipping.
-`python -m unittest tests.test_syllabus_tags` checks the vocabulary, the
-assignments, and the generated records.
-
-### Tag and filter UI
-
-`src/website/frontend/src/services/tags.js` owns all filtering as pure
-functions (facet counts, query parsing, URL encoding); both list surfaces call
-it, so search behaviour cannot drift between them. `TagChips.vue` renders one
-chip style in three modes — static label, deep link, filter toggle — and
-`FilterPanel.vue` combines the search box, an Any/All match switch, and tag
-facets grouped by syllabus section.
-
-- **Problems table** (`/problems`): panel open, filter state mirrored into the
-  URL as `?q=&tags=&match=`, so a filtered view is linkable and Back steps
-  through filters.
-- **IDE explorer**: same panel with `variant="compact"` — facets collapsed
-  behind a `<details>` and capped at 14rem so they never push the problem list
-  off screen. Each row shows its first two tags.
-- **Question panel**: tags sit behind a toggle beside *Show context*. A tag
-  names the technique under assessment, so it stays opt-in on an unattempted
-  problem for the same reason the mark scheme does.
-
-Multiple tags default to **Any**; with 4-5 tags per question, defaulting to All
-empties the table on the user's second click. Facet counts are computed against
-the *search*, not the tag selection, so they stay steady while sibling tags are
-toggled. Search requires every whitespace-separated term to match, `"quoted
-phrases"` are kept whole, and tag labels are part of the haystack.
-
-`python -m unittest tests.test_tag_ui` covers the wiring and runs the filter
-module itself under node against the real corpus (skipped when node is absent).
-
-## Grading Stack
-
-Build the Rust pseudocode parser (wraps the root `ast.rs`/`parser.rs`):
-
-```bash
-cd pseudocode-parser && cargo build --release && cargo test
-```
-
-The binary emits `cambridge-pseudocode-ast/v1` JSON:
-
-```bash
-pseudocode-parser/target/release/pseudocode-parser --format json --source-file answer.txt
-```
-
-`src.pipeline.grading.ast_adapter` invokes it from Python with a timeout and
-returns `parsed-answer/v1` payloads. Set `PSEUDOCODE_PARSER_BIN` to override
-binary discovery.
-
-Run the grading web app (stdlib only, no framework):
-
-```bash
-python -m src.website \
-  --records resources/generated/pseudocode_writing_hits/pseudocode_question_records.json \
-  --port 8000
-```
-
-Each record renders the cropped question image as the canonical view with a
-"Text" toggle that reconstructs the on-page layout from the qsplitter word
-boxes: words keep their original positions (selectable and copyable), Marker
-figure/diagram/table regions are shown as crisp crops taken straight from the
-PDF (`--pdf-dir`) rather than garbled text, and dotted/underscored blanks become
-interactive input fields whose contents can be copied into the answer box. The
-layout draws on `--qp-dir` (segmented questions) and `--marker-root` (normalized
-Marker regions); see `src/website/question_layout.py` and `marker_regions.py`.
-
-Evaluate grading quality against hand-authored answers (15 questions across
-fill-in / short / long types, each with high/medium/low candidates and the marks
-a human examiner would award). Dry-run without a key only exercises the harness;
-set `OPENROUTER_API_KEY` to measure how closely a model tracks the predicted marks:
-
-```bash
-python -m src.pipeline.grading.eval \
-  --records resources/generated/pseudocode_writing_hits/pseudocode_question_records.json \
-  --output-json resources/generated/pseudocode_writing_hits/grading_eval_results.json
-```
-
-OpenRouter configuration (grading falls back to a deterministic dry run when
-no key is set):
-
-```bash
-export OPENROUTER_API_KEY=...                       # user-provided secret
-export OPENROUTER_MODEL=google/gemini-2.5-flash   # optional override (this is the default; needs structured-output support)
-export OPENROUTER_PROVIDER_ONLY=mistral            # optional provider pin; comma-separate multiple values
-export OPENROUTER_PROVIDER_SORT=price              # optional provider routing hint
-export OPENROUTER_BASE_URL=https://openrouter.ai/api/v1  # optional override
-```
-
-## Planning Docs
-
-- `docs/project_direction.md` describes the current extraction pipeline and the intended AST-backed grading direction.
-- `docs/grading_roadmap.md` breaks that direction into implementation phases and acceptance criteria.
-
-## Verification
-
-```bash
-python -m unittest discover -s tests -p 'test_*.py'
-python -m unittest src.pipeline.msplitter.tests.test_markers
-python -m py_compile $(find src tests -path '*/__pycache__/*' -prune -o -name '*.py' -print)
-```
-
-For corpus-level checks, run into a temporary output directory first:
-
-```bash
-python -m src.pipeline.runners.qsplitter_batch \
-  --pdf-dir resources/pdfs/cs_papers \
-  --ocr-dir resources/ocr/surya_output \
-  --marker-dir resources/generated/normalized_marker_output \
-  --output-dir /tmp/pseudocode_solving_prod_audit/qp_output
-```
-
-## Maintenance Notes
-
-- `src.pipeline.parser.qsplitter` keeps compatibility modules for `geometry`,
-  `io`, `markers`, and `type_definitions`; the shared implementations live in
-  `src.pipeline.msplitter`.
-- `src.resources.paths` owns the canonical filesystem defaults for source inputs
-  and generated artifacts. Pipeline modules create artifacts there; website code
-  reads them from there.
-- `src.website` owns the grading/review web app.
-- `src/pipeline/parser/qsplitter/extract_question_text.py` and
-  `src/pipeline/pseudocode_tools/classify_pseudocode.py` are legacy standalone
-  helpers. The current production path uses `segmented_questions.json` plus
-  `select_pseudocode_writing.py`.
-- `select_pseudocode_writing.py` matches every question/subpart level. Because a
-  question node's `content_text` concatenates its subparts, a pseudocode-writing
-  subpart also makes the whole question match; the selector supersedes such
-  ancestors (written to `pseudocode_writing_superseded.json`) so only the specific
-  pseudocode subpart is graded and the whole question remains as context.
-- Mark-scheme parsing is table-first. A full audit on the checked-in corpus
-  leaves some older 2015/2016 mark schemes with empty question lists; treat that
-  as parser coverage work, not as a hidden fallback path.
-- A row whose question cell is a *relative* subpart marker ("(b)", "(ii)") rather
-  than a full "3(b)" is resolved against the current question number before it is
-  treated as a continuation of the previous cell. Some papers (the 2016 9608
-  schemes) print continuation subparts this way; without this the (b)/(c) content
-  — and its underlines — leaks into (a)'s cell. Only an empty question cell now
-  counts as a genuine page-break continuation.
-- Cambridge mark schemes often print several *alternative* solutions for one
-  question. `extract_structured_marking_points` tags each point with an
-  `alt_group` (a new group opens only when the rubric numbering restarts, so an
-  aside like "ALTERNATIVE using nested IFs:" does not split a list), and
-  deduplicates only *within* a group. The grading prompt lists the groups as
-  separate, mutually exclusive blocks — they are never merged into one additive
-  list — and `apply_max_marks_cap` clamps `total_awarded` to the question's
-  marks as a final safety net. `validate_marking_points` counts per group for
-  the same reason.
-- A "one mark per underlined part" header or declaration usually arrives as a
-  single continuous underlined run — the styling never changes across it, so the
-  PDF offers no sub-span structure — even though it carries several marks. When
-  merging cannot reach the mark total (it only ever reduces), the run is divided
-  at the declaration's own syntax breaks: the `RETURNS` clause, then each
-  parameter, then the `OF` of an array type. Splitting is skipped when any
-  alternative group already has its marks, so a supplementary `VB:`/`Pascal:`
-  restatement is not split as if it were the whole question.
-- The code guard that skips example-solution lines is relaxed for items that
-  continue a rubric list's numbering (and for bullets under a header), because
-  marking points routinely *name* the construct they mark — "FOR loop", "CASE OF
-  ThisMark ... ENDCASE", "OUTPUT statement". Out-of-sequence numbers still face
-  the guard, so circled mark digits printed inside the example code are rejected.
-- A few mark schemes number points 1-7 then print the eighth flush-left with no
-  "8." (verified against the rendered PDF and the OCR — the number is absent from
-  the source, not dropped in extraction). That flush-left line is indistinguishable
-  from a wrapped description by position, so the extractor attaches it and comes
-  up one point short. This is a mark-scheme formatting error, not a parsing
-  problem, so the four affected records (`9608_w17` q5(a) papers 21/23, `9618_w21`
-  q6(b) papers 21/23) are transcribed in `marking_point_overrides` with
-  `replaces_parse` rather than reconstructed by a heuristic that guesses which
-  wraps are really lost items.
-- Marking guidance that references points by number ("Mark points 7 and 8 must
-  not be nested") is a note about how the listed marks combine, not a criterion,
-  so a line beginning "Mark point(s) <n>" closes the current point rather than
-  extending it. The digit distinguishes it from the "Mark points as circled"
-  rubric header, which never leads with a number.
-- Some schemes list more criteria than marks ("One mark per point (Max 8):" above
-  nine items). That cap is recorded as `marking_points_max`, enforced by the
-  grading layer, and reported by the audit as `declared_max_list` rather than as
-  an extraction defect. The cap is also written without a bracket — "Note: Max 7
-  marks" on a trailing line, or "Mark as follows Max 6 marks:" above the list —
-  and a bare "Max n" is only read as a cap on a line that is *about* the marking,
-  never inside a marking point ("compare with Max 255"). "Note: Max 7 if
-  CharCount not used" is a conditional penalty, not a cap, so it is ignored.
-- A handful of papers over-list without declaring any cap at all (10 criteria for
-  [8] marks, MP1-MP8 for [7], or a "Mark points as circled" scheme with 7
-  descriptions for [6] where the 7th is conditional on the 1st). Their points were
-  read against the mark scheme by hand and are correct, so they are named in
-  `_VERIFIED_OVER_LIST` and audited as `verified_over_list`. That set is an
-  *annotation*, not an override: it supplies no marking points, so those records
-  still track the extractor as it improves. Note that "Mark points as circled,
-  descriptions as below" is not a styled-span convention — the circled digits
-  annotate the example code and index the numbered descriptions, which are the
-  real rubric — so it does not trigger `rubric_selection_mismatch`.
-- When a scheme declares that its marks *are* the styled spans ("One mark for
-  each part-statement, shown underlined and bold"), the underline recovery wins
-  over any text list found in the same cell. On a few 2016 papers a mark-scheme
-  row spans a page break and swallows the next question's rubric, and that
-  foreign list would otherwise be extracted as the answer's marking points.
-- `marking_point_overrides` entries normally apply only when nothing parsed. An
-  entry may set `replaces_parse` to win over a *bad* parse, for schemes whose
-  marks live in a layout the scanner cannot read (an expression table, a
-  highlight convention, bold gaps tagged with inline `MP n`). That flag silences
-  the extractor for the record permanently, so it stays rare and justified.
-- `ms_parser` rebuilds row text from a deduplicated character set (Cambridge
-  emulates bold by drawing glyphs twice, so clip extraction interleaves both
-  layers). Genuine inter-word space glyphs are *kept* through that dedup rather
-  than dropped and re-guessed from horizontal gaps: on fonts whose space is
-  narrower than the gap threshold (the 9618_w25 schemes) guessing collapsed
-  words together ("Count-controlledloop withBREAK"). Duplicate spaces left by
-  the double-draw are folded back to one. `_region_text_from_chars` still
-  synthesises a separator across an unusually wide gap (a spurious table column)
-  when neither side already carries a space.
-- `ms_parser` records underlined answer spans (`answer_underlined_spans`) via
-  PyMuPDF `TEXT_COLLECT_STYLES` (`char_flags & 2`). `build_final_records` turns
-  them into marking points for the "one mark per underlined word / expression"
-  schemes when no text rubric exists, using the node's mark value to decide how
-  finely to split runs (`marking_points_from_underlined_spans`).
+`tsconfig` runs with `erasableSyntaxOnly`, so no `enum` — use a `const` object
+plus a same-named union type (see `src/lib/types/enums.ts`).

@@ -6,7 +6,9 @@ import {
   assembleFillSource,
   isFillBlankQuestion,
   overlayTokenText,
-} from '../src/website/frontend/src/services/records.js'
+// path updated - the IDE's services moved to src/lib/ide/ when the two
+// apps merged into one.
+} from '../src/lib/ide/records.js'
 
 test('overlay tokens copy with spaces within lines and newlines between them', () => {
   const tokens = [
@@ -24,7 +26,8 @@ const layoutWithBlank = {
   pages: [{ page_index: 1, width: 600, tokens: [{ kind: 'blank', x: 20, y: 20, w: 200 }] }],
 }
 
-const resourceRoot = new URL('../src/website/frontend/public/resources/', import.meta.url)
+// path updated for the merged app's single public/ directory.
+const resourceRoot = new URL('../public/resources/', import.meta.url)
 const records = JSON.parse(readFileSync(new URL('pseudocode_question_records.json', resourceRoot)))
 const layouts = JSON.parse(readFileSync(new URL('question_layouts.json', resourceRoot)))
 const record = (id) => records.records.find((candidate) => candidate.id === id)
