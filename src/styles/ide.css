@@ -1,7 +1,11 @@
 /* ==========================================================================
+   MOSTLY HAND-WRITTEN. This file is the Cambridge IDE's own stylesheet,
+   carried over when the IDE stopped being a separate site and became a page
+   group in this one. Roughly 1,250 of its lines are the original author's.
 
-   The Cambridge IDE's component styles, carried over when the IDE stopped
-   being a separate site and became a page group in this one.
+   AI's contribution is this header and ~113 changed lines, all of them
+   deletions or re-scopings described below. It carried an
+   mistake, which credited AI with someone else's CSS.
 
    Two things were removed on the way:
 
