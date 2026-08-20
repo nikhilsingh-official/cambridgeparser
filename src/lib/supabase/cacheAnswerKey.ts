@@ -11,11 +11,24 @@
 //   - stops every attempt re-downloading and re-parsing the mark scheme;
 //   - keeps past attempts interpretable if the upstream source disappears.
 //
-// NOTE ON TRUST: this writes from the client, so for now the key is only as
-// trustworthy as the browser that sent it. That is fine for single-user
-// self-study and is the smallest change that unblocks correctness. Moving the
-// write into the edge function (which already parses the key server-side) is
-// tracked in docs/future_work.md and is a prerequisite for any shared/class view.
+// NOTE ON TRUST: this writes from the client, so the key is only as
+// trustworthy as the browser that sent it. Moving the write into the edge
+// function (which already parses the key server-side) is roadmap B4 and is a
+// prerequisite for any shared/class view.
+//
+// Until then, both writes are INSERT ... ON CONFLICT DO NOTHING rather than
+// upsert. That matters more than it looks:
+//
+//   paper_answers is keyed by PAPER, not by user - one row set serves everyone
+//   who ever sits that paper. An upsert let any client REWRITE a key that was
+//   already cached, and the set_question_correctness trigger would then dutifully
+//   re-mark against it. So a single bad client could not merely flatter its own
+//   score, it could corrupt every other student's marks for that paper.
+//
+// Insert-if-absent makes the cached key immutable from the browser: first
+// writer wins, and the only way to correct a mis-parse is server-side. It also
+// removes a pointless write - a mark scheme does not change between sittings,
+// so re-sending it on every attempt was work with no effect.
 // ==========================================================================
 
 import type { TableRow } from "@/lib/processing/processingTypes";
@@ -33,6 +46,14 @@ export async function cacheAnswerKey(
   if (!paperId) throw new Error('paperId required');
   if (!Array.isArray(answers) || answers.length === 0) return 0;
 
+  // `ignoreDuplicates: true` sends `Prefer: resolution=ignore-duplicates`,
+  // which PostgREST turns into `on conflict do nothing`. That needs only the
+  // INSERT privilege. The previous call omitted it, so PostgREST emitted
+  // `on conflict do update` - which needs UPDATE, and UPDATE is precisely the
+  // privilege that let one client overwrite everybody's answer key.
+  //
+  // A plain .insert() would NOT do: it emits a bare INSERT and would fail with
+  // a duplicate-key error the second time anyone sits the same paper.
   const { error: keyError } = await supabase
     .from('paper_answer_keys')
     .upsert(
@@ -42,7 +63,7 @@ export async function cacheAnswerKey(
         question_count: answers.length,
         parsed_at: new Date().toISOString(),
       },
-      { onConflict: 'paper_id' },
+      { onConflict: 'paper_id', ignoreDuplicates: true },
     );
   if (keyError) {
     console.error('Failed to upsert paper_answer_keys:', keyError);
@@ -68,7 +89,10 @@ export async function cacheAnswerKey(
 
   const { error } = await supabase
     .from('paper_answers')
-    .upsert(rows, { onConflict: 'paper_id,question_number' });
+    .upsert(rows, {
+      onConflict: 'paper_id,question_number',
+      ignoreDuplicates: true,
+    });
   if (error) {
     console.error('Failed to upsert paper_answers:', error);
     throw error;

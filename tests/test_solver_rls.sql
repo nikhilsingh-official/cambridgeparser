@@ -138,6 +138,32 @@ begin
   if not v_failed then raise exception 'LEAK: a client rewrote the answer key'; end if;
   raise notice 'answer key is not client-rewritable';
 
+  -- The answer key is cached by the client on first sit (cacheAnswerKey.ts),
+  -- so INSERT must still work - but only to ADD a key, never to replace one.
+  -- The upsert this replaced emitted `on conflict do update`, which needs
+  -- UPDATE, which is what let any client rewrite a key that serves every user
+  -- of that paper.
+  v_failed := false;
+  begin
+    insert into public.paper_answer_keys (paper_id, question_count)
+    values ('9999_s25_11', 40);
+  exception when insufficient_privilege then
+    v_failed := true;
+  end;
+  if v_failed then raise exception 'client can no longer cache a NEW answer key'; end if;
+  raise notice 'client can still cache a new answer key';
+
+  v_failed := false;
+  begin
+    insert into public.paper_answer_keys (paper_id, question_count)
+    values ('9999_s25_11', 999)
+    on conflict (paper_id) do update set question_count = excluded.question_count;
+  exception when insufficient_privilege then
+    v_failed := true;
+  end;
+  if not v_failed then raise exception 'LEAK: client overwrote an existing answer key'; end if;
+  raise notice 'client cannot overwrite an existing answer key';
+
   reset role;
   raise notice 'test_solver_rls: all assertions passed';
 end $$;
