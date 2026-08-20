@@ -11,8 +11,9 @@ export {
   fetchRecentAttempts,
   fetchAttemptById,
   fetchFilterOptions,
+  fetchPaperStates,
 } from './attempts';
-export type { FilterOptions } from './attempts';
+export type { FilterOptions, PaperAttemptState } from './attempts';
 
 export { fetchDailyActivity, fetchHourOfDay, computeStreaks } from './activity';
 

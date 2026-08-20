@@ -10,6 +10,8 @@ import { ChevronLeft } from "lucide-vue-next";
 defineProps<{
   state: boolean
   schema?: string
+  // set when fetch-pdf could not find the paper. See the note in MCQNav.
+  loadError?: string | null
 }>()
 
 // this component previously swallowed the start of the exam entirely - it
@@ -140,11 +142,15 @@ onBeforeUnmount(() => {
 <div v-if="!examVisible" class="loading-screen">
     <div class="back-btn" @click="emit('back')"><ChevronLeft class="icon" /> Back to Browser</div>
     <div class="centered-content">
-      <div :style="{ display: !countdownStarted ? 'flex' : 'none' }" ref="lottieContainer" class="lottie"></div>
-      <h3 :style="{ display: !countdownStarted ? 'flex' : 'none' }">{{ loading_messages[currentLoadingIndex] }}</h3>        
+      <div :style="{ display: !countdownStarted && !loadError ? 'flex' : 'none' }" ref="lottieContainer" class="lottie"></div>
+      <!-- the rotating "Preparing the PDF..." message is a lie once the
+           fetch has failed, so the error replaces it. -->
+      <h3 v-if="loadError" class="load-error">{{ loadError }}</h3>
+      <h3 v-else :style="{ display: !countdownStarted ? 'flex' : 'none' }">{{ loading_messages[currentLoadingIndex] }}</h3>        
       <h5 :style="{ display: !countdownStarted ? 'flex' : 'none' }">Paper · {{ schema ?? '—' }}</h5>
       <div class="button-container">
-        <button :style="{ display: state && !countdownStarted ? 'flex' : 'none' }" @click="startCountdown">Start Exam</button>
+        <button v-if="loadError" @click="emit('back')">Back to Browser</button>
+        <button v-else :style="{ display: state && !countdownStarted ? 'flex' : 'none' }" @click="startCountdown">Start Exam</button>
       </div>
       <p :style="{ display: countdownStarted ? 'flex' : 'none' }">{{ countdown }}</p>
     </div>
@@ -188,6 +194,12 @@ onBeforeUnmount(() => {
         }
         h3 {
             font-family: 'Lexend';
+        }
+        /* added with the load-failure state. */
+        .load-error {
+            max-width: 32ch;
+            text-align: center;
+            opacity: 0.85;
         }
         h5 {
             font-family: 'Kode Mono';

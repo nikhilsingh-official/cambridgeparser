@@ -54,14 +54,12 @@ async function handleLogout() {
                     </div>
                     <a class="sidebar-text">Paper Generator</a>
                 </li>
-                <li class="sidebar-item">
-                    <div class="sidebar-icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-compass"><circle cx="12" cy="12" r="10"></circle><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon></svg>
-                    </div>
-                    <router-link to="/solver/0455_w22_12" class="sidebar-text" active-class="active-link" exact>
-                      Paper Solver
-                    </router-link>                   
-                </li>
+                <!-- the "Paper Solver" item was removed. It was a
+                     router-link hardcoded to /solver/0455_w22_12, so every
+                     student who clicked it sat the same Economics paper
+                     regardless of what they wanted. The solver is a page ABOUT
+                     a specific paper; it has no meaning without one, so it is
+                     now reached only by picking a paper in the browser. -->
             </div>
             <!-- the Cambridge IDE, merged in from what was a separate site.
                  It is a page group here rather than a separate application:

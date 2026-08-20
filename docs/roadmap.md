@@ -257,6 +257,48 @@ changes the `fetch-pdf` contract.
 
 ### B5. Unbuilt UI work
 
+**Done 2026-08-20 — the Paper Browser is operational.** It was a mock: a
+hardcoded array of 32 subject cards with invented paper codes, filters offering
+`['Wade Cooper', ...]` / `['Cat','Dog','Rabbit']` bound to refs nothing read, a
+literal `"3 days ago"` on every card, a `"Recommended"` tag on every card, and
+**no click handler anywhere in the grid**. The only route into the solver was a
+sidebar link hardcoded to `/solver/0455_w22_12`, so every student sat the same
+Economics paper.
+
+Now:
+
+- `src/constants/paperCatalogue.ts` defines the papers that can be offered.
+  There is no catalogue table — `fetch-pdf` resolves any schema on demand — so
+  the grid is *generated* from the naming convention. It is restricted to
+  multiple-choice papers because the solver's option parser and the mark-scheme
+  reader both assume MCQs; 19 papers across 14 syllabuses (IGCSE sciences and
+  Economics, four A Level, four O Level).
+- All five filters work and compose: subject, year, season, variant, and
+  progress (not attempted / in progress / completed), the last of which is not a
+  catalogue property and is applied after the attempt join.
+- `fetchPaperStates()` joins `v_attempt_summary` in, one row per paper. Cards
+  carry the real last-attempt time, the real score and the completed/unfinished
+  badge; "Recommended" fires on a stated rule (≥2 completed papers in that
+  subject, averaging under 60%) and says so on hover.
+- Cards navigate to `/solver/<schema>` and are keyboard-reachable. **Paper
+  Solver was removed from the sidebar** — the page is about a specific paper and
+  has no meaning without one.
+- `MCQNav.setup()` ran unawaited and uncaught, so a paper the upstream mirror
+  does not have left the loading screen cycling "Preparing the PDF..." forever.
+  It now says so and offers the way back. This matters more than it did: the
+  browser can offer any series/variant combination, and not all were sat.
+
+Still open on the browser:
+
+- The catalogue asserts which series and variants exist. It is right for the
+  common cases and the Feb/March quirk (variant 2 only), but nothing verifies a
+  combination against the mirror before showing it — a student can still pick a
+  card that 404s. A HEAD-request probe, or caching what `fetch-pdf` learns,
+  would close it.
+- Non-MCQ subjects are simply absent. Extending the solver to structured papers
+  is a much larger piece of work; extending the *catalogue* once it can is one
+  array.
+
 Three items were scoped and approved but not started:
 
 | Item | What is missing |

@@ -2,7 +2,10 @@
 // Reads for the PROGRESS section and the recent-attempts log.
 // ==========================================================================
 
-import type { AttemptSummaryView, Db } from '@/lib/types/database';
+import type {
+  AttemptSummaryView, Db, IsoTimestamp, PaperSchema,
+} from '@/lib/types/database';
+import type { AttemptStatus } from '@/lib/types/enums';
 import { applyAttemptFilter, COMPLETED, unwrap, type StatsFilter } from './core';
 
 const SUMMARY = 'v_attempt_summary';
@@ -114,4 +117,71 @@ export async function fetchFilterOptions(
     series: uniqueSorted(rows.map(r => r.series)),
     variants: uniqueSorted(rows.map(r => r.variant)),
   };
+}
+
+/**
+ * the Paper Browser's attempt overlay.
+ *
+ * One row per paper the user has touched - the MOST RECENT attempt of each.
+ * The browser needs this to tell "never opened" from "sat and scored 72%",
+ * which is what drives the card's status badge, its "last attempted" line and
+ * the recommendation tag.
+ *
+ * Reduced client-side rather than with DISTINCT ON: PostgREST cannot express
+ * `distinct on (paper_id)`, and the alternative - a dedicated view - would be a
+ * migration for something bounded by papers-sat, which is small. The one
+ * consequence is PostgREST's max_rows (1000, supabase/config.toml): past a
+ * thousand lifetime attempts the oldest ones stop feeding the badges. They are
+ * the least interesting ones, and the fix - a view - is cheap when it matters.
+ */
+export interface PaperAttemptState {
+  paperId: PaperSchema;
+  status: AttemptStatus;
+  /** started_at of the newest attempt; an abandoned paper has no finish. */
+  lastAttemptedAt: IsoTimestamp;
+  /** 0..1 over the whole answer key, or null when it was never marked. */
+  accuracy: number | null;
+  /** How many times this exact paper has been opened. */
+  attemptCount: number;
+}
+
+export async function fetchPaperStates(
+  supabase: Db,
+  userId: string,
+): Promise<Map<PaperSchema, PaperAttemptState>> {
+  const rows = await unwrap<
+    Pick<AttemptSummaryView, 'paper_id' | 'status' | 'started_at' | 'accuracy'>
+  >(
+    'fetchPaperStates',
+    supabase
+      .from(SUMMARY)
+      .select('paper_id, status, started_at, accuracy')
+      .eq('user_id', userId)
+      // Newest first, so the first row seen for a paper is the one kept.
+      .order('started_at', { ascending: false }),
+  );
+
+  const byPaper = new Map<PaperSchema, PaperAttemptState>();
+  for (const r of rows) {
+    const existing = byPaper.get(r.paper_id);
+    if (existing) {
+      existing.attemptCount += 1;
+      // A completed attempt outranks an abandoned one for the badge, even if
+      // the abandoned one is newer - "you have finished this paper" is the
+      // fact worth showing.
+      if (existing.status !== COMPLETED && r.status === COMPLETED) {
+        existing.status = r.status;
+        existing.accuracy = r.accuracy;
+      }
+      continue;
+    }
+    byPaper.set(r.paper_id, {
+      paperId: r.paper_id,
+      status: r.status,
+      lastAttemptedAt: r.started_at,
+      accuracy: r.accuracy,
+      attemptCount: 1,
+    });
+  }
+  return byPaper;
 }

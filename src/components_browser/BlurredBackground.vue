@@ -1,27 +1,34 @@
 <script setup lang="ts">
+// the wallpaper behind the browser header - fifty Cards at blur(14px).
+// It used to build its own mock card objects with a hardcoded
+// 'Paper 2: Extended MCQs' variant and a made-up `${code}/s24/21` code. Now it
+// samples the real catalogue, so the blurred shapes are the same shapes the
+// grid below is made of, and there is one card contract instead of two.
 import { ref } from 'vue'
-import { codeToIcon, codeToSubject } from '../constants/codeMaps'
 import Card from './Card.vue'
+import { buildPaperEntries, condensedLabel } from '@/constants/paperCatalogue'
+import { EXAM_SERIES_LABEL } from '@/lib/types/enums'
+import { PaperProgress } from './browserFilter'
+import type { PaperCard } from '@/lib/browser/usePaperBrowser'
 
-const subjectCodes = [
-  "0620", "0625", "0610", "0580", "0607", "0606",
-  "0478", "0417", "0460", "0495", "0457", "0455",
-  "0452", "0500", "0475", "0520", "0530", "0411",
-  "0697", "0410", "0680", "0400", "0445", "0470",
-  "9990", "0450", "0454", "0413", "8001", "0471",
-  "0648", "0490"
-]
+// The whole catalogue, unfiltered - this is decoration, so variety is the
+// only requirement.
+const ALL = buildPaperEntries({ subjectCodes: [], examYears: [], series: [], variants: [] })
 
-function getRandomCards(count = 10) {
-  const cards = []
+function getRandomCards(count = 10): PaperCard[] {
+  const cards: PaperCard[] = []
   for (let i = 0; i < count; i++) {
-    const code = subjectCodes[Math.floor(Math.random() * subjectCodes.length)]
+    const entry = ALL[Math.floor(Math.random() * ALL.length)]
+    const sessionLabel = `${EXAM_SERIES_LABEL[entry.series]} ${entry.examYear}`
     cards.push({
-      subject: codeToSubject[code] || 'Unknown Subject',
-      code,
-      variant: 'Paper 2: Extended MCQs',
-      condensed: `${code}/s24/21`,
-      icon: codeToIcon[code] || '',
+      ...entry,
+      attempt: null,
+      progress: PaperProgress.Unattempted,
+      condensed: condensedLabel(entry),
+      sessionLabel,
+      lastAttemptedLabel: 'Never attempted',
+      tags: [entry.qualification, sessionLabel],
+      recommendation: null,
     })
   }
   return cards
@@ -54,7 +61,8 @@ const scrollDurations = ref(
         <Card
           v-for="(card, index) in cards"
           :key="index"
-          v-bind="card"
+          :card="card"
+          decorative
         />
       </div>
     </div>

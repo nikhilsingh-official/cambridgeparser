@@ -51,6 +51,12 @@ const { showOverview } = getShowStates();
 let perfStart: number | null;
 const examLoaded = ref(false);
 const examStarted = ref(false);
+// the paper failed to load. Added because the Paper Browser is now the only
+// way into the solver, so a student can pick any catalogue combination - and
+// fetch-pdf 404s when that series/variant was never sat. setup() previously ran
+// unawaited and uncaught, so a 404 left the loading screen cycling
+// "Preparing the PDF..." forever with no way to tell it had failed.
+const loadError = ref<string | null>(null);
 
 const iframeRef = ref<HTMLIFrameElement | null>(null);
 let observer: MutationObserver | null = null;
@@ -704,13 +710,23 @@ async function setup() {
   iframe.style.background = 'transparent';
   iframe.setAttribute('allowtransparency', 'true');
 
-  const { answers: answersFromPDF, pdfBytes, pdfUrl } = await getPDF();
-  answers = answersFromPDF;
+  try {
+    const { answers: answersFromPDF, pdfBytes, pdfUrl } = await getPDF();
+    answers = answersFromPDF;
 
-  if (!iframeRef.value) return;
-  iframeRef.value.src = '/web/viewer.html?file=' + encodeURIComponent(pdfUrl);
+    if (!iframeRef.value) return;
+    iframeRef.value.src = '/web/viewer.html?file=' + encodeURIComponent(pdfUrl);
 
-  iframe.addEventListener('load', () => onLoad(pdfBytes));
+    iframe.addEventListener('load', () => onLoad(pdfBytes));
+  } catch (err) {
+    // fetch-pdf returns 404 when the question paper or the mark scheme is
+    // not on the upstream mirror - a real outcome for an uncommon
+    // series/variant, not a bug. Surfaced so the student can go back and pick
+    // another rather than waiting on a load that will never finish.
+    console.error('paper load failed:', err);
+    loadError.value =
+      'This paper could not be loaded. It may not exist for that series or variant.';
+  }
 }
 
 onBeforeUnmount(() => {
@@ -768,6 +784,7 @@ onMounted(async () => {
   <LoadingScreen
     :state="examLoaded"
     :schema="props.schema"
+    :load-error="loadError"
     @start="startExam"
     @back="router.push('/browser')"
   ></LoadingScreen>

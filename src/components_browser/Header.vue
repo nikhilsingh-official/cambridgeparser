@@ -1,25 +1,72 @@
 <script setup lang="ts">
-// an unused placeholder filter (options1/selected1) was removed - it was
-// bound to nothing and failed the type check that now gates the build.
-// moved to main.ts - see the note there.
-import { ref } from 'vue'
-import BlurredBackground from "./BlurredBackground.vue";
+// this header was a mock. Its five multiselects offered ['Wade Cooper',
+// 'Arlene Mccoy', ...], ['Red','Green','Blue'], ['Cat','Dog','Rabbit'],
+// ['Toyota','Honda','Ford'] and the four seasons, all bound to refs nothing
+// read - so the browser could not be filtered at all. They are now bound to
+// the shared BrowserFilter and their options come from the paper catalogue.
 import Multiselect from '@vueform/multiselect'
+import BlurredBackground from './BlurredBackground.vue'
+import { computed } from 'vue'
+import { CATALOGUE_SUBJECTS, CATALOGUE_YEARS } from '@/constants/paperCatalogue'
+import { EXAM_SERIES_LABEL, ExamSeries } from '@/lib/types/enums'
+import {
+  PAPER_PROGRESS_LABEL, PaperProgress, defaultFilter, type BrowserFilter,
+} from './browserFilter'
 
-const options = ['Wade Cooper', 'Arlene Mccoy', 'Devon Webb', 'Tom Cook']
-const selected = ref([])
+// two-way, so the page owns the filter and this component only edits it.
+const filter = defineModel<BrowserFilter>({ required: true })
 
-const options2 = ['Red', 'Green', 'Blue']
-const selected2 = ref(null)
+// how many papers the current filter yields, passed down rather than
+// recomputed - the page has already built the list.
+const props = defineProps<{ resultCount: number; totalCount: number }>()
 
-const options3 = ['Cat', 'Dog', 'Rabbit']
-const selected3 = ref(null)
+const subjectOptions = CATALOGUE_SUBJECTS.map(s => ({
+  value: s.code,
+  label: `${s.subject} (${s.code})`,
+}))
 
-const options4 = ['Toyota', 'Honda', 'Ford']
-const selected4 = ref(null)
+const yearOptions = CATALOGUE_YEARS.map(y => ({ value: y, label: String(y) }))
 
-const options5 = ['Spring', 'Summer', 'Autumn', 'Winter']
-const selected5 = ref(null)
+const seriesOptions = (Object.keys(EXAM_SERIES_LABEL) as ExamSeries[]).map(s => ({
+  value: s,
+  label: EXAM_SERIES_LABEL[s],
+}))
+
+// 1-3 rather than a distinct-over-the-catalogue, because every syllabus in
+// it is sat as variants 1-3. Derived would be the same three numbers with more
+// machinery.
+const variantOptions = [1, 2, 3].map(v => ({ value: v, label: `Variant ${v}` }))
+
+const progressOptions = (Object.values(PaperProgress) as PaperProgress[]).map(p => ({
+  value: p,
+  label: PAPER_PROGRESS_LABEL[p],
+}))
+
+// a filter that matches nothing is otherwise indistinguishable from a
+// broken page - the grid just goes blank. The subheading says which it is.
+const summary = computed(() => {
+  if (props.totalCount === 0) return 'Loading papers...'
+  if (props.resultCount === 0) return 'No papers match these filters.'
+  return `${props.resultCount} paper${props.resultCount === 1 ? '' : 's'} - pick one to sit it.`
+})
+
+const isDefault = computed(() => {
+  const d = defaultFilter()
+  const f = filter.value
+  const same = (a: unknown[], b: unknown[]) =>
+    a.length === b.length && a.every(v => (b as unknown[]).includes(v))
+  return (
+    same(f.subjectCodes, d.subjectCodes) &&
+    same(f.examYears, d.examYears) &&
+    same(f.series, d.series) &&
+    same(f.variants, d.variants) &&
+    same(f.progress, d.progress)
+  )
+})
+
+function reset() {
+  filter.value = defaultFilter()
+}
 </script>
 <template>
     <div class="header-container">
@@ -34,49 +81,53 @@ const selected5 = ref(null)
         <p class="subheading-text">
           Search and explore past paper questions by year, tag, or subject.
         </p>
+        <!-- the live result count. Replaces nothing - there was no
+             feedback at all that a filter had done anything. -->
+        <p class="result-text">{{ summary }}</p>
+        <button v-if="!isDefault" class="reset-btn" @click="reset">Reset filters</button>
       </div>
       <div class="half filter-container">
-        <Multiselect 
-          v-model="selected" 
-          :options="options" 
-          :taggable="true"
+        <Multiselect
+          v-model="filter.subjectCodes"
+          :options="subjectOptions"
           mode="tags"
           :searchable="true"
-          placeholder="Filter Subjects" 
-        /> 
+          :close-on-select="false"
+          placeholder="All subjects"
+        />
         <div class="time-filter">
-          <Multiselect 
-            v-model="selected2" 
-            :options="options2" 
-            :taggable="true"
+          <Multiselect
+            v-model="filter.examYears"
+            :options="yearOptions"
             mode="tags"
             :searchable="true"
-            placeholder="Years..." 
+            :close-on-select="false"
+            placeholder="Years..."
           />
-          <Multiselect 
-            v-model="selected3" 
-            :options="options3" 
-            :taggable="true"
+          <Multiselect
+            v-model="filter.series"
+            :options="seriesOptions"
             mode="tags"
-            :searchable="true"
-            placeholder="Seasons..." 
+            :searchable="false"
+            :close-on-select="false"
+            placeholder="Seasons..."
           />
-          <Multiselect 
-            v-model="selected4" 
-            :options="options4" 
-            :taggable="true"
+          <Multiselect
+            v-model="filter.variants"
+            :options="variantOptions"
             mode="tags"
-            :searchable="true"
-            placeholder="Variants..." 
+            :searchable="false"
+            :close-on-select="false"
+            placeholder="Variants..."
           />
         </div>
-        <Multiselect 
-          v-model="selected5" 
-          :options="options5" 
-          :taggable="true"
+        <Multiselect
+          v-model="filter.progress"
+          :options="progressOptions"
           mode="tags"
-          :searchable="true"
-          placeholder="Tags..." 
+          :searchable="false"
+          :close-on-select="false"
+          placeholder="Any progress..."
         />
       </div>
     </div>
@@ -113,6 +164,29 @@ const selected5 = ref(null)
   .subheading-text {
     position: relative;
     font-family: 'Lexend';
+  }
+  /* added with the result count and reset control. */
+  .result-text {
+    position: relative;
+    font-family: 'Lexend';
+    font-weight: 300;
+    opacity: 0.7;
+    margin-top: 0.5rem;
+  }
+  .reset-btn {
+    position: relative;
+    margin-top: 1rem;
+    width: fit-content;
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: 'Lexend';
+    color: $text;
+    background: $secondary-background;
+    transition: background 0.3s ease;
+
+    &:hover { background: $tertiary-background; }
   }
 }
 .filter-container {

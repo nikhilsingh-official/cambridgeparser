@@ -1,34 +1,24 @@
-<script setup lang="ts">;
-import { defineProps, watch } from 'vue';
+<script setup lang="ts">
 import Card from './Card.vue';
-// this file declared its own `interface Card` which BOTH shadowed the
-// imported component of the same name AND differed from the Card interface in
-// constants/codeMaps.ts (it required `color`, the other had no such field).
-// TypeScript therefore saw two unrelated types called Card and rejected the
-// assignment in BrowserPage. Now there is one shared shape.
-import type { Card as CardData } from '@/constants/codeMaps';
+// was `Card as CardData` from constants/codeMaps - the mock's shape. The
+// grid now carries real papers, so it carries PaperCard.
+import type { PaperCard } from '@/lib/browser/usePaperBrowser';
 
+// the `watch` that console.log'd 'Array changed:' on every render is gone.
 const props = defineProps<{
-  array: CardData[];
+  array: PaperCard[];
 }>();
-
-watch(() => props.array, (newArray) => {
-  console.log('Array changed:', newArray);
-
-}, { immediate: true });
-
 </script>
 
 <template>
     <div class = "track">
-        <Card v-for="(item, index) in props.array" 
-            :key="index"     
-            :color="item.color" 
-            :subject="item.subject"
-            :code="item.code"
-            :condensed="item.condensed"
-            :variant="item.variant"
-            :icon="item.icon" >
+        <!-- keyed by paper id, not by index. With a filter that reorders
+             the list, an index key makes Vue reuse a card's DOM for a
+             different paper - the artwork and the badge would be the previous
+             paper's until something forced a repaint. -->
+        <Card v-for="item in props.array"
+            :key="item.id"
+            :card="item">
         </Card>
     </div>
 </template>
@@ -39,7 +29,12 @@ watch(() => props.array, (newArray) => {
   width: 100%;
   height: 100%;
   grid-template-columns: repeat(auto-fit, minmax(350px, 350px));
-  grid-template-rows: repeat(10, 1fr);
+  /* was `grid-template-rows: repeat(10, 1fr)`, which declared exactly ten
+     rows. The mock had 32 cards in a 3-4 column layout, so it fit; a real
+     filter can produce hundreds, and everything past row ten landed in an
+     implicit row of height 0 - cards were being rendered on top of each other.
+     Auto rows size to the cards instead. */
+  grid-auto-rows: min-content;
   row-gap: 5px;
   column-gap: 5px;
   align-items: center;
