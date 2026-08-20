@@ -21,13 +21,14 @@ import { Target, ScatterChart, Shuffle } from 'lucide-vue-next';
 import EChart from './EChart.vue';
 import { baseAxis, baseTooltip, type ChartTheme } from '@/lib/charts/echarts';
 import { pct, duration, count } from '@/lib/stats/format';
-import type { CalibrationPoint, FocusTotals } from '@/lib/supabase/queries';
+import type { CalibrationPoint, FocusTotals, AnswerChangeSummary } from '@/lib/supabase/queries';
 import type { QuestionFlagsView } from '@/lib/types/database';
 
 const props = defineProps<{
   calibration: CalibrationPoint[];
   flags: QuestionFlagsView[];
   focus: FocusTotals;
+  answerChanges: AnswerChangeSummary | null;
 }>();
 
 const hasData = computed(() => props.flags.length > 0);
@@ -43,6 +44,49 @@ const tiles = computed(() => [
   { label: 'Questions',       value: count(props.focus.questions),      hint: 'in this selection' },
   { label: 'Median hesitation', value: duration(props.focus.medianHesitationMs), hint: 'before first action' },
 ]);
+
+// ---------------------------------------------------------- answer changes
+// A horizontal bar per outcome. Three magnitudes over one categorical axis,
+// which is a bar chart; the net figure is a hero number beside it rather than a
+// fourth bar, because it is a different quantity (a difference, not a count)
+// and putting it on the same scale would invite reading it as one.
+//
+// Right-to-wrong is the bar that matters, so it is the status colour: this is
+// the only chart on the page where one category is unambiguously bad.
+const answerChangeOption = (theme: ChartTheme) => {
+  const a = props.answerChanges!;
+  return {
+    grid: { top: 10, right: 60, bottom: 10, left: 116 },
+    tooltip: {
+      ...baseTooltip(theme), trigger: 'axis', axisPointer: { type: 'shadow' },
+      valueFormatter: (v: number) => `${v} question${v === 1 ? '' : 's'}`,
+    },
+    xAxis: { type: 'value', ...baseAxis(theme), splitLine: { show: false }, axisLabel: { show: false } },
+    yAxis: {
+      type: 'category',
+      data: ['Wrong → wrong', 'Right → wrong', 'Wrong → right'],
+      ...baseAxis(theme), splitLine: { show: false },
+      axisLabel: { ...baseAxis(theme).axisLabel, fontSize: 12 },
+    },
+    series: [{
+      type: 'bar',
+      barMaxWidth: 26,
+      // Direct labels on every bar: three bars is few enough that a value on
+      // each reads faster than an axis, and it satisfies the light-theme
+      // contrast relief the palette validator asked for.
+      label: {
+        show: true, position: 'right', color: theme.text,
+        fontFamily: theme.fontMono, fontSize: 12,
+      },
+      itemStyle: { borderRadius: [0, 4, 4, 0] },
+      data: [
+        { value: a.wrongToWrong, itemStyle: { color: theme.muted } },
+        { value: a.rightToWrong, itemStyle: { color: theme.danger } },
+        { value: a.wrongToRight, itemStyle: { color: theme.success } },
+      ],
+    }],
+  };
+};
 
 // ------------------------------------------------------------- calibration
 // Confidence on x, observed accuracy on y, against a y=x reference line.
@@ -175,15 +219,24 @@ const scatterOption = (theme: ChartTheme) => {
           <p class="panel-sub">first choice to final choice &mdash; is your instinct right?</p>
         </div>
       </div>
-      <!-- not built. attempt_events records every option transition, so
-           right->wrong vs wrong->right IS derivable - it just has no query or
-           chart yet (docs/roadmap.md B6). Saying so beats an empty box that
-           reads as a chart which failed to load. -->
-      <div class="chart-canvas chart-canvas-wide not-built">
-        <p>Not built yet</p>
+      <!-- built. attempt_events has recorded every option transition since
+           it existed; v_answer_changes turns consecutive choices into verdicts
+           against the answer key. Previously this panel said "not built yet". -->
+      <div v-if="answerChanges" class="change-row">
+        <EChart class="chart-canvas chart-canvas-wide" :option="answerChangeOption"
+                :has-data="true" label="answer changes by outcome" />
+        <div class="change-net" :class="answerChanges.netMarks >= 0 ? 'net-good' : 'net-bad'">
+          <span class="net-value">{{ answerChanges.netMarks >= 0 ? '+' : '' }}{{ answerChanges.netMarks }}</span>
+          <span class="net-label">marks, net</span>
+          <span class="net-hint">
+            across {{ answerChanges.changes }} change{{ answerChanges.changes === 1 ? '' : 's' }}
+          </span>
+        </div>
+      </div>
+      <div v-else class="chart-canvas chart-canvas-wide not-built">
+        <p>No answer changes recorded</p>
         <p class="not-built-hint">
-          Every option change is recorded; turning that into right&rarr;wrong
-          and wrong&rarr;right is the next metric.
+          This fills in once you have changed your mind on a question.
         </p>
       </div>
     </div>
@@ -204,6 +257,21 @@ const scatterOption = (theme: ChartTheme) => {
 
 <style lang="scss" scoped>
 // honest empty state for the one panel with no metric behind it yet.
+.change-row { display: flex; align-items: stretch; gap: 1rem; }
+.change-row .chart-canvas { flex: 1 1 auto; min-width: 0; }
+
+.change-net {
+  flex: 0 0 auto;
+  display: flex; flex-direction: column; justify-content: center; align-items: flex-end;
+  padding-left: 1rem;
+  border-left: 1px solid var(--border);
+  .net-value { font-family: var(--font-mono); font-size: 2rem; line-height: 1; }
+  .net-label { font-family: var(--font-body); font-size: 0.72rem; color: var(--muted); margin-top: 0.2rem; }
+  .net-hint  { font-family: var(--font-body); font-size: 0.68rem; color: var(--muted); opacity: 0.75; }
+}
+.net-good .net-value { color: var(--success); }
+.net-bad  .net-value { color: var(--danger); }
+
 .not-built {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 0.25rem; text-align: center;

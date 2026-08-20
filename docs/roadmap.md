@@ -226,9 +226,23 @@ Four defects surfaced only by rendering it with real data:
    asserting steady accuracy across days holding no measurement. Now a time axis
    with each series carrying only its own points.
 
-**Still open:** "Answer changes" is the one panel with no metric behind it (B6)
-and says so on the page rather than rendering an empty box. The IDE contributes
-nothing to this page yet - see A4.
+**Section recommendations.** Each of the three sections carries a one-line
+reading above its charts, from `lib/stats/recommendations.ts`. These are RULES,
+not a language model: a banner sits beside the chart it describes, so anything
+that can contradict the numbers destroys trust in the page, and rules cannot -
+they are computed from the same values. They are also deterministic (a changed
+banner means changed behaviour, not a changed sample), auditable, and free.
+Every rule returns a number it used.
+
+The thresholds they read (0.7/0.4 confidence, 0.4x median for guesses) were
+picked rather than measured, and the recommendations inherit that - which is an
+argument for rules, since the number is visible and tunable.
+
+A model would earn its place synthesising ACROSS sections into a study plan,
+quoting figures it was handed rather than inventing them. That is a separate
+feature from a per-section banner.
+
+**Still open:** the IDE contributes nothing to this page yet - see A4.
 
 ### B4. Scores are still forgeable
 
@@ -269,7 +283,7 @@ Also open, from `future_work.md` §5:
 | Calibration curve | `v_calibration_curve` written | a chart, and `question_metrics` populated |
 | Over/underconfidence | `v_question_flags` written | thresholds validated against real data — 0.7 / 0.4 were **picked, not measured** |
 | Guess detection | `v_question_flags` written | same problem: `< 0.4 × median` and `exploration_depth <= 1` are guesses about guessing |
-| **Answer-change quality** | not built | **the highest-value unbuilt metric.** `attempt_events` records every transition with its option index, so right→wrong vs wrong→right is now derivable. `optionSwitchCount` only ever counted switches, never whether they helped |
+| ~~Answer-change quality~~ | **built** | `v_answer_changes` / `v_answer_change_summary` classify every consecutive pair of chosen options against the key. The Focus section shows the three outcomes and the net marks changing won or cost |
 | Elimination precision | not built | `eliminated_mask` × `correct_option` — how often a ruled-out option really was wrong, and how often the *correct* one got eliminated |
 | Pacing / fatigue | not built | `attempt_events` gives true answering order, which `question_number` cannot |
 | Topic mastery | plumbing done | **content.** `src/constants/topicMap.ts` is a fill-in-the-blank file awaiting a syllabus taxonomy, then `seedTopics()` and `applyPaperTopics()` |

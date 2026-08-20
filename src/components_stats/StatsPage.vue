@@ -5,10 +5,14 @@ import FocusOverall from './Focus-Overall.vue';
 import CardStrip from './CardStrip.vue';
 import Multiselect from '@vueform/multiselect';
 import EChart from './EChart.vue';
+import RecommendationBanner from './RecommendationBanner.vue';
 import { computed } from 'vue';
 import { useStats } from '@/lib/stats/useStats';
 import { baseTooltip, type ChartTheme } from '@/lib/charts/echarts';
 import { pct } from '@/lib/stats/format';
+import {
+  progressRecommendation, engagementRecommendation, focusRecommendation,
+} from '@/lib/stats/recommendations';
 import type { ExamSeries } from '@/lib/types/enums';
 
 // the filters were ['Wade Cooper', 'Arlene Mccoy', ...] and bound to
@@ -42,6 +46,65 @@ const selectedSeries = computed({
   get: () => filter.series ?? [],
   set: v => { filter.series = v.length ? (v as ExamSeries[]) : undefined; },
 });
+
+// the three section readings.
+//
+// Computed here rather than inside each section component because this is where
+// the data already is, and because the banners render in the section HEADERS -
+// outside the 20x20 grids the sections own, so adding them costs no chart a row
+// and needs no change to layout the author wrote.
+//
+// Rules, not a model: see the header of lib/stats/recommendations.ts.
+const rankedSubjects = computed(() =>
+  [...state.subjects].filter(s => s.accuracy != null).sort((a, b) => (b.accuracy ?? 0) - (a.accuracy ?? 0)));
+
+const accuracyTrend = computed(() => {
+  const chron = [...state.attempts]
+    .filter(a => a.accuracy != null)
+    .sort((a, b) => a.local_date.localeCompare(b.local_date));
+  if (chron.length < 6) return null;
+  const take = Math.min(5, Math.floor(chron.length / 2));
+  const mean = (xs: typeof chron) => xs.reduce((n, a) => n + (a.accuracy ?? 0), 0) / xs.length;
+  return mean(chron.slice(-take)) - mean(chron.slice(0, take));
+});
+
+const daysSinceLast = computed(() => {
+  const latest = state.attempts.reduce<string | null>(
+    (m, a) => (m === null || a.local_date > m ? a.local_date : m), null);
+  if (!latest) return null;
+  return Math.max(0, Math.round(
+    (Date.now() - new Date(`${latest}T00:00:00`).getTime()) / 86_400_000));
+});
+
+const asSubject = (s: (typeof rankedSubjects)['value'][number] | undefined) =>
+  s && s.accuracy != null
+    ? { name: s.subject_name ?? s.subject_code, accuracy: s.accuracy }
+    : null;
+
+const progressRec = computed(() => progressRecommendation({
+  papers: totals.value.papers,
+  accuracy: totals.value.accuracy,
+  trend: accuracyTrend.value,
+  strongest: asSubject(rankedSubjects.value[0]),
+  weakest: asSubject(rankedSubjects.value[rankedSubjects.value.length - 1]),
+}));
+
+const engagementRec = computed(() => engagementRecommendation({
+  papers: totals.value.papers,
+  currentStreak: streaks.value.current,
+  longestStreak: streaks.value.longest,
+  daysSinceLast: daysSinceLast.value,
+  avgPaperMs: totals.value.avgPaperMs,
+}));
+
+const focusRec = computed(() => focusRecommendation({
+  questions: focus.value.questions,
+  overconfident: focus.value.overconfident,
+  underconfident: focus.value.underconfident,
+  guesses: focus.value.guesses,
+  guessAccuracy: focus.value.guessAccuracy,
+  answerChanges: state.answerChanges,
+}));
 
 const subtitle = computed(() => {
   if (loading.value) return 'Reading your attempt history…';
@@ -139,6 +202,7 @@ const subjectSplitOption = (theme: ChartTheme) => ({
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down-icon lucide-chevron-down"><path d="m6 9 6 6 6-6"/></svg>
                 </div>
             </div>
+            <RecommendationBanner class="section-rec" :recommendation="progressRec" />
             <div class="section-body">
                 <ProgressOverall :attempts="state.attempts" :subjects="state.subjects" :totals="totals" />
             </div>
@@ -150,6 +214,7 @@ const subjectSplitOption = (theme: ChartTheme) => ({
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down-icon lucide-chevron-down"><path d="m6 9 6 6 6-6"/></svg>
                 </div>
             </div>
+            <RecommendationBanner class="section-rec" :recommendation="engagementRec" />
             <div class="section-body">
                 <EngagementOverall :attempts="state.attempts" :daily="state.daily" :hours="state.hours" :streaks="streaks" :totals="totals" />
             </div>
@@ -161,8 +226,9 @@ const subjectSplitOption = (theme: ChartTheme) => ({
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down-icon lucide-chevron-down"><path d="m6 9 6 6 6-6"/></svg>
                 </div>
             </div>
+            <RecommendationBanner class="section-rec" :recommendation="focusRec" />
             <div class="section-body">
-                <FocusOverall :calibration="state.calibration" :flags="state.flags" :focus="focus" />
+                <FocusOverall :calibration="state.calibration" :flags="state.flags" :focus="focus" :answer-changes="state.answerChanges" />
             </div>
         </div>
     </div>
@@ -172,6 +238,10 @@ const subjectSplitOption = (theme: ChartTheme) => ({
     // the chart host fills its container, and this grid cell is large, so
     // an unconstrained pie rendered several hundred pixels across and dwarfed
     // the header text beside it. Bound it.
+    // the section banners sit between each section's header and its grid,
+    // so they introduce the charts without taking a row from them.
+    .section-rec { margin: 0 0 0.75rem; }
+
     .pie-container {
         min-height: 180px;
         max-height: 240px;
@@ -279,6 +349,8 @@ const subjectSplitOption = (theme: ChartTheme) => ({
             font-size: 15px;
         }
     }
+    // the section banners sit between each section's header and its grid,
+    // so they introduce the charts without taking a row from them.
     .pie-container {
         height: 100%;
         aspect-ratio: 1/1;

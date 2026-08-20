@@ -227,3 +227,42 @@ export async function fetchScatterPoints(
       : r.question_metrics?.confidence ?? null,
   }));
 }
+
+// ==========================================================================
+// answer-change quality. The metric docs/roadmap.md B6 called the highest
+// value unbuilt one - `attempt_events` has recorded every option transition
+// since it existed, and nothing read it.
+// ==========================================================================
+
+export interface AnswerChangeSummary {
+  changes: number;
+  wrongToRight: number;
+  rightToWrong: number;
+  wrongToWrong: number;
+  /** wrongToRight - rightToWrong. Marks that changing your mind won or cost. */
+  netMarks: number;
+}
+
+export async function fetchAnswerChanges(
+  supabase: Db,
+  userId: string,
+): Promise<AnswerChangeSummary | null> {
+  const rows = await unwrap<{
+    changes: number; wrong_to_right: number; right_to_wrong: number;
+    wrong_to_wrong: number; net_marks: number;
+  }>(
+    'fetchAnswerChanges',
+    supabase.from('v_answer_change_summary').select('*').eq('user_id', userId),
+  );
+  const row = rows[0];
+  // Null rather than a row of zeros: a user who has never changed an answer has
+  // no data here, which is a different statement from "changed 0 answers".
+  if (!row || row.changes === 0) return null;
+  return {
+    changes: row.changes,
+    wrongToRight: row.wrong_to_right,
+    rightToWrong: row.right_to_wrong,
+    wrongToWrong: row.wrong_to_wrong,
+    netMarks: row.net_marks,
+  };
+}

@@ -21,8 +21,9 @@ export {
   fetchCalibrationCurve,
   fetchScatterPoints,
   summariseFlags,
+  fetchAnswerChanges,
 } from './focus';
-export type { CalibrationPoint, FocusTotals, ScatterPoint } from './focus';
+export type { CalibrationPoint, FocusTotals, ScatterPoint, AnswerChangeSummary } from './focus';
 
 export { fetchSubjectStats, fetchTopicMastery } from './subjects';
 export { fetchActiveGoals } from './goals';

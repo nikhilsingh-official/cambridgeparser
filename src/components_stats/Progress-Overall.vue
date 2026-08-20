@@ -170,6 +170,8 @@ const weakestSubject = computed(() => {
   return ranked[0] ?? null;
 });
 
+// the section's reading, from the same numbers the charts draw.
+
 /** Accuracy of the newest five papers minus the oldest five, in points. */
 const trend = computed(() => {
   const withAccuracy = chronological.value.filter(a => a.accuracy != null);
@@ -221,6 +223,7 @@ const trend = computed(() => {
 </template>
 
 <style lang="scss" scoped>
+
     // the containers below keep their original grid placement and skin.
     // These rules only add the internal layout the charts need - a title row
     // and a chart that fills the rest - because a chart in a box with no

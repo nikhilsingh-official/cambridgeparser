@@ -21,6 +21,7 @@ import {
   fetchSubjectStats,
   fetchQuestionFlags,
   fetchCalibrationCurve,
+  fetchAnswerChanges,
   fetchFilterOptions,
   computeStreaks,
   summariseFlags,
@@ -28,6 +29,7 @@ import {
   type FilterOptions,
   type CalibrationPoint,
   type FocusTotals,
+  type AnswerChangeSummary,
 } from '@/lib/supabase/queries';
 import type {
   AttemptSummaryView, DailyActivityView, HourOfDayView,
@@ -41,11 +43,13 @@ export interface StatsState {
   subjects: SubjectStatsView[];
   flags: QuestionFlagsView[];
   calibration: CalibrationPoint[];
+  answerChanges: AnswerChangeSummary | null;
   options: FilterOptions | null;
 }
 
 const EMPTY: StatsState = {
-  attempts: [], daily: [], hours: [], subjects: [], flags: [], calibration: [], options: null,
+  attempts: [], daily: [], hours: [], subjects: [], flags: [], calibration: [],
+  answerChanges: null, options: null,
 };
 
 export function useStats() {
@@ -71,7 +75,7 @@ export function useStats() {
     try {
       // Parallel, not sequential: seven independent reads chained with await
       // would take seven round trips for no reason.
-      const [attempts, daily, hours, subjects, flags, calibration, options] = await Promise.all([
+      const [attempts, daily, hours, subjects, flags, calibration, answerChanges, options] = await Promise.all([
         fetchAttemptSummaries(supabase, userId, filter),
         // Not every view carries the full filter. v_daily_activity is keyed
         // on date only, and v_subject_stats / v_hour_of_day / the calibration
@@ -84,12 +88,13 @@ export function useStats() {
         fetchSubjectStats(supabase, userId),
         fetchQuestionFlags(supabase, userId, filter),
         fetchCalibrationCurve(supabase, userId),
+        fetchAnswerChanges(supabase, userId),
         // Filter options describe what COULD be selected, so they are read
         // unfiltered - otherwise selecting Chemistry removes every other
         // subject from the dropdown and the filter becomes a one-way door.
         fetchFilterOptions(supabase, userId),
       ]);
-      Object.assign(state, { attempts, daily, hours, subjects, flags, calibration, options });
+      Object.assign(state, { attempts, daily, hours, subjects, flags, calibration, answerChanges, options });
     } catch (e) {
       error.value = e instanceof Error ? e.message : String(e);
       Object.assign(state, EMPTY);

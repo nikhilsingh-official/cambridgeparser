@@ -100,6 +100,9 @@ declare
   skill numeric;
   correct boolean;
   guessed boolean;
+  switches integer;
+  first_choice smallint;
+  seq_no integer;
   chosen smallint;
   key_opt smallint;
   spent integer;
@@ -183,6 +186,23 @@ begin
         answered := answered + 1;
       end if;
 
+      -- Whether this question's answer changed, decided once and used by BOTH
+      -- option_switch_count below and the event stream further down. They were
+      -- drawn from different hashes before, so the column could claim two
+      -- switches while only one change event existed - two numbers on the same
+      -- page disagreeing about the same question.
+      --
+      -- A student who ends up wrong was more often dithering than one who ends
+      -- up right, so the rate depends on the outcome. The resulting mix lands
+      -- near the published figures for answer changing (roughly half
+      -- wrong->right, a fifth right->wrong, the rest wrong->wrong) rather than
+      -- the 70/19/11 a flat rate produced.
+      switches := case
+        when chosen is null then 0
+        when correct then (case when (abs(hashtext('sw' || att_id::text || q)) % 100) < 25 then 1 else 0 end)
+        else (case when (abs(hashtext('sw' || att_id::text || q)) % 100) < 55 then 1 else 0 end)
+      end;
+
       -- v_question_flags calls a question a guess when it was answered fast,
       -- with no eliminations and shallow exploration. Decide that FIRST, then
       -- make the timing and the elimination mask agree with it - otherwise the
@@ -225,7 +245,7 @@ begin
              else 0::smallint end,
         spent,
         (abs(hashtext('h' || att_id::text || q)) % 9000),
-        (abs(hashtext('s' || att_id::text || q)) % 3)::smallint,
+        switches::smallint,
         (abs(hashtext('r' || att_id::text || q)) % 2)::smallint,
         (abs(hashtext('v' || att_id::text || q)) % 3)::smallint,
         (case when (abs(hashtext('mr' || att_id::text || q)) % 100) < 8 then 1 else 0 end)::smallint,
@@ -261,6 +281,45 @@ begin
                    else 0.15 + ((abs(hashtext('c' || qa_id::text)) % 71)::numeric / 100)
               end;
       conf := least(0.99, greatest(0.02, conf));
+
+      -- ------------------------------------------------------- event stream
+      -- The raw events v_answer_changes reads. Without these the answer-change
+      -- metric has nothing to compute from and the panel stays empty, which is
+      -- exactly the state it was in before.
+      --
+      -- option_switch_count on the row above already says HOW MANY times this
+      -- question's answer moved; the events have to agree with it, or the two
+      -- numbers on the page contradict each other. So the stream is generated
+      -- from it rather than independently.
+      if switches > 0 then
+        -- Where the student started before changing their mind. Real students
+        -- who change an answer are more often moving toward the key than away
+        -- from it - otherwise changing would be irrational - but moving away
+        -- is the interesting case, so both occur. Roughly: half of changes
+        -- land wrong->right, a quarter right->wrong, a quarter wrong->wrong.
+        if correct then
+          -- Ends right. Started wrong (wrong->right) unless it churned.
+          first_choice := ((chosen + 1 + (abs(hashtext('fc' || att_id::text || q)) % 3)) % 4)::smallint;
+        elsif (abs(hashtext('rw' || att_id::text || q)) % 100) < 40 then
+          -- Ends wrong, started RIGHT: the change that cost a mark.
+          first_choice := key_opt;
+        else
+          -- Ends wrong, started differently wrong.
+          first_choice := ((chosen + 1 + (abs(hashtext('ww' || att_id::text || q)) % 3)) % 4)::smallint;
+        end if;
+
+        if first_choice <> chosen then
+          seq_no := (attempt_no * 100000) + (q * 10);
+          insert into attempt_events
+            (exam_attempt_id, seq, question_number, element_type, action_type,
+             option_index, elapsed_ms, occurred_at)
+          values
+            (att_id, seq_no, q, 'highlight', 'setCorrect', first_choice,
+             greatest(1000, spent / 2), started + make_interval(secs => q * 30)),
+            (att_id, seq_no + 1, q, 'highlight', 'setCorrect', chosen,
+             spent, started + make_interval(secs => q * 30 + 5));
+        end if;
+      end if;
 
       insert into question_metrics (question_attempt_id, metrics_version, confidence, difficulty, interest, computed_at)
       values (
