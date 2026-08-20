@@ -188,8 +188,27 @@ Expect to fix DDL errors. Check in this order:
 
 ### B2. RLS — the production gate
 
-**Asymmetric, which is worse than absent.** Measured against the live local
-database on 2026-08-20:
+**Done 2026-08-20** — `00000000000003_solver_rls.sql`. All 14 public tables now
+have RLS on; `tests/test_solver_rls.sql` proves isolation rather than asserting
+it (owner sees 47 attempts / 1880 question rows / 1880 metrics, a second
+authenticated user sees **0** through every table and every view, cannot insert
+a row owned by someone else, cannot attach an event to someone else's attempt,
+can still read the 196 subjects, and cannot rewrite the answer key).
+
+Three things worth knowing about how it was written: policies use
+`(select auth.uid())` rather than a bare call, so it is an InitPlan evaluated
+once per statement instead of once per row — on `attempt_events` that is 1 call
+instead of 1250. The derived tables (`question_attempts`, `attempt_events`,
+`question_metrics`) have no `user_id` and reach ownership by EXISTS through
+their parent attempt, rather than denormalising a column that could drift. And
+the grants were narrowed to match the policies: `paper_answers` was UPDATE-able
+by any authenticated client, which meant one user could rewrite the key and
+change everybody's marks.
+
+Still open here: `paper_answers` remains *readable* by any signed-in user
+because the client marks the paper. No policy can fix that — it is B4.
+
+The state this replaced, for the record:
 
 | Tables | `relrowsecurity` | Policies |
 |---|---|---|
