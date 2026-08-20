@@ -45,13 +45,15 @@ defineProps<{
 
 .micro-label {
   font-family: var(--font-body);
-  font-size: 0.7rem;
-  letter-spacing: 0.04em;
+  font-size: 0.68rem;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
   color: var(--muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* was nowrap + ellipsis, which rendered "CURRENT STREAK" as "CURRENT S…"
+     in a tile roughly 110px wide. The tiles are ~180px TALL, so the space to
+     spend is vertical: wrap to a second line rather than truncate. A truncated
+     label is a label you have to guess at. */
+  line-height: 1.25;
 }
 
 .micro-value {
@@ -69,11 +71,9 @@ defineProps<{
 
 .micro-hint {
   font-family: var(--font-body);
-  font-size: 0.68rem;
+  font-size: 0.66rem;
   color: var(--muted);
   opacity: 0.8;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.3;
 }
 </style>

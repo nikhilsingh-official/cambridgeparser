@@ -18,7 +18,7 @@ import { computed } from 'vue';
 import EChart from './EChart.vue';
 import MicroStat from './MicroStat.vue';
 import { baseAxis, baseTooltip, type ChartTheme } from '@/lib/charts/echarts';
-import { pct, count, shortDate } from '@/lib/stats/format';
+import { pct, count, shortDate, subjectLabel } from '@/lib/stats/format';
 import type { AttemptSummaryView, SubjectStatsView } from '@/lib/types/database';
 
 const props = defineProps<{
@@ -52,7 +52,7 @@ const accuracyOption = (theme: ChartTheme) => {
   // about days that contain no measurement at all. On a time axis each series
   // carries only its own points and the gaps stay gaps.
   const series = subjectOrder.value.map((s, i) => ({
-    name: s.subject_name ?? s.subject_code,
+    name: subjectLabel(s, props.subjects),
     type: 'line',
     smooth: false,
     showSymbol: true,
@@ -206,7 +206,7 @@ const trend = computed(() => {
         <MicroStat label="Questions" :value="count(totals.questions)" hint="answered" />
     </div>
     <div class="quickview-container quickview-container-4">
-        <MicroStat label="Marks" :value="totals.marksTotal ? `${totals.marksAwarded}/${totals.marksTotal}` : null" hint="earned of available" />
+        <MicroStat label="Marks" :value="totals.marksTotal ? `${totals.marksAwarded}/${totals.marksTotal}` : null" hint="earned / available" />
     </div>
     <div class="quickview-container quickview-container-3">
         <MicroStat
@@ -215,10 +215,10 @@ const trend = computed(() => {
           hint="latest vs earliest" />
     </div>
     <div class="quickview-container quickview-container-1">
-        <MicroStat label="Strongest" :value="bestSubject?.subject_name ?? null" :hint="pct(bestSubject?.accuracy) ?? 'no data'" />
+        <MicroStat label="Strongest" :value="bestSubject ? subjectLabel(bestSubject, subjects) : null" :hint="pct(bestSubject?.accuracy) ?? 'no data'" />
     </div>
     <div class="quickview-container quickview-container-2">
-        <MicroStat label="Weakest" :value="weakestSubject?.subject_name ?? null" :hint="pct(weakestSubject?.accuracy) ?? 'no data'" />
+        <MicroStat label="Weakest" :value="weakestSubject ? subjectLabel(weakestSubject, subjects) : null" :hint="pct(weakestSubject?.accuracy) ?? 'no data'" />
     </div>
 </template>
 

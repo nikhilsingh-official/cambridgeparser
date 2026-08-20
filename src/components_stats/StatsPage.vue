@@ -9,7 +9,7 @@ import RecommendationBanner from './RecommendationBanner.vue';
 import { computed } from 'vue';
 import { useStats } from '@/lib/stats/useStats';
 import { baseTooltip, type ChartTheme } from '@/lib/charts/echarts';
-import { pct } from '@/lib/stats/format';
+import { pct, subjectLabel } from '@/lib/stats/format';
 import {
   progressRecommendation, engagementRecommendation, focusRecommendation,
 } from '@/lib/stats/recommendations';
@@ -24,12 +24,27 @@ const { filter, state, loading, error, hasData, totals, streaks, focus } = useSt
 // attempts behind it is a dead end, and offering it makes the filter feel
 // broken.
 const yearOptions = computed(() => state.options?.examYears ?? []);
-const seriesOptions = computed(() => state.options?.series ?? []);
-const subjectOptions = computed(() =>
-  (state.options?.subjectCodes ?? []).map(code => ({
-    value: code,
-    label: state.options?.subjectNames.get(code) ?? code,
+
+// the series filter listed the raw stored codes - "s" and "w" - which is
+// what the database holds and not what anyone calls them.
+const SERIES_LABEL: Record<string, string> = {
+  s: 'Summer (May/June)', w: 'Winter (Oct/Nov)', m: 'March',
+};
+const seriesOptions = computed(() =>
+  (state.options?.series ?? []).map(code => ({
+    value: code, label: SERIES_LABEL[code] ?? code,
   })));
+
+// disambiguated for the same reason as everywhere else - the list showed
+// "Computer Science" twice, and picking one of them was a coin flip.
+const subjectOptions = computed(() => {
+  const codes = state.options?.subjectCodes ?? [];
+  const named = codes.map(code => ({
+    subject_code: code,
+    subject_name: state.options?.subjectNames.get(code) ?? code,
+  }));
+  return named.map(s => ({ value: s.subject_code, label: subjectLabel(s, named) }));
+});
 
 // Multiselect binds v-model directly; writing through computed setters keeps
 // `filter` the single source of truth rather than mirroring state into refs
@@ -78,7 +93,9 @@ const daysSinceLast = computed(() => {
 
 const asSubject = (s: (typeof rankedSubjects)['value'][number] | undefined) =>
   s && s.accuracy != null
-    ? { name: s.subject_name ?? s.subject_code, accuracy: s.accuracy }
+    // disambiguated - 0478 and 9618 are both "Computer Science", and the
+    // banner previously named the same subject as both strongest and weakest.
+    ? { name: subjectLabel(s, state.subjects), accuracy: s.accuracy }
     : null;
 
 const progressRec = computed(() => progressRecommendation({
@@ -139,7 +156,7 @@ const subjectSplitOption = (theme: ChartTheme) => ({
       .sort((a, b) => (b.marks_awarded ?? 0) - (a.marks_awarded ?? 0))
       .slice(0, 6)
       .map((s, i) => ({
-        name: s.subject_name ?? s.subject_code,
+        name: subjectLabel(s, state.subjects),
         value: s.marks_awarded ?? 0,
         itemStyle: { color: theme.series[i] },
       })),
@@ -243,8 +260,11 @@ const subjectSplitOption = (theme: ChartTheme) => ({
     .section-rec { margin: 0 0 0.75rem; }
 
     .pie-container {
-        min-height: 180px;
-        max-height: 240px;
+        /* the legend sits to the right of the donut, so the box has to be
+           wide enough for both. At 240px the legend was drawn over the chart. */
+        min-width: 420px;
+        min-height: 200px;
+        max-height: 260px;
         align-self: center;
     }
 
@@ -312,21 +332,44 @@ const subjectSplitOption = (theme: ChartTheme) => ({
 
 .grid-container {
     width: 100%;
-    height: 400%;
     padding-left: 5vw;
     display: grid;
     grid-template-columns: repeat(20, 1fr);
-    grid-template-rows: repeat(40, 1fr);
+    /* was `height: 400%` with `repeat(40, 1fr)`. 1fr divides whatever height
+       the container happens to have, and 400% resolved to 8860px - so every row
+       became 221px regardless of what sat in it, the page ran to 8860px, and the
+       header alone was 1551px tall for a title and three dropdowns.
+       An explicit row height makes the grid additive: 40 rows of 90px is a
+       2,880px page, and every span below keeps the proportions it was drawn
+       with. */
+    /* the first ten rows are fixed - they hold the marquee, a gap and the
+       header, all of which have a known size. The three sections that follow
+       are `auto`, because their height is a function of their content and
+       pinning them to ten 90px rows each made the Focus section overflow its
+       box and draw on top of Engagement's calendar. A section that needs
+       1,050px now gets 1,050px. */
+    grid-template-rows: repeat(10, 90px) auto auto auto;
     background-color: $background;
+    /* Nothing here should ever scroll the page sideways. */
+    overflow-x: hidden;
 }
 .top-card-strip-container {
     grid-column: 1/21;
-    grid-row: 1/2;
+    /* one 90px row clipped the cards, which are ~200px tall - they were cut
+       off top and bottom. Two rows fits a card. */
+    grid-row: 1/3;
+    /* the marquee inside is deliberately wider than this box. Without this
+       it escaped and gave the whole page 5,500px of horizontal scroll. */
+    overflow: hidden;
 }
 .header-container {
     grid-column: 1/21;
-    grid-row: 3/10;
+    /* six rows rather than seven. The block holds a title, one line of
+       subtitle, three filters and a 260px donut; the extra row was empty space
+       between the card strip and the heading. */
+    grid-row: 4/10;
     display: flex;
+    align-items: center;
     .text-container {
         display: flex;
         flex-direction: column;
@@ -361,15 +404,15 @@ const subjectSplitOption = (theme: ChartTheme) => ({
 }
 .focus-container {
     grid-column: 1/21;
-    grid-row: 31/41;
+    grid-row: 13/14;
 }
 .engagement-container {
     grid-column: 1/21;
-    grid-row: 21/31;
+    grid-row: 12/13;
 }
 .progress-container {
     grid-column: 1/21;
-    grid-row: 11/21;
+    grid-row: 11/12;
 }
 .section-container {
     display: flex;
@@ -405,10 +448,14 @@ const subjectSplitOption = (theme: ChartTheme) => ({
     }
     .section-body {
         width: 100%;
-        height: 100%;
         display: grid;
         grid-template-columns: repeat(20, 1fr);
-        grid-template-rows: repeat(20, 1fr);
+        /* was `height: 100%` + `repeat(20, 1fr)`, which divided whatever
+           height the section had been given. With the section now sized by its
+           content that would collapse to nothing, so the row is explicit: 20
+           rows of 46px is the ~920px these grids were drawn against. Sections
+           whose body is not a grid (Focus uses flex) simply ignore it. */
+        grid-template-rows: repeat(20, 46px);
         padding: 1rem;
         gap: 1rem;
     }

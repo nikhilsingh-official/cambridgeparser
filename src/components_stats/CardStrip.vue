@@ -72,6 +72,9 @@ const cards = computed<Card[]>(() => {
 
 <template>
   <div class="card-strip">
+    <!-- rendered twice so the -50% keyframe lands on the start of the
+         second copy and the loop is seamless. aria-hidden on the duplicate so
+         a screen reader hears each statistic once. -->
     <StatsCard
       v-for="card in cards"
       :key="card.category"
@@ -79,24 +82,50 @@ const cards = computed<Card[]>(() => {
       :text="card.text"
       :metric-data="card.metricData"
     />
+    <StatsCard
+      v-for="card in cards"
+      :key="`dup-${card.category}`"
+      :category="card.category"
+      :text="card.text"
+      :metric-data="card.metricData"
+      aria-hidden="true"
+    />
   </div>
 </template>
 
 <style lang="scss" scoped>
+/* the marquee is the original design and is kept. Two things about it were
+   broken once the strip stopped being a fixed 30-card test array.
+
+   `width: 500%` was a stand-in for "wider than the container". With 11 real
+   cards it resolved to 7182px against a 1436px container, and because nothing
+   clipped it the whole PAGE gained 5,500px of horizontal scroll. Width is now
+   max-content - as wide as the cards actually are - and the container clips it
+   (see .top-card-strip-container).
+
+   `translateX(-50%)` only loops seamlessly if the content is exactly two
+   copies of itself; against 500% it jumped. The template now renders the list
+   twice, so -50% lands precisely on the start of the second copy. */
 .card-strip {
-    width: 500%;
+    width: max-content;
     height: 100%;
     display: flex;
     column-gap: 10px;
     background-color: $background;
-    animation: infinite-side-scroll 100s linear infinite;
+    animation: infinite-side-scroll 90s linear infinite;
 }
+
+/* a marquee that cannot be stopped is a problem for anyone reading the
+   numbers on it. */
+.card-strip:hover { animation-play-state: paused; }
+
+@media (prefers-reduced-motion: reduce) {
+    .card-strip { animation: none; }
+}
+
 @keyframes infinite-side-scroll {
-    0% {
-        transform: translateX(0%);
-    }
-    100% {
-        transform: translateX(-50%);
-    }
+    0%   { transform: translateX(0); }
+    /* Half the doubled content plus half the gap that separates the two copies. */
+    100% { transform: translateX(calc(-50% - 5px)); }
 }
 </style>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // an unused placeholder filter (options1/selected1) was removed - it was
 // bound to nothing and failed the type check that now gates the build.
-import '@vueform/multiselect/themes/default.css'
+// moved to main.ts - see the note there.
 import { ref } from 'vue'
 import BlurredBackground from "./BlurredBackground.vue";
 import Multiselect from '@vueform/multiselect'

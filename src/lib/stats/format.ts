@@ -31,3 +31,25 @@ export function shortDate(iso: string): string {
   const d = new Date(`${iso}T00:00:00`);
   return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 }
+
+/**
+ * A subject's display name, disambiguated by code only when it needs to be.
+ *
+ * Cambridge reuses names across qualifications: 0478 (IGCSE) and 9618 (A Level)
+ * are both "Computer Science". The stats page showed one as the strongest
+ * subject and the other as the weakest, which read as a bug in the page rather
+ * than two different courses. Appending the code unconditionally would clutter
+ * the common case, so it is appended only where the name is ambiguous within
+ * the data actually on screen.
+ */
+export function subjectLabel(
+  subject: { subject_code: string; subject_name?: string | null },
+  all: { subject_code: string; subject_name?: string | null }[],
+): string {
+  const name = subject.subject_name ?? subject.subject_code;
+  const sharesName = all.some(
+    other => other.subject_code !== subject.subject_code
+      && (other.subject_name ?? other.subject_code) === name,
+  );
+  return sharesName ? `${name} ${subject.subject_code}` : name;
+}

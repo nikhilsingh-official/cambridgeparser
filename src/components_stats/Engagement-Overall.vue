@@ -21,7 +21,7 @@ import { computed } from 'vue';
 import EChart from './EChart.vue';
 import MicroStat from './MicroStat.vue';
 import { baseAxis, baseTooltip, type ChartTheme } from '@/lib/charts/echarts';
-import { duration, shortDate, pct } from '@/lib/stats/format';
+import { duration, shortDate, pct, subjectLabel } from '@/lib/stats/format';
 import type { AttemptSummaryView, DailyActivityView, HourOfDayView } from '@/lib/types/database';
 
 const props = defineProps<{
@@ -165,7 +165,7 @@ const peakHour = computed(() => {
                 <tbody>
                     <tr v-for="s in sessions" :key="s.id">
                         <td>{{ shortDate(s.local_date) }}</td>
-                        <td>{{ s.subject_name ?? s.subject_code }}</td>
+                        <td>{{ subjectLabel(s, attempts) }}</td>
                         <td class="num">{{ pct(s.accuracy) ?? '—' }}</td>
                     </tr>
                 </tbody>
@@ -180,7 +180,7 @@ const peakHour = computed(() => {
         <MicroStat label="Longest streak" :value="streaks.longest ? `${streaks.longest}d` : '0d'" hint="personal best" />
     </div>
     <div class="quickview-container quickview-container-3">
-        <MicroStat label="Total time" :value="duration(totals.timeMs)" hint="across all papers" />
+        <MicroStat label="Total time" :value="duration(totals.timeMs)" hint="all papers" />
     </div>
     <div class="quickview-container quickview-container-4">
         <MicroStat label="Peak hour" :value="peakHour" :hint="totals.avgPaperMs ? `${duration(totals.avgPaperMs)} avg paper` : 'when you revise'" />

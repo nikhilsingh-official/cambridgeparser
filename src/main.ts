@@ -13,6 +13,12 @@ import "@/styles/themes.scss";
 import "@fontsource/ibm-plex-mono/latin-400.css";
 import "@fontsource/ibm-plex-mono/latin-600.css";
 import "@/styles/ide.css";
+// @vueform/multiselect's stylesheet was imported inside Header.vue - a
+// component on a LAZY route. So the stats page's filters were styled only if
+// you happened to visit the Paper Browser first, and rendered as bare bulleted
+// lists otherwise. Third-party CSS that several routes depend on has to load
+// with the app, not with whichever chunk happens to arrive first.
+import "@vueform/multiselect/themes/default.css";
 import { initializeTheme } from "@/lib/theme";
 
 // before createApp so the first painted frame is already themed.
