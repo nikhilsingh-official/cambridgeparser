@@ -54,15 +54,24 @@ Database are gone: `services/supabase.js` replaces `services/firebase.js`,
 `auth.js` keeps its exported names but calls `supabase.auth`, and the RTDB
 subtree at `users/$uid/` became two tables.
 
-| Was | Is |
-|---|---|
-| Firebase Auth | Supabase Auth, PKCE flow (implicit-flow tokens land in the fragment, which collides with hash routing) |
-| RTDB `users/$uid/profile` | `ide_profiles` |
-| RTDB `users/$uid/progress/$recordId` | `ide_progress`, with the best-score / never-un-solve rule moved from a client `runTransaction` into `record_ide_attempt()` |
-| RTDB `users/$uid/stats` | `v_ide_stats`, a view — counters that cannot drift from the rows they count |
-| RTDB `gradingQuotas/$uid` + rule expressions | `grading_quotas` + `consume_grading_quota()`, `security definer`, no client-writable policy |
-| Firebase ID token verified via `accounts:lookup` | Supabase access token resolved via `/auth/v1/user` |
-| `firebase.json`, `database.rules.json`, `.firebaserc` | deleted |
+| Was | Is | Client wired? |
+|---|---|---|
+| Firebase Auth | Supabase Auth, PKCE flow (implicit-flow tokens land in the fragment, which collides with hash routing) | **yes** |
+| RTDB `users/$uid/profile` | `ide_profiles` | **no — nothing writes it** |
+| RTDB `users/$uid/progress/$recordId` | `ide_progress`, with the best-score / never-un-solve rule moved from a client `runTransaction` into `record_ide_attempt()` | **no — `record_ide_attempt` has zero callers** |
+| RTDB `users/$uid/stats` | `v_ide_stats`, a view — counters that cannot drift from the rows they count | **no — reads an empty table, always 0 rows** |
+| RTDB `gradingQuotas/$uid` + rule expressions | `grading_quotas` + `consume_grading_quota()`, `security definer`, no client-writable policy | **yes** — `api/_quota.py` |
+| Firebase ID token verified via `accounts:lookup` | Supabase access token resolved via `/auth/v1/user` | **yes** — `lib/ide/grading.js` |
+| `firebase.json`, `database.rules.json`, `.firebaserc` | deleted | — |
+
+**Correction (2026-08-20).** An earlier version of this table read as though the
+whole migration was done in code. It is not. The *schema* landed and the auth
+and quota paths are live, but **the IDE persists nothing**: `IdeView.vue` saves
+the editor buffer to `localStorage` and stops. `grep -rn record_ide_attempt src/`
+returns nothing. So `ide_profiles` and `ide_progress` are empty tables with
+policies on them, and everything downstream of them — `v_ide_stats`, A4, any
+cross-app stat — is blocked on a writer that was never built, not on the
+schema.
 
 Two properties were deliberately preserved. Vercel still holds **no admin
 credential** — the anon key and the caller's own token are the whole credential
@@ -155,13 +164,14 @@ drift the first time either changes.
 Detail for every item here is in `apps/solver/docs/future_work.md`; this is the
 current status and the ordering.
 
-### B1. The schema has never been executed — **blocks everything below it**
+### B1. The schema — **done, executed, verified**
 
-`supabase/migrations/00000000000000_solver_schema.sql` is 25 kB of DDL that has
-never run against a database. Neither has the IDE's
-`00000000000001_ide_schema.sql` (A1). No `psql` or `supabase` CLI was available
-while either was written, so every table, view, trigger, generated column and
-function in both is unverified.
+~~25 kB of DDL that has never run against a database.~~ Both migrations, plus
+`00000000000002_answer_changes.sql`, now apply cleanly to a local stack and are
+exercised by the seed and by the stats page. The three generated-column
+assumptions held; the `paper_id` CHECK regex holds for the whole catalogue. The
+defects running it found are listed under A1. What follows is kept for the
+method, not because it is outstanding.
 
 ```bash
 npm run supabase:start
@@ -178,7 +188,17 @@ Expect to fix DDL errors. Check in this order:
 
 ### B2. RLS — the production gate
 
-Deliberately absent: local emulators only, so far. Supabase default-denies, so
+**Asymmetric, which is worse than absent.** Measured against the live local
+database on 2026-08-20:
+
+| Tables | `relrowsecurity` | Policies |
+|---|---|---|
+| `ide_profiles`, `ide_progress`, `grading_quotas` | **on** | 3 / 3 / 1 |
+| `exam_attempts`, `question_attempts`, `attempt_events`, `question_metrics`, `goals`, `profiles`, `paper_answer_keys`, `paper_answers`, `subjects`, `topics`, `metrics_versions` | **off** | none |
+
+So the half of the app that stores nothing is locked down, and the half holding
+every student's attempt history is open to any authenticated caller. Deliberate —
+local emulators only, so far. Supabase default-denies, so
 **nothing works in production without it**. Policies are already drafted in
 `apps/solver/docs/database_design.md` §3.5.
 
@@ -254,6 +274,26 @@ function should be deleted.
 This is the last step to unforgeable scores and a **hard prerequisite for any
 shared, class, or leaderboard view**. Decide it before the schema hardens: it
 changes the `fetch-pdf` contract.
+
+### B0. The Dashboard is entirely fake — **the biggest remaining mock**
+
+Not previously tracked, and it should have been: `/dashboard` is where every
+sign-in lands. It performs **zero reads**. There is no `supabase` import, no
+`useStats`, no fetch of any kind in `src/components_dashboard/`.
+
+| Tile | Shows | Source |
+|---|---|---|
+| streak | `10 days`, `longest: 21 days` | literal, `QuickView.vue` |
+| papers | `352` | literal |
+| time | `12h 17m` | literal |
+| accuracy | `157/170` | literal |
+| StatsPrev panels | `16`, `12`, `5`, `3` | literal |
+
+Every number is already computed and verified on the stats page — `useStats()`
+returns totals, streaks and subject stats, and `computeStreaks()` exists. This is
+a wiring job, not a data job. (`StatsPrev.vue` also spells it `Acccuracy`.)
+
+`QuickView.vue` has no `<script>` block at all.
 
 ### B5. Unbuilt UI work
 
