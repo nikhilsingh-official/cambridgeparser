@@ -368,7 +368,7 @@ that looks broken on day one is worse than one with fewer charts.
 | Calibration curve | ~200 answered questions | **10 deciles is far too many** — `v_calibration_curve` uses `width_bucket(…, 10)`, so at 40 questions most buckets hold ≤4 and the curve is pure noise. Drop to 4–5 buckets until n is large, and always render bucket counts so the reader can see the thinness |
 | Calendar heatmap | any | fine when empty — an empty year still reads correctly |
 | Boxplots | 5 attempts per subject | fall back to a dot strip |
-| Topic mastery | `topicMap.ts` populated | hide the section entirely; do not show an empty radar |
+| Topic mastery | the paper is tagged in `question_topics` | hide the section entirely; do not show an empty radar |
 | Sankey | ~20 answer changes | hide |
 
 Give every chart an explicit empty state naming what to do — *"Sit two more
@@ -390,7 +390,7 @@ papers to see a trend"* — not a blank card.
 6. **Focus section.** Calibration curve + scatter. Do these *after* enough real
    attempts exist to tune the thresholds in §6 against actual data.
 7. **§5 event charts.** Sankey, pacing, elimination precision.
-8. **Topic mastery.** Blocked on `topicMap.ts` content.
+8. **Topic mastery.** Data is in (`question_topics`); nothing renders it yet.
 
 ---
 

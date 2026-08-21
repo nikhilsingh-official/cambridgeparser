@@ -273,7 +273,7 @@ Infrastructure exists for all of these; none has a consumer.
 | **Answer-change quality** | **not built** | the highest-value unbuilt metric. Now possible: `attempt_events` records every transition type (`setCorrect`, `elimToCorrect`, `correctToElim`, …) with the option index, so right→wrong vs wrong→right is derivable. `optionSwitchCount` only ever counted switches, never whether they helped. |
 | Elimination precision | not built | `eliminated_mask` × `correct_option` — how often a ruled-out option really was wrong, and how often the *correct* answer was eliminated |
 | Pacing / fatigue | not built | `attempt_events` gives true answering order, which `question_number` cannot |
-| Topic mastery | `v_topic_mastery` + `topics` + `paper_answers.topic_id` exist | **content** — fill in `src/constants/topicMap.ts`, then call `seedTopics()` and `applyPaperTopics()` |
+| Topic mastery | **done** — `v_topic_mastery` reads the `question_topics` link table, seeded by `npm run topics:build` | UI: nothing renders it yet (`fetchTopicMastery()` has no caller) |
 | Exam readiness / predicted grade | not built | grade-threshold table per subject; thin layer over accuracy + topic mastery |
 
 **On the three thresholds:** the guess and confidence cut-offs are placeholders

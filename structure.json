@@ -1,0 +1,3132 @@
+{
+    "IGCSE": {
+        "Additional_Mathematics(0606)-11": [
+            {
+                "name": "SETS (Excluded)",
+                "id": "1"
+            },
+            {
+                "name": "INTERSECTION POINTS",
+                "id": "2"
+            },
+            {
+                "name": "SURDS,INDICES,LOG",
+                "id": "3"
+            },
+            {
+                "name": "FACTOR THEOREM",
+                "id": "4"
+            },
+            {
+                "name": "MATRICES (Excluded)",
+                "id": "5"
+            },
+            {
+                "name": "COORDINATE GEOMETRY",
+                "id": "6"
+            },
+            {
+                "name": "LINEAR LAW",
+                "id": "7"
+            },
+            {
+                "name": "FUNCTIONS, MODOLUS",
+                "id": "8"
+            },
+            {
+                "name": "TRIGONOMETRY",
+                "id": "9"
+            },
+            {
+                "name": "CIRCULAR MEASURE",
+                "id": "10"
+            },
+            {
+                "name": "PERMUTATION AND  COMBINATION",
+                "id": "11"
+            },
+            {
+                "name": "BINOMIAL THEOREM",
+                "id": "12"
+            },
+            {
+                "name": "DIFFERENTIATION",
+                "id": "13"
+            },
+            {
+                "name": "INTEGRATION",
+                "id": "14"
+            },
+            {
+                "name": "KINEMATICS",
+                "id": "15"
+            },
+            {
+                "name": "VECTORS",
+                "id": "16"
+            },
+            {
+                "name": "RELATIVE VELOCITY",
+                "id": "17"
+            },
+            {
+                "name": "SEQUENCES AND SERIES",
+                "id": "622"
+            }
+        ],
+        "Biology_9-1(0970)-247": [
+            {
+                "name": "Characteristics and Classification of Living Organisms",
+                "id": "2929"
+            },
+            {
+                "name": "Organisation of the Organism",
+                "id": "2930"
+            },
+            {
+                "name": "Movement In and Out of Cells",
+                "id": "2931"
+            },
+            {
+                "name": "4_Biological Molecules",
+                "id": "2932"
+            },
+            {
+                "name": "Enzymes",
+                "id": "2933"
+            },
+            {
+                "name": "Plant Nutrition",
+                "id": "2934"
+            },
+            {
+                "name": "Human Nutrition",
+                "id": "2935"
+            },
+            {
+                "name": "Transport in Plants and Animals",
+                "id": "2936"
+            },
+            {
+                "name": "Diseases and Immunity",
+                "id": "2937"
+            },
+            {
+                "name": "Gas Exchange and Respiration",
+                "id": "2938"
+            },
+            {
+                "name": "Excretion in Humans",
+                "id": "2939"
+            },
+            {
+                "name": "Coordination and Response",
+                "id": "2940"
+            },
+            {
+                "name": "Reproduction",
+                "id": "2941"
+            },
+            {
+                "name": "Inheritance",
+                "id": "2942"
+            },
+            {
+                "name": "Variation and Selection",
+                "id": "2943"
+            },
+            {
+                "name": "Organisms and Their Environment",
+                "id": "2944"
+            },
+            {
+                "name": "Biotechnology and Genetic Engineering",
+                "id": "2945"
+            },
+            {
+                "name": "Human Influences on Ecosystems",
+                "id": "2946"
+            }
+        ],
+        "Biology(0610)-13": [
+            {
+                "name": "CHARACTERISTICS AND CLASSIFICATION OF LIVING ORGANISMS",
+                "id": "33"
+            },
+            {
+                "name": "ORGANIZATION AND MAINTENANCE OF THE ORGANISM",
+                "id": "34"
+            },
+            {
+                "name": "MOVEMENT IN AND OUT OF CELLS",
+                "id": "35"
+            },
+            {
+                "name": "BIOLOGICAL MOLECULES",
+                "id": "36"
+            },
+            {
+                "name": "ENZYMES",
+                "id": "37"
+            },
+            {
+                "name": "PLANT NUTRITION",
+                "id": "38"
+            },
+            {
+                "name": "HUMAN NUTRITION",
+                "id": "39"
+            },
+            {
+                "name": "TRANSPORT IN PLANTS",
+                "id": "40"
+            },
+            {
+                "name": "TRANSPORT IN ANIMALS",
+                "id": "41"
+            },
+            {
+                "name": "DISEASES AND IMMUNITY",
+                "id": "42"
+            },
+            {
+                "name": "GAS EXCHANGE IN HUMANS",
+                "id": "43"
+            },
+            {
+                "name": "RESPIRATION",
+                "id": "44"
+            },
+            {
+                "name": "EXCRETION IN HUMANS",
+                "id": "45"
+            },
+            {
+                "name": "CO-ORDINATION AND RESPONSE",
+                "id": "46"
+            },
+            {
+                "name": "DRUGS",
+                "id": "47"
+            },
+            {
+                "name": "REPRODUCTION",
+                "id": "48"
+            },
+            {
+                "name": "INHERITANCE",
+                "id": "49"
+            },
+            {
+                "name": "VARIATION AND SELECTION",
+                "id": "50"
+            },
+            {
+                "name": "ORGANISMS AND THEIR ENVIRONMENT",
+                "id": "51"
+            },
+            {
+                "name": "BIOTECHNOLOGY AND GENETIC ENGINEERING",
+                "id": "52"
+            },
+            {
+                "name": "HUMAN INFLUENCES ON ECOSYSTEMS",
+                "id": "53"
+            }
+        ],
+        "Chemistry_9-1(0971)-249": [
+            {
+                "name": "The Particulate Nature of Matter",
+                "id": "2947"
+            },
+            {
+                "name": "Experimental Techniques",
+                "id": "2948"
+            },
+            {
+                "name": "Atoms, Elements, and Compounds",
+                "id": "2949"
+            },
+            {
+                "name": "Stoichiometry",
+                "id": "2950"
+            },
+            {
+                "name": "Electricity and Chemistry",
+                "id": "2951"
+            },
+            {
+                "name": "Chemical Energetics",
+                "id": "2952"
+            },
+            {
+                "name": "Chemical Reactions",
+                "id": "2953"
+            },
+            {
+                "name": "Acids, Bases, and Salts",
+                "id": "2954"
+            },
+            {
+                "name": "The Periodic Table",
+                "id": "2955"
+            },
+            {
+                "name": "Metals",
+                "id": "2956"
+            },
+            {
+                "name": "Air and Water",
+                "id": "2957"
+            },
+            {
+                "name": "Sulfur",
+                "id": "2958"
+            },
+            {
+                "name": "Carbonates",
+                "id": "2959"
+            },
+            {
+                "name": "Organic Chemistry",
+                "id": "2960"
+            }
+        ],
+        "Chemistry(0620)-16": [
+            {
+                "name": "STATES OF MATTER",
+                "id": "65"
+            },
+            {
+                "name": "SEPARATING SUBSTANCES",
+                "id": "66"
+            },
+            {
+                "name": "ATOMS AND ELEMENTS",
+                "id": "67"
+            },
+            {
+                "name": "ATOMS COMBINING",
+                "id": "68"
+            },
+            {
+                "name": "REACTING MASSES AND CHEMICAL EQUATIONS",
+                "id": "69"
+            },
+            {
+                "name": "USING MOLES",
+                "id": "70"
+            },
+            {
+                "name": "REDOX REACTIONS",
+                "id": "71"
+            },
+            {
+                "name": "ELECTRICITY AND  CHEMICAL CHANGES",
+                "id": "72"
+            },
+            {
+                "name": "ENERGY CHANGES AND REVERSIBLE REACTIONS",
+                "id": "73"
+            },
+            {
+                "name": "THE SPEED OF A REACTION",
+                "id": "74"
+            },
+            {
+                "name": "ACIDS AND BASES",
+                "id": "75"
+            },
+            {
+                "name": "THE PERIODIC TABLE",
+                "id": "76"
+            },
+            {
+                "name": "THE BEHAVIOR OF METALS ",
+                "id": "77"
+            },
+            {
+                "name": "MAKING USE OF METALS ",
+                "id": "78"
+            },
+            {
+                "name": "AIR AND WATER",
+                "id": "79"
+            },
+            {
+                "name": "SOME NON-METALS AND THEIR COMPOUNDS",
+                "id": "80"
+            },
+            {
+                "name": "ORGANIC CHEMISTRY",
+                "id": "81"
+            },
+            {
+                "name": "POLYMERS",
+                "id": "82"
+            },
+            {
+                "name": "IN THE LAB  (CHEMICAL TEST& SALT ANALYSIS)",
+                "id": "83"
+            }
+        ],
+        "Computer_Science_9-1(0984)-250": [
+            {
+                "name": "Data Representation",
+                "id": "2961"
+            },
+            {
+                "name": "Communication and Internet Technologies",
+                "id": "2962"
+            },
+            {
+                "name": "Hardware and Software",
+                "id": "2963"
+            },
+            {
+                "name": "Security",
+                "id": "2964"
+            },
+            {
+                "name": "Ethics",
+                "id": "2967"
+            },
+            {
+                "name": "Algorithm Design and Problem-solving",
+                "id": "2965"
+            },
+            {
+                "name": "Programming",
+                "id": "2966"
+            },
+            {
+                "name": "Databases",
+                "id": "2968"
+            }
+        ],
+        "Computer_Science(0478)-128": [
+            {
+                "name": "Data Representation",
+                "id": "704"
+            },
+            {
+                "name": "Communication and Internet Technologies",
+                "id": "1710"
+            },
+            {
+                "name": "Hardware and Software",
+                "id": "1711"
+            },
+            {
+                "name": "Security",
+                "id": "1712"
+            },
+            {
+                "name": "Ethics",
+                "id": "1713"
+            },
+            {
+                "name": "Algorithm design and problem-solving",
+                "id": "2859"
+            },
+            {
+                "name": "Programming",
+                "id": "2860"
+            },
+            {
+                "name": "Databases",
+                "id": "2861"
+            },
+            {
+                "name": "Boolean logic",
+                "id": "2862"
+            }
+        ],
+        "Economics_9-1(0987)-252": [
+            {
+                "name": "Basic Economic Problem",
+                "id": "2909"
+            },
+            {
+                "name": "Allocation of Resources",
+                "id": "2910"
+            },
+            {
+                "name": "Microeconomic Decision Makers",
+                "id": "2911"
+            },
+            {
+                "name": "Government and the Macroeconomy",
+                "id": "2912"
+            },
+            {
+                "name": "Economic Development",
+                "id": "2913"
+            },
+            {
+                "name": "International Trade and Globalisation",
+                "id": "2914"
+            }
+        ],
+        "Economics(0455)-17": [
+            {
+                "name": "Basic economic problem: choice and the allocation of resources",
+                "id": "489"
+            },
+            {
+                "name": "The allocation of resources: how the market works; market failure",
+                "id": "544"
+            },
+            {
+                "name": "The individual as producer, consumer and borrower",
+                "id": "545"
+            },
+            {
+                "name": "The private firm as producer and employer",
+                "id": "546"
+            },
+            {
+                "name": "Role of government in economy",
+                "id": "547"
+            },
+            {
+                "name": "Economic indicators",
+                "id": "548"
+            },
+            {
+                "name": "Developed and developing economies: trends in production, population and living standards",
+                "id": "549"
+            },
+            {
+                "name": "International aspects",
+                "id": "550"
+            }
+        ],
+        "English_1st_Language(0500)-18": [
+            {
+                "name": "Write a Letter - P2",
+                "id": "535"
+            },
+            {
+                "name": "Write an Article - P2",
+                "id": "536"
+            },
+            {
+                "name": "Write the Entry in Your Journal - P2",
+                "id": "537"
+            },
+            {
+                "name": "Write What You Say - P2",
+                "id": "538"
+            },
+            {
+                "name": "Write Newspaper Report - P2",
+                "id": "539"
+            },
+            {
+                "name": "Write Your Diary Entry - P2",
+                "id": "540"
+            },
+            {
+                "name": "Write a Report - P2",
+                "id": "541"
+            },
+            {
+                "name": "Writer's Effect - P2",
+                "id": "542"
+            },
+            {
+                "name": "Summary - P2",
+                "id": "543"
+            },
+            {
+                "name": "Directed Writing - Magazine Article - P3",
+                "id": "530"
+            },
+            {
+                "name": "Directed Writing - Letter - P3",
+                "id": "531"
+            },
+            {
+                "name": "Composition - Argumentative/Discursive Writing - P3",
+                "id": "532"
+            },
+            {
+                "name": "Composition - Descriptive Writing - P3",
+                "id": "533"
+            },
+            {
+                "name": "Composition - Narrative Writing - P3",
+                "id": "534"
+            }
+        ],
+        "English_2nd_Language(0510)-19": [
+            {
+                "name": "READING",
+                "id": "235"
+            },
+            {
+                "name": "SUMMARY",
+                "id": "236"
+            },
+            {
+                "name": "LETTER - EMAIL",
+                "id": "237"
+            },
+            {
+                "name": "ARTICLE",
+                "id": "238"
+            }
+        ],
+        "History(0470)-24": [
+            {
+                "name": "Core Content",
+                "id": "713"
+            },
+            {
+                "name": "The First World War, 1914–18",
+                "id": "714"
+            },
+            {
+                "name": "Germany, 1918–45",
+                "id": "715"
+            },
+            {
+                "name": "Russia, 1905–41",
+                "id": "716"
+            },
+            {
+                "name": "The United States, 1919–41",
+                "id": "717"
+            },
+            {
+                "name": "China, c.1930–c.1990",
+                "id": "718"
+            },
+            {
+                "name": "South Africa, c.1940–c.1994",
+                "id": "719"
+            },
+            {
+                "name": "Israelis and Palestinians since 1945",
+                "id": "720"
+            },
+            {
+                "name": "The Second World War in Europe and the Asia–Pacific, 1939–c.1945",
+                "id": "2844"
+            }
+        ],
+        "ICT(0417)-23": [
+            {
+                "name": "Types and components of computer systems",
+                "id": "559"
+            },
+            {
+                "name": "Input and output devices",
+                "id": "560"
+            },
+            {
+                "name": "Storage devices and media",
+                "id": "561"
+            },
+            {
+                "name": "Networks and the effects of using them",
+                "id": "562"
+            },
+            {
+                "name": "The effects of using IT",
+                "id": "563"
+            },
+            {
+                "name": "ICT applications",
+                "id": "564"
+            },
+            {
+                "name": "The systems life cycle",
+                "id": "565"
+            },
+            {
+                "name": "Safety and security",
+                "id": "566"
+            },
+            {
+                "name": "Audience",
+                "id": "567"
+            },
+            {
+                "name": "Communication",
+                "id": "568"
+            },
+            {
+                "name": "File management",
+                "id": "569"
+            },
+            {
+                "name": "Images",
+                "id": "570"
+            },
+            {
+                "name": "Layout",
+                "id": "571"
+            },
+            {
+                "name": "Styles",
+                "id": "572"
+            },
+            {
+                "name": "Proofing",
+                "id": "573"
+            },
+            {
+                "name": "Graphs and charts",
+                "id": "574"
+            },
+            {
+                "name": "Document production",
+                "id": "575"
+            },
+            {
+                "name": "Data manipulation",
+                "id": "576"
+            },
+            {
+                "name": "Presentations",
+                "id": "577"
+            },
+            {
+                "name": "Data analysis",
+                "id": "578"
+            },
+            {
+                "name": "Website authoring",
+                "id": "579"
+            }
+        ],
+        "Mathematics_9-1(0980)-262": [
+            {
+                "name": "Number",
+                "id": "2915"
+            },
+            {
+                "name": "Algebra and Graphs",
+                "id": "2916"
+            },
+            {
+                "name": "Coordinate Geometry",
+                "id": "2917"
+            },
+            {
+                "name": "Geometry",
+                "id": "2918"
+            },
+            {
+                "name": "Mensuration",
+                "id": "2919"
+            },
+            {
+                "name": "Trigonometry",
+                "id": "2920"
+            },
+            {
+                "name": "Vectors and Transformations",
+                "id": "2921"
+            },
+            {
+                "name": "Probability",
+                "id": "2922"
+            },
+            {
+                "name": "Statistics",
+                "id": "2923"
+            }
+        ],
+        "Mathematics_International(0607)-136": [
+            {
+                "name": "Number",
+                "id": "698"
+            },
+            {
+                "name": "Algebra",
+                "id": "697"
+            },
+            {
+                "name": "Functions",
+                "id": "696"
+            },
+            {
+                "name": "Coordinate geometry",
+                "id": "695"
+            },
+            {
+                "name": "Geometry",
+                "id": "694"
+            },
+            {
+                "name": "Vectors and transformations",
+                "id": "693"
+            },
+            {
+                "name": "Mensuration",
+                "id": "721"
+            },
+            {
+                "name": "Trigonometry",
+                "id": "722"
+            },
+            {
+                "name": "Sets",
+                "id": "723"
+            },
+            {
+                "name": "Probability",
+                "id": "724"
+            },
+            {
+                "name": "Statistics",
+                "id": "725"
+            }
+        ],
+        "Mathematics(0580)-22": [
+            {
+                "name": "DECIMALS",
+                "id": "23"
+            },
+            {
+                "name": "NUMBER FACTS",
+                "id": "24"
+            },
+            {
+                "name": "RATIONAL AND IRRATIONAL NUMBERS",
+                "id": "25"
+            },
+            {
+                "name": "APPROXIMATION AND ESTIMATION",
+                "id": "26"
+            },
+            {
+                "name": "UPPER AND LOWER BOUND",
+                "id": "27"
+            },
+            {
+                "name": "STANDARD FORM",
+                "id": "28"
+            },
+            {
+                "name": "RATIO AND PROPORTION",
+                "id": "29"
+            },
+            {
+                "name": "FOREIGN EXCHANGE",
+                "id": "30"
+            },
+            {
+                "name": "MAP SCALES",
+                "id": "31"
+            },
+            {
+                "name": "PERCENTAGES",
+                "id": "32"
+            },
+            {
+                "name": "SIMPLE AND COMPOUND INTEREST ",
+                "id": "18"
+            },
+            {
+                "name": "SPEED,DISTANCE AND TIME",
+                "id": "19"
+            },
+            {
+                "name": "FORMULAEE",
+                "id": "22"
+            },
+            {
+                "name": "BRACKETS AND SYMPLIFYING",
+                "id": "84"
+            },
+            {
+                "name": "LINEAR EQUAETION",
+                "id": "85"
+            },
+            {
+                "name": "SIMULTANEOUS EQUATIONS",
+                "id": "86"
+            },
+            {
+                "name": "FACTORISING",
+                "id": "87"
+            },
+            {
+                "name": "QUADRATIC EQUATIONS",
+                "id": "88"
+            },
+            {
+                "name": "CHANGING THE SUBJECT",
+                "id": "89"
+            },
+            {
+                "name": "VARIATION",
+                "id": "90"
+            },
+            {
+                "name": "INDICES",
+                "id": "91"
+            },
+            {
+                "name": "SOLVING INEQUALITIES",
+                "id": "92"
+            },
+            {
+                "name": "MENSURATION",
+                "id": "93"
+            },
+            {
+                "name": "POLYGONS",
+                "id": "94"
+            },
+            {
+                "name": "PARALLEL LINES",
+                "id": "95"
+            },
+            {
+                "name": "PYTHAGORAS THEOREM",
+                "id": "96"
+            },
+            {
+                "name": "SYMMETRY",
+                "id": "97"
+            },
+            {
+                "name": "SIMILARITY",
+                "id": "98"
+            },
+            {
+                "name": "CONGRUENCE",
+                "id": "99"
+            },
+            {
+                "name": "AREAS & VOLUMES OF SIMILAR SHAPES",
+                "id": "100"
+            },
+            {
+                "name": "CIRCLE THEOREM",
+                "id": "101"
+            },
+            {
+                "name": "CONSTRUCTIONS AND LOCI",
+                "id": "102"
+            },
+            {
+                "name": "TRIGONOMETRY",
+                "id": "103"
+            },
+            {
+                "name": "LINES",
+                "id": "104"
+            },
+            {
+                "name": "PLOTTING CURVES",
+                "id": "105"
+            },
+            {
+                "name": "GRAPHICAL SOLUTION OF EQUATIONS",
+                "id": "106"
+            },
+            {
+                "name": "DISTANCE-TIME GRAPHS",
+                "id": "107"
+            },
+            {
+                "name": "SPEED-TIME GRAPHS",
+                "id": "108"
+            },
+            {
+                "name": "SETS",
+                "id": "109"
+            },
+            {
+                "name": "VECTORS",
+                "id": "110"
+            },
+            {
+                "name": "MATRICES",
+                "id": "111"
+            },
+            {
+                "name": "TRANSFORMATOIN",
+                "id": "112"
+            },
+            {
+                "name": "STATISTICS",
+                "id": "113"
+            },
+            {
+                "name": "PROBABILITY",
+                "id": "114"
+            },
+            {
+                "name": "FUNCTIONS",
+                "id": "115"
+            },
+            {
+                "name": "LINEAR PROGRAMMING",
+                "id": "116"
+            },
+            {
+                "name": "SEQUENCES",
+                "id": "117"
+            },
+            {
+                "name": "ANGLES",
+                "id": "118"
+            },
+            {
+                "name": "NET ",
+                "id": "119"
+            },
+            {
+                "name": "DIFFERENIATION",
+                "id": "623"
+            }
+        ],
+        "Physics_9-1(0972)-265": [
+            {
+                "name": "General Physics",
+                "id": "2924"
+            },
+            {
+                "name": "Thermal Physics",
+                "id": "2925"
+            },
+            {
+                "name": "Properties of Waves, Including Light and Sound",
+                "id": "2926"
+            },
+            {
+                "name": "Electricity and Magnetism",
+                "id": "2927"
+            },
+            {
+                "name": "Atomic Physics",
+                "id": "2928"
+            }
+        ],
+        "Physics(0625)-29": [
+            {
+                "name": "MEASUREMENTS AND UNITS",
+                "id": "54"
+            },
+            {
+                "name": "FORCES AND MOTION",
+                "id": "55"
+            },
+            {
+                "name": "FORCES AND PRESSURE",
+                "id": "56"
+            },
+            {
+                "name": "FORCES AND ENERGY",
+                "id": "57"
+            },
+            {
+                "name": "THERMAL EFFECTS",
+                "id": "58"
+            },
+            {
+                "name": "WAVES AND SOUNDS",
+                "id": "59"
+            },
+            {
+                "name": "RAYS AND WAVES",
+                "id": "60"
+            },
+            {
+                "name": "ELECTRICITY",
+                "id": "61"
+            },
+            {
+                "name": "MAGNETS AND CURRENTS",
+                "id": "62"
+            },
+            {
+                "name": "ELECTRON AND ELECTRONICS",
+                "id": "63"
+            },
+            {
+                "name": "ATOMS AND RADIOACTIVITY",
+                "id": "64"
+            },
+            {
+                "name": "SPACE PHYSICS",
+                "id": "2815"
+            }
+        ],
+        "Religious_Studies(0490)-279": [
+            {
+                "name": "Christianity",
+                "id": "726"
+            },
+            {
+                "name": "Islam",
+                "id": "727"
+            },
+            {
+                "name": "Judaism",
+                "id": "728"
+            }
+        ],
+        "Science_Combined(0653)-25": [
+            {
+                "name": "B1. Characteristics of living organisms",
+                "id": "444"
+            },
+            {
+                "name": "B2. Cells",
+                "id": "445"
+            },
+            {
+                "name": "B3. Biological molecules",
+                "id": "630"
+            },
+            {
+                "name": "B4. Enzymes",
+                "id": "631"
+            },
+            {
+                "name": "B5. Plant nutrition",
+                "id": "632"
+            },
+            {
+                "name": "B6. Animal nutrition",
+                "id": "633"
+            },
+            {
+                "name": "B7. Transport",
+                "id": "634"
+            },
+            {
+                "name": "B8. Gas exchange and respiration",
+                "id": "635"
+            },
+            {
+                "name": "B9. Coordination and response",
+                "id": "636"
+            },
+            {
+                "name": "B10. Reproduction",
+                "id": "637"
+            },
+            {
+                "name": "B11. Organisms and their environment",
+                "id": "638"
+            },
+            {
+                "name": "B12. Human influences on ecosystems",
+                "id": "639"
+            },
+            {
+                "name": "C1. The particulate nature of matter",
+                "id": "640"
+            },
+            {
+                "name": "C2. Experimental techniques",
+                "id": "641"
+            },
+            {
+                "name": "C3. Atoms, elements and compounds",
+                "id": "642"
+            },
+            {
+                "name": "C4. Stoichiometry",
+                "id": "643"
+            },
+            {
+                "name": "C5. Electricity and chemistry",
+                "id": "644"
+            },
+            {
+                "name": "C6. Energy changes in chemical reactions",
+                "id": "645"
+            },
+            {
+                "name": "C7. Chemical reactions",
+                "id": "646"
+            },
+            {
+                "name": "C8. Acids, bases and salts",
+                "id": "647"
+            },
+            {
+                "name": "C9. The Periodic Table",
+                "id": "648"
+            },
+            {
+                "name": "C10. Metals",
+                "id": "649"
+            },
+            {
+                "name": "C11. Air and water",
+                "id": "650"
+            },
+            {
+                "name": "C12. Organic chemistry",
+                "id": "651"
+            },
+            {
+                "name": "P1. Motion",
+                "id": "652"
+            },
+            {
+                "name": "P2. Work, energy and power",
+                "id": "653"
+            },
+            {
+                "name": "P3. Thermal Physics",
+                "id": "654"
+            },
+            {
+                "name": "P4. Properties of waves, including light and sound",
+                "id": "655"
+            },
+            {
+                "name": "P5. Electrical quantities",
+                "id": "656"
+            },
+            {
+                "name": "P6. Electric circuits",
+                "id": "657"
+            },
+            {
+                "name": "P7. Space Physics",
+                "id": "3101"
+            }
+        ],
+        "Science_Coordinate(0654)-26": [
+            {
+                "name": "B1. Characteristics of living organisms",
+                "id": "658"
+            },
+            {
+                "name": "B2. Cells",
+                "id": "659"
+            },
+            {
+                "name": "B3. Biological molecules",
+                "id": "660"
+            },
+            {
+                "name": "B4. Enzymes",
+                "id": "661"
+            },
+            {
+                "name": "B5. Plant nutrition",
+                "id": "662"
+            },
+            {
+                "name": "B6. Animal nutrition",
+                "id": "663"
+            },
+            {
+                "name": "B7. Transport",
+                "id": "664"
+            },
+            {
+                "name": "B8. Gas exchange and respiration",
+                "id": "665"
+            },
+            {
+                "name": "B9. Coordination and response",
+                "id": "666"
+            },
+            {
+                "name": "B10. Reproduction",
+                "id": "667"
+            },
+            {
+                "name": "B11. Inheritance",
+                "id": "668"
+            },
+            {
+                "name": "B12. Organisms and their environment",
+                "id": "669"
+            },
+            {
+                "name": "B13. Human influences on ecosystems",
+                "id": "670"
+            },
+            {
+                "name": "C1. The particulate nature of matter",
+                "id": "671"
+            },
+            {
+                "name": "C2. Experimental techniques",
+                "id": "672"
+            },
+            {
+                "name": "C3. Atoms, elements and compounds",
+                "id": "673"
+            },
+            {
+                "name": "C4. Stoichiometry",
+                "id": "674"
+            },
+            {
+                "name": "C5. Electricity and chemistry",
+                "id": "675"
+            },
+            {
+                "name": "C6. Energy changes in chemical reactions",
+                "id": "676"
+            },
+            {
+                "name": "C7. Chemical reactions",
+                "id": "677"
+            },
+            {
+                "name": "C8. Acids, bases and salts",
+                "id": "678"
+            },
+            {
+                "name": "C9. The Periodic Table",
+                "id": "679"
+            },
+            {
+                "name": "C10. Metals",
+                "id": "680"
+            },
+            {
+                "name": "C11. Air and water",
+                "id": "681"
+            },
+            {
+                "name": "C12. Sulfur",
+                "id": "682"
+            },
+            {
+                "name": "C13. Carbonates",
+                "id": "683"
+            },
+            {
+                "name": "C14. Organic chemistry",
+                "id": "684"
+            },
+            {
+                "name": "P1. Motion",
+                "id": "685"
+            },
+            {
+                "name": "P2. Work, energy and power",
+                "id": "686"
+            },
+            {
+                "name": "P3. Thermal physics",
+                "id": "687"
+            },
+            {
+                "name": "P4.. Properties of waves, including light and sound",
+                "id": "688"
+            },
+            {
+                "name": "P5. Electricity and magnetism",
+                "id": "689"
+            },
+            {
+                "name": "P6. Electric circuits",
+                "id": "690"
+            },
+            {
+                "name": "P7. Electromagnetic effects",
+                "id": "691"
+            },
+            {
+                "name": "P8. Atomic physics",
+                "id": "692"
+            },
+            {
+                "name": "P9. Space physics",
+                "id": "3100"
+            }
+        ],
+        "Sciences_Co-ordinated_9-1(0973)-266": [
+            {
+                "name": "B1 - Characteristics and classification of living organisms",
+                "id": "2969"
+            },
+            {
+                "name": "B2 - Organisation of the organism",
+                "id": "2970"
+            },
+            {
+                "name": "B3 - Movement in and out of cells",
+                "id": "2971"
+            },
+            {
+                "name": "B4 - Biological molecules",
+                "id": "2972"
+            },
+            {
+                "name": "B5 - Enzymes",
+                "id": "2973"
+            },
+            {
+                "name": "B6 - Plant nutrition",
+                "id": "2974"
+            },
+            {
+                "name": "B7 - Human nutrition",
+                "id": "2975"
+            },
+            {
+                "name": "B8 - Transport in plants and animals",
+                "id": "2976"
+            },
+            {
+                "name": "B9 - Diseases and immunity",
+                "id": "2977"
+            },
+            {
+                "name": "B10 - Gas exchange and respiration",
+                "id": "2978"
+            },
+            {
+                "name": "B11 - Excretion in humans",
+                "id": "2979"
+            },
+            {
+                "name": "B12 - Coordination and response",
+                "id": "2980"
+            },
+            {
+                "name": "B13 - Reproduction",
+                "id": "2981"
+            },
+            {
+                "name": "B14 - Inheritance",
+                "id": "2982"
+            },
+            {
+                "name": "B15 - Variation and selection",
+                "id": "2983"
+            },
+            {
+                "name": "B16 - Organisms and their environment",
+                "id": "2984"
+            },
+            {
+                "name": "B17 - Biotechnology and genetic engineering",
+                "id": "2985"
+            },
+            {
+                "name": "B18 - Human influences on ecosystems",
+                "id": "2986"
+            },
+            {
+                "name": "C1 - States of matter",
+                "id": "2987"
+            },
+            {
+                "name": "C2 - Atoms, elements, and compounds",
+                "id": "2988"
+            },
+            {
+                "name": "C3 - Stoichiometry",
+                "id": "2989"
+            },
+            {
+                "name": "C4 - Electricity and chemistry",
+                "id": "2990"
+            },
+            {
+                "name": "C5 - Chemical energetics",
+                "id": "2991"
+            },
+            {
+                "name": "C6 - Chemical reactions",
+                "id": "2992"
+            },
+            {
+                "name": "C7 - Acids, bases, and salts",
+                "id": "2993"
+            },
+            {
+                "name": "C8 - The Periodic Table",
+                "id": "2994"
+            },
+            {
+                "name": "C9 - Metals",
+                "id": "2995"
+            },
+            {
+                "name": "C10 - Air and water",
+                "id": "2996"
+            },
+            {
+                "name": "C11 - Sulfur",
+                "id": "2997"
+            },
+            {
+                "name": "C12 - Carbonates",
+                "id": "2998"
+            },
+            {
+                "name": "C13 - Organic chemistry",
+                "id": "2999"
+            },
+            {
+                "name": "P1 - Motion",
+                "id": "3000"
+            },
+            {
+                "name": "P2 - Work, energy, and power",
+                "id": "3001"
+            },
+            {
+                "name": "P3 - Thermal physics",
+                "id": "3002"
+            },
+            {
+                "name": "P4 - Properties of waves, including light and sound",
+                "id": "3003"
+            },
+            {
+                "name": "P5 - Electricity and magnetism",
+                "id": "3004"
+            },
+            {
+                "name": "P6 - Electric circuits",
+                "id": "3005"
+            },
+            {
+                "name": "P7 - Electromagnetic effects",
+                "id": "3006"
+            },
+            {
+                "name": "P8 - Radioactivity and particles",
+                "id": "3007"
+            }
+        ],
+        "Sociology(0495)-30": [
+            {
+                "name": "Methodology - Research Methods - Theory and Methods - P1",
+                "id": "551"
+            },
+            {
+                "name": "Culture, Identity and Socialization -P1",
+                "id": "552"
+            },
+            {
+                "name": "Social Stratification and Inequality - P1",
+                "id": "553"
+            },
+            {
+                "name": "Power and Authority - P1",
+                "id": "554"
+            },
+            {
+                "name": "Family - P2",
+                "id": "555"
+            },
+            {
+                "name": "Education - P2",
+                "id": "556"
+            },
+            {
+                "name": "Crime, Deviance and Social Control - P2",
+                "id": "557"
+            },
+            {
+                "name": "Media - P2",
+                "id": "558"
+            }
+        ]
+    },
+    "A-Level": {
+        "Biology(9700)-47": [
+            {
+                "name": "CELL STRUCTURE",
+                "id": "218"
+            },
+            {
+                "name": "BIOLOGICAL MOLECULES",
+                "id": "219"
+            },
+            {
+                "name": "ENZYMES",
+                "id": "427"
+            },
+            {
+                "name": "CELL MEMBRANES AND TRANSPORT",
+                "id": "428"
+            },
+            {
+                "name": "THE MITOTIC CELL CYCLE",
+                "id": "429"
+            },
+            {
+                "name": "NUCLEIC ACIDS AND PROTEIN SYNTHESIS",
+                "id": "430"
+            },
+            {
+                "name": "TRANSPORT IN PLANTS",
+                "id": "431"
+            },
+            {
+                "name": "TRANSPORT IN MAMMALS",
+                "id": "432"
+            },
+            {
+                "name": "GAS EXCHANGE AND SMOKING",
+                "id": "433"
+            },
+            {
+                "name": "INFECTIOUS DISEASE",
+                "id": "434"
+            },
+            {
+                "name": "IMMUNITY",
+                "id": "435"
+            },
+            {
+                "name": "ENERGY AND RESPIRATION",
+                "id": "436"
+            },
+            {
+                "name": "PHOTOSYNTHESIS",
+                "id": "437"
+            },
+            {
+                "name": "HOMEOSTASIS",
+                "id": "438"
+            },
+            {
+                "name": "CONTROL AND CO-ORDINATION",
+                "id": "439"
+            },
+            {
+                "name": "INHERITED CHANGE",
+                "id": "440"
+            },
+            {
+                "name": "SELECTION AND EVOLUTION",
+                "id": "441"
+            },
+            {
+                "name": "BIODIVERSITY, CLASSIFICATION AND CONSERVATION",
+                "id": "442"
+            },
+            {
+                "name": "GENETIC TECHNOLOGY",
+                "id": "443"
+            }
+        ],
+        "Chemistry(9701)-49": [
+            {
+                "name": "ATOMS,MOLECULES & STOICHIOMETRY",
+                "id": "220"
+            },
+            {
+                "name": "ATOMIC STRUCTURE",
+                "id": "221"
+            },
+            {
+                "name": "CHEMICAL BONDING",
+                "id": "320"
+            },
+            {
+                "name": "STATES OF MATTER",
+                "id": "321"
+            },
+            {
+                "name": "CHEMICAL ENERGETICS",
+                "id": "322"
+            },
+            {
+                "name": "ELECTROCHEMISTRY",
+                "id": "323"
+            },
+            {
+                "name": "EQUILIBRIA",
+                "id": "324"
+            },
+            {
+                "name": "REACTION KINETICS",
+                "id": "325"
+            },
+            {
+                "name": "THE PERIODIC TABLE : CHEMICAL PERIODICITY",
+                "id": "326"
+            },
+            {
+                "name": "GROUP 2",
+                "id": "327"
+            },
+            {
+                "name": "GROUP 17",
+                "id": "328"
+            },
+            {
+                "name": "AN INTRODUCTION TO THE CHEMISTRY OF TRANSITION ELEMENTS",
+                "id": "329"
+            },
+            {
+                "name": "NITROGEN & SULFUR",
+                "id": "330"
+            },
+            {
+                "name": "AN INTRODUCTION TO ORGANIC CHEMISTRY",
+                "id": "331"
+            },
+            {
+                "name": "HYDROCARBONS",
+                "id": "332"
+            },
+            {
+                "name": "HALOGEN DERIVATIVES",
+                "id": "333"
+            },
+            {
+                "name": "HYDROXY COMPOUNDS",
+                "id": "334"
+            },
+            {
+                "name": "CARBONYL COMPOUNDS",
+                "id": "335"
+            },
+            {
+                "name": "CARBOXYLIC ACIDS AND DERIVATIVES",
+                "id": "336"
+            },
+            {
+                "name": "NITROGEN COMPOUNDS",
+                "id": "337"
+            },
+            {
+                "name": "POLYMERISATTION",
+                "id": "338"
+            },
+            {
+                "name": "ANALYTICAL TECHNIQUES",
+                "id": "339"
+            },
+            {
+                "name": "ORGANIC SYNTHESIS",
+                "id": "340"
+            }
+        ],
+        "Computer_Science(from_2021)(9618)-642": [
+            {
+                "name": "Information Representation",
+                "id": "1714"
+            },
+            {
+                "name": "Communication",
+                "id": "1715"
+            },
+            {
+                "name": "Hardware",
+                "id": "1716"
+            },
+            {
+                "name": "Processor Fundamentals",
+                "id": "1717"
+            },
+            {
+                "name": "System Software (OS)",
+                "id": "1718"
+            },
+            {
+                "name": "Security, Privacy and Data Integrity",
+                "id": "1719"
+            },
+            {
+                "name": "Ethics and Ownership",
+                "id": "1720"
+            },
+            {
+                "name": "Databases",
+                "id": "1721"
+            },
+            {
+                "name": "Algorithm Design and Problem-Solving",
+                "id": "1722"
+            },
+            {
+                "name": "Data Types and Structures",
+                "id": "1723"
+            },
+            {
+                "name": "Programming",
+                "id": "1724"
+            },
+            {
+                "name": "Software Development",
+                "id": "1725"
+            },
+            {
+                "name": "Data Representation",
+                "id": "1726"
+            },
+            {
+                "name": "Communication and Internet Technologies",
+                "id": "1739"
+            },
+            {
+                "name": "Hardware and Virtual Machines",
+                "id": "1740"
+            },
+            {
+                "name": "System Software (Purposes of an OS)",
+                "id": "1745"
+            },
+            {
+                "name": "Security",
+                "id": "1741"
+            },
+            {
+                "name": "Artificial Intelligence (AI)",
+                "id": "1742"
+            },
+            {
+                "name": "Computational Thinking and Problem Solving",
+                "id": "1743"
+            },
+            {
+                "name": "Further Programming",
+                "id": "1744"
+            }
+        ],
+        "Computer_Science(9608)-149": [
+            {
+                "name": "Information Representation ",
+                "id": "580"
+            },
+            {
+                "name": "Communication and Internet Technologies",
+                "id": "581"
+            },
+            {
+                "name": "Hardware",
+                "id": "582"
+            },
+            {
+                "name": "Processor Fundamentals ",
+                "id": "583"
+            },
+            {
+                "name": "System Software ",
+                "id": "584"
+            },
+            {
+                "name": "Security, Privacy and Data Integrity ",
+                "id": "585"
+            },
+            {
+                "name": "Ethics and Ownership",
+                "id": "586"
+            },
+            {
+                "name": "Database and Data Modeling",
+                "id": "587"
+            },
+            {
+                "name": "Algorithm Design and Problem-Solving",
+                "id": "588"
+            },
+            {
+                "name": "Data Representation",
+                "id": "589"
+            },
+            {
+                "name": "Programming",
+                "id": "590"
+            },
+            {
+                "name": "Software Development",
+                "id": "591"
+            },
+            {
+                "name": "Monitoring and Control Systems",
+                "id": "592"
+            }
+        ],
+        "Economics(9708)-50": [
+            {
+                "name": "Basic Economic Ideas and Resource Allocation",
+                "id": "597"
+            },
+            {
+                "name": "The Price System and the Micro Economy",
+                "id": "598"
+            },
+            {
+                "name": "Government Microeconomic Intervention",
+                "id": "599"
+            },
+            {
+                "name": "The Macro Economy",
+                "id": "600"
+            },
+            {
+                "name": "Government Macro Intervention",
+                "id": "601"
+            },
+            {
+                "name": "International Economic Issues",
+                "id": "2842"
+            }
+        ],
+        "Further_Mathematics(9231)-58": [
+            {
+                "name": "Roots of polynomial equations",
+                "id": "425"
+            },
+            {
+                "name": "Rational functions and graphs",
+                "id": "426"
+            },
+            {
+                "name": "Summation of series",
+                "id": "602"
+            },
+            {
+                "name": "Matrices",
+                "id": "603"
+            },
+            {
+                "name": "Polar coordinates",
+                "id": "604"
+            },
+            {
+                "name": "Vectors",
+                "id": "605"
+            },
+            {
+                "name": "Proof by induction",
+                "id": "606"
+            },
+            {
+                "name": "Hyperbolic functions",
+                "id": "607"
+            },
+            {
+                "name": "Differentiation",
+                "id": "608"
+            },
+            {
+                "name": "Integration",
+                "id": "609"
+            },
+            {
+                "name": "Complex numbers",
+                "id": "610"
+            },
+            {
+                "name": "Differential equations",
+                "id": "611"
+            },
+            {
+                "name": "Momentum and impulse",
+                "id": "612"
+            },
+            {
+                "name": "Circular motion",
+                "id": "613"
+            },
+            {
+                "name": "Equilibrium of a rigid body under coplanar forces",
+                "id": "614"
+            },
+            {
+                "name": "Rotation of a rigid body",
+                "id": "615"
+            },
+            {
+                "name": "Simple harmonic motion",
+                "id": "616"
+            },
+            {
+                "name": "Further work on distributions",
+                "id": "617"
+            },
+            {
+                "name": "Inference using normal and t-distributions",
+                "id": "618"
+            },
+            {
+                "name": "X2 Test",
+                "id": "619"
+            },
+            {
+                "name": "Bivariate data",
+                "id": "620"
+            },
+            {
+                "name": "Projectile motion",
+                "id": "419"
+            },
+            {
+                "name": "Linear motion under variable force",
+                "id": "624"
+            },
+            {
+                "name": "Non parametric test",
+                "id": "625"
+            },
+            {
+                "name": "Continuous random variable",
+                "id": "626"
+            },
+            {
+                "name": "Probability generating function",
+                "id": "627"
+            },
+            {
+                "name": "HOOK'S LAW",
+                "id": "709"
+            },
+            {
+                "name": "Linear motion under a variable force",
+                "id": "3423"
+            }
+        ],
+        "History(9389)-164": [
+            {
+                "name": "Liberalism and Nationalism in Italy and Germany, 1815–1871",
+                "id": "807"
+            },
+            {
+                "name": "The Origins of the Civil War, 1846–1861",
+                "id": "808"
+            },
+            {
+                "name": "The Search for International Peace and Security, 1919–1945",
+                "id": "809"
+            },
+            {
+                "name": "Modern Europe, 1789–1917 ",
+                "id": "810"
+            },
+            {
+                "name": "The History of the USA, 1840–1941",
+                "id": "811"
+            },
+            {
+                "name": "International Relations, 1871–1945",
+                "id": "812"
+            },
+            {
+                "name": "The Causes and Impact of British Imperialism, c.1850–1939 ",
+                "id": "813"
+            },
+            {
+                "name": "The Holocaust",
+                "id": "814"
+            },
+            {
+                "name": "The Origins and Development of the Cold War, 1941–1950",
+                "id": "815"
+            },
+            {
+                "name": "Europe of the Dictators, 1918–1941",
+                "id": "816"
+            },
+            {
+                "name": "The History of the USA, 1945–1990",
+                "id": "817"
+            },
+            {
+                "name": "International History, 1945–1991",
+                "id": "818"
+            },
+            {
+                "name": "African History, 1945–1991",
+                "id": "819"
+            },
+            {
+                "name": "Southeast Asian History, 1945–1990s",
+                "id": "820"
+            }
+        ],
+        "History(9489)-675": [
+            {
+                "name": "Liberalism and Nationalism in Germany, 1815–71",
+                "id": "1727"
+            },
+            {
+                "name": "The Origins of the Civil War, 1820–61",
+                "id": "1728"
+            },
+            {
+                "name": "The League of Nations and International Relations in the 1930s",
+                "id": "1729"
+            },
+            {
+                "name": "The Russian Revolution, 1894–1921",
+                "id": "1730"
+            },
+            {
+                "name": "Civil War and Reconstruction, 1861–77",
+                "id": "1731"
+            },
+            {
+                "name": "China and Japan, 1912–45",
+                "id": "1732"
+            },
+            {
+                "name": "Modern Europe, 1750–1921",
+                "id": "1733"
+            },
+            {
+                "name": "The History of the USA, 1820–1941",
+                "id": "1734"
+            },
+            {
+                "name": "International History, 1870–1945",
+                "id": "1735"
+            },
+            {
+                "name": "The Origins of the First World War",
+                "id": "1736"
+            },
+            {
+                "name": "The Holocaust",
+                "id": "1737"
+            },
+            {
+                "name": "The Origins and Development of the Cold War",
+                "id": "1738"
+            },
+            {
+                "name": "European History in the Interwar Years, 1919–41",
+                "id": "1746"
+            },
+            {
+                "name": "The USA, 1944–92",
+                "id": "1747"
+            },
+            {
+                "name": "International History, 1945–92",
+                "id": "1748"
+            },
+            {
+                "name": "France, 1774–1814",
+                "id": "3424"
+            },
+            {
+                "name": "The Gilded Age and Progressive Era, 1870s to 1920",
+                "id": "3425"
+            },
+            {
+                "name": "Empire and the emergence of world powers, 1870–1919",
+                "id": "3426"
+            },
+            {
+                "name": "The Industrial Revolution in Britain, 1750–1850",
+                "id": "3427"
+            },
+            {
+                "name": "The Great Crash, the Great Depression and the New Deal policies, 1920–41",
+                "id": "3428"
+            },
+            {
+                "name": "The League of Nations and international relations in the 1920s",
+                "id": "3429"
+            }
+        ],
+        "Mathematics_Mechanics(9709)-319": [
+            {
+                "name": "FORCES & EQUILIBRIUM",
+                "id": "710"
+            },
+            {
+                "name": "KINEMATICS OF MOTION IN A STRAIGHT LINE",
+                "id": "711"
+            },
+            {
+                "name": "NEWTON'S LAWS OF MOTION",
+                "id": "701"
+            },
+            {
+                "name": "ENERGY ,WORK & POWER",
+                "id": "702"
+            },
+            {
+                "name": "GENERAL MOTION IN STRAIGHT LINE",
+                "id": "703"
+            },
+            {
+                "name": "MOMENTUM",
+                "id": "825"
+            }
+        ],
+        "Mathematics_Mechanics_1(9709)-55": [
+            {
+                "name": "FORCES & EQUILIBRIUM",
+                "id": "266"
+            },
+            {
+                "name": "KINEMATICS OF MOTION IN A STRAIGHT LINE",
+                "id": "267"
+            },
+            {
+                "name": "NEWTON'S LAWS OF MOTION",
+                "id": "423"
+            },
+            {
+                "name": "ENERGY ,WORK & POWER",
+                "id": "424"
+            },
+            {
+                "name": "GENERAL MOTION IN STRAIGHT LINE",
+                "id": "468"
+            },
+            {
+                "name": "MOMENTUM",
+                "id": "628"
+            }
+        ],
+        "Mathematics_Mechanics_2(9709)-56": [
+            {
+                "name": "Motion Of a Projectile",
+                "id": "268"
+            },
+            {
+                "name": "Moments Of Forces",
+                "id": "269"
+            },
+            {
+                "name": "Centre Of Mass",
+                "id": "525"
+            },
+            {
+                "name": "Uniform Motion in a Circle",
+                "id": "526"
+            },
+            {
+                "name": "Hook's Law",
+                "id": "527"
+            },
+            {
+                "name": "Linear Motion Under a Variable Force",
+                "id": "528"
+            }
+        ],
+        "Mathematics_Probability_&_Statistics_1(9709)-320": [
+            {
+                "name": "REPRESENTATION OF DATA",
+                "id": "826"
+            },
+            {
+                "name": "PERMUTATION & COMBINATION",
+                "id": "827"
+            },
+            {
+                "name": "PROBABILITY",
+                "id": "828"
+            },
+            {
+                "name": "DISCRETE RANDOM VARIABLES ",
+                "id": "829"
+            },
+            {
+                "name": "THE NORMAL DISTRIBUTION",
+                "id": "830"
+            },
+            {
+                "name": "THE BINOMIAL DISTRIBUTION",
+                "id": "831"
+            },
+            {
+                "name": "GEOMETRIC DISTRIBUTION",
+                "id": "832"
+            }
+        ],
+        "Mathematics_Probability_&_Statistics_2(9709)-321": [
+            {
+                "name": "Hypothesis Testing Using Binomial Distribution",
+                "id": "833"
+            },
+            {
+                "name": "Hypothesis Testing Using Normal Distribution",
+                "id": "834"
+            },
+            {
+                "name": "Poisson Distribution",
+                "id": "835"
+            },
+            {
+                "name": "Linear Combination Of Random Variables",
+                "id": "836"
+            },
+            {
+                "name": "Continuous Random Variables",
+                "id": "837"
+            },
+            {
+                "name": "Sampling",
+                "id": "838"
+            }
+        ],
+        "Mathematics_Pure_Math_1(9709)-51": [
+            {
+                "name": "COORDINATES  GEOMETRY",
+                "id": "247"
+            },
+            {
+                "name": "FUNCTIONS",
+                "id": "248"
+            },
+            {
+                "name": "INTERSECTION POINTS",
+                "id": "249"
+            },
+            {
+                "name": "DIFFERENTIATION",
+                "id": "250"
+            },
+            {
+                "name": "SEQUENCES & SERIES",
+                "id": "251"
+            },
+            {
+                "name": "BINOMIAL THEOREM",
+                "id": "252"
+            },
+            {
+                "name": "TRIGONOMETRY",
+                "id": "253"
+            },
+            {
+                "name": "VECTORS",
+                "id": "254"
+            },
+            {
+                "name": "INTEGRATION",
+                "id": "255"
+            },
+            {
+                "name": "RADIANS",
+                "id": "256"
+            }
+        ],
+        "Mathematics_Pure_Math_2,3(9709)-52": [
+            {
+                "name": "ALGEBRA",
+                "id": "257"
+            },
+            {
+                "name": "LOGARITHMIC & EXPONENTIAL FUNCTIONS",
+                "id": "258"
+            },
+            {
+                "name": "TRIGONOMETRY",
+                "id": "259"
+            },
+            {
+                "name": "DIFFERENTIATION",
+                "id": "260"
+            },
+            {
+                "name": "INTEGRATION",
+                "id": "261"
+            },
+            {
+                "name": "DIFFERENTIAL EQUATION",
+                "id": "262"
+            },
+            {
+                "name": "NUMERICAL METHODS",
+                "id": "263"
+            },
+            {
+                "name": "COMPLEX NUMBERS",
+                "id": "264"
+            },
+            {
+                "name": "VECTORS",
+                "id": "265"
+            }
+        ],
+        "Mathematics_Statistics_1(9709)-53": [
+            {
+                "name": "REPRESENTATION OF DATA",
+                "id": "270"
+            },
+            {
+                "name": "PERMUTATION & COMBINATION",
+                "id": "271"
+            },
+            {
+                "name": "PROBABILITY",
+                "id": "420"
+            },
+            {
+                "name": "DISCRETE RANDOM VARIABLES",
+                "id": "421"
+            },
+            {
+                "name": "THE NORMAL DISTRIBUTION",
+                "id": "422"
+            },
+            {
+                "name": "THE BINOMIAL DISTRIBUTION",
+                "id": "469"
+            },
+            {
+                "name": "GEOMETRIC DISTRIBUTION",
+                "id": "629"
+            }
+        ],
+        "Mathematics_Statistics_2(9709)-54": [
+            {
+                "name": "Hypothesis Testing Using Binomial Distribution",
+                "id": "272"
+            },
+            {
+                "name": "Hypothesis Testing Using Normal Distribution",
+                "id": "521"
+            },
+            {
+                "name": "Poisson Distribution",
+                "id": "522"
+            },
+            {
+                "name": "Linear Combination Of Random Variables",
+                "id": "523"
+            },
+            {
+                "name": "Continuous Random Variables",
+                "id": "524"
+            },
+            {
+                "name": "Sampling",
+                "id": "529"
+            }
+        ],
+        "Physical_Education(9396)-174": [
+            {
+                "name": "Applied Anatomy and Physiology",
+                "id": "795"
+            },
+            {
+                "name": "Acquiring, Developing and Performing Movement Skills",
+                "id": "802"
+            },
+            {
+                "name": "Contemporary Studies in Physical Education and Sport",
+                "id": "803"
+            },
+            {
+                "name": "Exercise and Sport Physiology",
+                "id": "804"
+            },
+            {
+                "name": "Psychology of Sport Performance",
+                "id": "805"
+            },
+            {
+                "name": "Olympic Games: A Global Perspective",
+                "id": "806"
+            }
+        ],
+        "Physics(9702)-57": [
+            {
+                "name": "PHYSICAL QUANTITIES & UNITS",
+                "id": "216"
+            },
+            {
+                "name": "MEASUREMENT TECHNIQUES",
+                "id": "217"
+            },
+            {
+                "name": "KINEMATICS",
+                "id": "395"
+            },
+            {
+                "name": "DYNAMICS",
+                "id": "396"
+            },
+            {
+                "name": "FORCES, DENSITY & PRESSURE",
+                "id": "397"
+            },
+            {
+                "name": "WORK, ENERGY & POWER",
+                "id": "398"
+            },
+            {
+                "name": "MOTION IN A CIRCLE",
+                "id": "399"
+            },
+            {
+                "name": "GRAVITATIONAL FIELDS",
+                "id": "400"
+            },
+            {
+                "name": "DEFORMATION OF SOLIDS",
+                "id": "401"
+            },
+            {
+                "name": "IDEAL GASES",
+                "id": "402"
+            },
+            {
+                "name": "TEMPERATURE",
+                "id": "403"
+            },
+            {
+                "name": "THERMAL PROPERTIES OF MATERIALS",
+                "id": "404"
+            },
+            {
+                "name": "OSCILLATIONS",
+                "id": "405"
+            },
+            {
+                "name": "WAVES",
+                "id": "406"
+            },
+            {
+                "name": "SUPERPOSITION",
+                "id": "407"
+            },
+            {
+                "name": "COMMUNICATION",
+                "id": "408"
+            },
+            {
+                "name": "ELECTRIC FIELDS",
+                "id": "409"
+            },
+            {
+                "name": "CAPACITANCE",
+                "id": "410"
+            },
+            {
+                "name": "CURRENT OF ELECTRICITY",
+                "id": "411"
+            },
+            {
+                "name": "D.C. CIRCUITS",
+                "id": "412"
+            },
+            {
+                "name": "ELECTRONICS",
+                "id": "413"
+            },
+            {
+                "name": "MAGNETIC FIELDS",
+                "id": "414"
+            },
+            {
+                "name": "ELECTROMAGNETIC INDUCTION",
+                "id": "415"
+            },
+            {
+                "name": "ALTERNATING CURRENTS",
+                "id": "416"
+            },
+            {
+                "name": "QUANTUM PHYSICS",
+                "id": "417"
+            },
+            {
+                "name": "PARTICLE & NUCLEAR PHYSICS",
+                "id": "418"
+            },
+            {
+                "name": "MEDICAL IMAGING",
+                "id": "708"
+            },
+            {
+                "name": "ASTRONOMY & COSMOLOGY",
+                "id": "1709"
+            }
+        ],
+        "Psychology(from_2018)(9990)-291": [
+            {
+                "name": "Approaches, Issues and Debates",
+                "id": "796"
+            },
+            {
+                "name": "Research Methods",
+                "id": "797"
+            },
+            {
+                "name": "Theory : Psychology and Abnormality",
+                "id": "798"
+            },
+            {
+                "name": "Theory : Psychology and Consumer Behaviour",
+                "id": "799"
+            },
+            {
+                "name": "Theory : Psychology and Health",
+                "id": "800"
+            },
+            {
+                "name": "Theory : Psychology and Organisations",
+                "id": "801"
+            },
+            {
+                "name": "Clinical Psychology",
+                "id": "2845"
+            },
+            {
+                "name": "Consumer Psychology",
+                "id": "2846"
+            },
+            {
+                "name": "Health Psychology",
+                "id": "2847"
+            },
+            {
+                "name": "Organisational Psychology",
+                "id": "2848"
+            }
+        ],
+        "Sociology(9699)-186": [
+            {
+                "name": "The Family",
+                "id": "789"
+            },
+            {
+                "name": "Theory and Methods",
+                "id": "790"
+            },
+            {
+                "name": "Social Inequality and Opportunity : Education",
+                "id": "791"
+            },
+            {
+                "name": "Social Inequality and Opportunity : Global Development",
+                "id": "792"
+            },
+            {
+                "name": "Social Inequality and Opportunity : Media",
+                "id": "793"
+            },
+            {
+                "name": "Social Inequality and Opportunity : Religion",
+                "id": "794"
+            },
+            {
+                "name": "Socialisation, Identity and Methods of Research",
+                "id": "928"
+            },
+            {
+                "name": " Education",
+                "id": "930"
+            },
+            {
+                "name": "Globalisation, Media and Religion",
+                "id": "931"
+            }
+        ]
+    },
+    "O-Level": {
+        "Additional_Mathematics(4037)-187": [
+            {
+                "name": "Functions",
+                "id": "3513"
+            },
+            {
+                "name": "Quadratic functions",
+                "id": "3515"
+            },
+            {
+                "name": "Factors of polynomials",
+                "id": "3516"
+            },
+            {
+                "name": "Equations, inequalities and graphs",
+                "id": "3517"
+            },
+            {
+                "name": "Simultaneous equations",
+                "id": "3519"
+            },
+            {
+                "name": "Logarithmic and exponential functions",
+                "id": "3520"
+            },
+            {
+                "name": "Straight-line graphs",
+                "id": "3521"
+            },
+            {
+                "name": "Coordinate geometry of the circle",
+                "id": "3522"
+            },
+            {
+                "name": "Circular measure",
+                "id": "3523"
+            },
+            {
+                "name": "Trigonometry",
+                "id": "3525"
+            },
+            {
+                "name": "Permutations and combinations",
+                "id": "3526"
+            },
+            {
+                "name": "Series",
+                "id": "3527"
+            },
+            {
+                "name": "Vectors in two dimensions",
+                "id": "3528"
+            },
+            {
+                "name": "Calculus",
+                "id": "3529"
+            }
+        ],
+        "Biology(5090)-193": [
+            {
+                "name": "Cells",
+                "id": "3530"
+            },
+            {
+                "name": "Classification",
+                "id": "3531"
+            },
+            {
+                "name": "Movement into and out of cells",
+                "id": "3532"
+            },
+            {
+                "name": "Biological molecules",
+                "id": "3533"
+            },
+            {
+                "name": "Enzymes",
+                "id": "3534"
+            },
+            {
+                "name": "Plant nutrition",
+                "id": "3535"
+            },
+            {
+                "name": "Transport in flowering plants",
+                "id": "3536"
+            },
+            {
+                "name": "Human nutrition",
+                "id": "3537"
+            },
+            {
+                "name": "Human gas exchange",
+                "id": "3538"
+            },
+            {
+                "name": "Respiration",
+                "id": "3539"
+            },
+            {
+                "name": "Transport in humans",
+                "id": "3540"
+            },
+            {
+                "name": "Disease and immunity",
+                "id": "3541"
+            },
+            {
+                "name": "Excretion",
+                "id": "3542"
+            },
+            {
+                "name": "Coordination and control",
+                "id": "3543"
+            },
+            {
+                "name": "Coordination and response in plants",
+                "id": "3544"
+            },
+            {
+                "name": "Development of organisms and continuity of life",
+                "id": "3545"
+            },
+            {
+                "name": "Inheritance",
+                "id": "3547"
+            },
+            {
+                "name": "Biotechnology and genetic modification",
+                "id": "3548"
+            },
+            {
+                "name": "Relationships of organisms with one another and with the environment",
+                "id": "3549"
+            }
+        ],
+        "Business_Studies(7115)-194": [
+            {
+                "name": "Understanding business activity",
+                "id": "3647"
+            },
+            {
+                "name": "People in business",
+                "id": "3648"
+            },
+            {
+                "name": "Marketing",
+                "id": "3649"
+            },
+            {
+                "name": "Operations management",
+                "id": "3650"
+            },
+            {
+                "name": "Financial information and decisions",
+                "id": "3651"
+            },
+            {
+                "name": "External influences on business activity",
+                "id": "3652"
+            }
+        ],
+        "Chemistry(5070)-201": [
+            {
+                "name": "States of matter",
+                "id": "3550"
+            },
+            {
+                "name": "Atoms, elements and compounds",
+                "id": "3551"
+            },
+            {
+                "name": "Stoichiometry",
+                "id": "3552"
+            },
+            {
+                "name": "Electrochemistry",
+                "id": "3553"
+            },
+            {
+                "name": "Chemical energetics",
+                "id": "3554"
+            },
+            {
+                "name": "Chemical reactions",
+                "id": "3555"
+            },
+            {
+                "name": "Acids, bases and salts",
+                "id": "3556"
+            },
+            {
+                "name": "The Periodic Table",
+                "id": "3557"
+            },
+            {
+                "name": "Metals",
+                "id": "3558"
+            },
+            {
+                "name": "Chemistry of the environment",
+                "id": "3559"
+            },
+            {
+                "name": "Organic chemistry",
+                "id": "3560"
+            },
+            {
+                "name": "Experimental techniques and chemical analysis",
+                "id": "3561"
+            }
+        ],
+        "Combined_Science(5129)-202": [
+            {
+                "name": "Cells",
+                "id": "3588"
+            },
+            {
+                "name": "Enzymes",
+                "id": "3590"
+            },
+            {
+                "name": "Plant nutrition and transport",
+                "id": "3591"
+            },
+            {
+                "name": "Human nutrition",
+                "id": "3593"
+            },
+            {
+                "name": "Human gas exchange",
+                "id": "3595"
+            },
+            {
+                "name": "Respiration",
+                "id": "3596"
+            },
+            {
+                "name": "Transport in humans",
+                "id": "3598"
+            },
+            {
+                "name": "Drugs and their effects",
+                "id": "3599"
+            },
+            {
+                "name": "Coordination and control",
+                "id": "3601"
+            },
+            {
+                "name": "Development of organisms and continuity of life",
+                "id": "3603"
+            },
+            {
+                "name": "Biotechnology and genetic modification",
+                "id": "3605"
+            },
+            {
+                "name": "Relationships of organisms with one another and with the environment",
+                "id": "3607"
+            },
+            {
+                "name": "States of matter",
+                "id": "3609"
+            },
+            {
+                "name": "Atoms, elements and compounds",
+                "id": "3611"
+            },
+            {
+                "name": "Stoichiometry",
+                "id": "3612"
+            },
+            {
+                "name": "Chemical energetics",
+                "id": "3614"
+            },
+            {
+                "name": "Chemical reactions",
+                "id": "3615"
+            },
+            {
+                "name": "Acids, bases and salts",
+                "id": "3617"
+            },
+            {
+                "name": "The Periodic Table",
+                "id": "3618"
+            },
+            {
+                "name": "Metals",
+                "id": "3619"
+            },
+            {
+                "name": "Chemistry of the environment",
+                "id": "3621"
+            },
+            {
+                "name": "Organic chemistry",
+                "id": "3622"
+            },
+            {
+                "name": "Motion, forces and energy",
+                "id": "3624"
+            },
+            {
+                "name": "Thermal physics",
+                "id": "3625"
+            },
+            {
+                "name": "Waves",
+                "id": "3626"
+            },
+            {
+                "name": "Electricity",
+                "id": "3627"
+            },
+            {
+                "name": "Nuclear physics",
+                "id": "3628"
+            }
+        ],
+        "Computer_Science(2210)-205": [
+            {
+                "name": "Data representation",
+                "id": "3653"
+            },
+            {
+                "name": "Data transmission",
+                "id": "3654"
+            },
+            {
+                "name": "Hardware",
+                "id": "3655"
+            },
+            {
+                "name": "Software",
+                "id": "3656"
+            },
+            {
+                "name": "The internet and its uses",
+                "id": "3657"
+            },
+            {
+                "name": "Automated and emerging technologies",
+                "id": "3658"
+            },
+            {
+                "name": "Algorithm design and problem solving",
+                "id": "3661"
+            },
+            {
+                "name": "Programming",
+                "id": "3663"
+            },
+            {
+                "name": "Databases",
+                "id": "3664"
+            },
+            {
+                "name": "Boolean logic",
+                "id": "3666"
+            }
+        ],
+        "Economics(2281)-208": [
+            {
+                "name": "The basic economic problem",
+                "id": "3641"
+            },
+            {
+                "name": "The allocation of resources",
+                "id": "3642"
+            },
+            {
+                "name": "Microeconomic decision makers",
+                "id": "3643"
+            },
+            {
+                "name": "Government and the macroeconomy",
+                "id": "3644"
+            },
+            {
+                "name": "Economic development",
+                "id": "3645"
+            },
+            {
+                "name": "International trade and globalisation",
+                "id": "3646"
+            }
+        ],
+        "Mathematics(Syllabus_D)(4024)-200": [
+            {
+                "name": "Number",
+                "id": "3569"
+            },
+            {
+                "name": "Algebra and graphs",
+                "id": "3570"
+            },
+            {
+                "name": "Coordinate geometry",
+                "id": "3572"
+            },
+            {
+                "name": "Geometry",
+                "id": "3574"
+            },
+            {
+                "name": "Mensuration",
+                "id": "3577"
+            },
+            {
+                "name": "Trigonometry",
+                "id": "3582"
+            },
+            {
+                "name": "Transformations and vectors",
+                "id": "3583"
+            },
+            {
+                "name": "Probability",
+                "id": "3584"
+            },
+            {
+                "name": "Statistics",
+                "id": "3586"
+            }
+        ],
+        "Physics(5054)-222": [
+            {
+                "name": "Motion, forces and energy",
+                "id": "3562"
+            },
+            {
+                "name": "Thermal physics",
+                "id": "3563"
+            },
+            {
+                "name": "Waves",
+                "id": "3564"
+            },
+            {
+                "name": "Electricity and magnetism",
+                "id": "3565"
+            },
+            {
+                "name": "Nuclear physics",
+                "id": "3566"
+            },
+            {
+                "name": "Space physics",
+                "id": "3568"
+            }
+        ],
+        "Statistics(4040)-229": [
+            {
+                "name": "Data and its collection",
+                "id": "3629"
+            },
+            {
+                "name": "Summary representation of data",
+                "id": "3630"
+            },
+            {
+                "name": "Formation of data into ungrouped or grouped frequency distributions",
+                "id": "3631"
+            },
+            {
+                "name": "Formation of frequency distributions into cumulative frequency distributions",
+                "id": "3632"
+            },
+            {
+                "name": "Statistical measures, their interpretation and appropriate use",
+                "id": "3633"
+            },
+            {
+                "name": "Transformations involving mean and standard deviation",
+                "id": "3634"
+            },
+            {
+                "name": "Crude and standardised rates, and their appropriate use",
+                "id": "3635"
+            },
+            {
+                "name": "Index numbers",
+                "id": "3636"
+            },
+            {
+                "name": "Bivariate distributions and their representation by scatter diagrams",
+                "id": "3637"
+            },
+            {
+                "name": "Time series",
+                "id": "3638"
+            },
+            {
+                "name": "Elementary ideas of probability",
+                "id": "3639"
+            },
+            {
+                "name": "Probability distributions",
+                "id": "3640"
+            }
+        ]
+    }
+}

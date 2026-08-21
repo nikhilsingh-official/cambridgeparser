@@ -387,7 +387,7 @@ Also open, from `future_work.md` §5:
 | ~~Answer-change quality~~ | **built** | `v_answer_changes` / `v_answer_change_summary` classify every consecutive pair of chosen options against the key. The Focus section shows the three outcomes and the net marks changing won or cost |
 | Elimination precision | not built | `eliminated_mask` × `correct_option` — how often a ruled-out option really was wrong, and how often the *correct* one got eliminated |
 | Pacing / fatigue | not built | `attempt_events` gives true answering order, which `question_number` cannot |
-| Topic mastery | plumbing done | **content.** `src/constants/topicMap.ts` is a fill-in-the-blank file awaiting a syllabus taxonomy, then `seedTopics()` and `applyPaperTopics()` |
+| Topic mastery | **done** | 734 topics and 57,145 question tags seeded from `structure.json` + `question_topics.json` by `scripts/buildTopics.ts`; `v_topic_mastery` reads `question_topics`. Covers the 14 multiple-choice syllabuses only |
 | Exam readiness / predicted grade | not built | a grade-threshold table per subject; thin layer over accuracy + topic mastery |
 
 Once a few hundred questions exist, **check the three thresholds against data**.

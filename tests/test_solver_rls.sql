@@ -58,6 +58,10 @@ begin
   if v_n = 0 then raise exception 'owner cannot read v_question_flags'; end if;
   raise notice 'owner sees % rows in v_question_flags', v_n;
 
+  select count(*) into v_n from public.v_topic_mastery;
+  if v_n = 0 then raise exception 'v_topic_mastery returned 0 rows for the owner'; end if;
+  raise notice 'owner sees % rows in v_topic_mastery', v_n;
+
   -- ------------------------------------------------------------- intruder
   reset role;
   set local role authenticated;
@@ -97,6 +101,11 @@ begin
   select count(*) into v_n from public.v_answer_change_summary;
   if v_n <> 0 then raise exception 'LEAK via view: intruder sees % rows in v_answer_change_summary', v_n; end if;
 
+  -- v_topic_mastery joins reference data (question_topics, topics) that every
+  -- user can read, so the isolation rests entirely on the exam_attempts join.
+  select count(*) into v_n from public.v_topic_mastery;
+  if v_n <> 0 then raise exception 'LEAK via view: intruder sees % rows in v_topic_mastery', v_n; end if;
+
   raise notice 'intruder sees 0 rows in every owned table and every view';
 
   -- Writing another user's row must fail the WITH CHECK, not silently succeed.
@@ -126,6 +135,31 @@ begin
   select count(*) into v_n from public.subjects;
   if v_n = 0 then raise exception 'reference data unreadable: subjects returned 0 rows'; end if;
   raise notice 'reference data readable: % subjects', v_n;
+
+  -- Topic tagging is reference data too: readable, and read-only. A client
+  -- that could retag questions could move its own weak topics onto strong
+  -- ones, which is the whole point of the mastery view.
+  select count(*) into v_n from public.question_topics;
+  if v_n = 0 then raise exception 'reference data unreadable: question_topics returned 0 rows'; end if;
+  raise notice 'reference data readable: % question topic tags', v_n;
+
+  v_failed := false;
+  begin
+    insert into public.question_topics (paper_id, question_number, topic_id)
+    select '0625_s24_11', 1, id from public.topics limit 1;
+  exception when insufficient_privilege then
+    v_failed := true;
+  end;
+  if not v_failed then raise exception 'LEAK: a client tagged a question'; end if;
+
+  v_failed := false;
+  begin
+    delete from public.question_topics where true;
+  exception when insufficient_privilege then
+    v_failed := true;
+  end;
+  if not v_failed then raise exception 'LEAK: a client deleted topic tags'; end if;
+  raise notice 'question topic tags are not client-writable';
 
   -- ...but not writable. The answer key must not be rewritable by a client,
   -- or one user could change everybody's marks.

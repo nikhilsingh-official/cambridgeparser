@@ -23,10 +23,15 @@ export async function fetchSubjectStats(
 /**
  * Per-topic mastery.
  *
- * returns [] until topics and paper_answers.topic_id are populated from
- * src/constants/topicMap.ts. That is content, not code - the caller should
- * HIDE the topic section on an empty result rather than render an empty radar,
- * which reads as broken. See docs/stats_page_design.md §6.
+ * returns [] for any paper outside the tagged set - supabase/seeds/03_topics.sql
+ * covers the multiple-choice syllabuses only, and 82% of the browsable years
+ * within them. The caller should HIDE the topic section on an empty result
+ * rather than render an empty radar, which reads as broken. See
+ * docs/stats_page_design.md §6.
+ *
+ * A question can carry more than one topic, so marks_total summed across
+ * topics can exceed the paper's marks. Read it per topic; v_subject_stats is
+ * what answers "how am I doing at Physics".
  */
 export async function fetchTopicMastery(
   supabase: Db,
