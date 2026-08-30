@@ -25,6 +25,15 @@ export type DocumentQuestionMarkers = PageQuestionMarkers[];
 export type QuestionSegment = {
   segmentText: textbox[];
   averageY: number;
+  // the question's true vertical extent, in page coordinates.
+  //
+  // Consumers used to derive this from segmentText[0] and segmentText[last],
+  // which assumes the array is in top-to-bottom order. It is in PDF
+  // content-stream order - the order the typesetter drew the items - and a
+  // diagram's labels are routinely drawn after the text below them. Computed
+  // once in segmentQuestions.ts so every consumer gets the same answer.
+  contentY: number;
+  contentY2: number;
 };
 
 export type PageSegments = QuestionSegment[];

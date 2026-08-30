@@ -8,7 +8,7 @@
 
 # Pre-production unresolved issues
 
-Reviewed against the local repository and local Supabase stack on 2026-08-27.
+Reviewed against the local repository and local Supabase stack through 2026-08-30.
 The public `cambridgeparser.com` deployment was deliberately excluded because it
 still serves the old IDE. “Confirmed” means the current implementation contains
 the defect or limitation. “Release risk” means the code path could not be
@@ -43,35 +43,37 @@ band are ordered by severity and release priority.
 | Complexity rank | ID | Type | Severity | Summary |
 |---:|---|---|---|---|
 | 1 · XL | CP-001 | Confirmed trust defect | Critical | Shared answer keys are exposed and first-writer-controlled |
-| 2 · XL | CP-002 | Confirmed correctness defects | High | Golden-corpus audit exposes 13 PDF parsing failures across 10 representative papers |
-| 3 · XL | CP-005 | Confirmed limitation | High if mobile is promised | Phone-width dashboard and solver layouts are not usable |
-| 4 · XL/data | CP-018 | Model risk | Medium | Analytics thresholds are hand-picked rather than calibrated |
-| 5 · L–XL | CP-006 | Product gap | High if resume is promised | In-progress papers cannot be saved, resumed, or restarted |
-| 6 · L | CP-003 | Confirmed persistence defect | High | Attempt completion is non-transactional and has no retry |
-| 7 · L | CP-004 | Confirmed stats defect | High | Page-level filters control only some stats panels |
-| 8 · L | CP-008 | Confirmed lifecycle defect | Medium | Tab-close abandonment can leave stale in-progress attempts |
-| 9 · L | CP-015 | Integration risk | Medium–High | Every uncached solver load depends on one paper mirror |
-| 10 · L | CP-017 | Compatibility risk | Medium | Vendored PDF.js v3 is mixed with npm pdfjs-dist v5 |
-| 11 · L | GAP-001 | Product gap | Medium | Overview rows cannot navigate to their PDF questions |
-| 12 · L | GAP-002 | Product gap | Medium | Paper Generator is not implemented |
-| 13 · M–L | CP-016 | Performance risk | Medium | PDFs are transported as inflated JSON number arrays |
-| 14 · M–L | CP-020 | Standards defect | Medium | Substantial Python tools/tests exist outside the only permitted Python directory |
-| 15 · M–L | GAP-003 | Product gap | Low–Medium | Calendar has no route or data model |
-| 16 · M | CP-007 | Confirmed auth defect | High | Recovery links have no set-new-password workflow; UI entry is now hidden |
-| 17 · M | CP-011 | Production risk | High | Hosted Supabase schema, policies, seed, and function are unverified |
-| 18 · M | CP-012 | Production risk | High | Real deployed Google/OpenRouter grading is unverified |
-| 19 · M | CP-013 | Production risk | High | Hosted OAuth/provider configuration is unverified |
-| 20 · M | CP-019 | Build/performance risk | Low–Medium | Lottie uses eval and ECharts produces a large route dependency |
-| 21 · M | GAP-004 | Product gap | Medium | Profile and Settings workflows are not implemented |
-| 22 · M | GAP-005 | Product gap | Low | Active-question copy is not implemented |
-| 23 · M | GAP-006 | Product gap | Medium | Some Learn topics have no linked practice |
-| 24 · S–M | CP-009 | Confirmed integration defect | Low | The default PDF.js locale bundle is missing |
-| 25 · S–M | GAP-007 | Product gap | Low | Shortcut help has no in-product overlay |
-| 26 · S operational | CP-014 | Production risk | High until exercised | Preview deployment and deep-link behavior are unverified |
+| 2 · XL | CP-005 | Confirmed limitation | High if mobile is promised | Phone-width dashboard and solver layouts are not usable |
+| 3 · XL/data | CP-018 | Model risk | Medium | Analytics thresholds are hand-picked rather than calibrated |
+| 4 · L–XL | CP-006 | Product gap | High if resume is promised | In-progress papers cannot be saved, resumed, or restarted |
+| 5 · L | CP-003 | Confirmed persistence defect | High | Attempt completion is non-transactional and has no retry |
+| 6 · L | CP-004 | Confirmed stats defect | High | Page-level filters control only some stats panels |
+| 7 · L | CP-008 | Confirmed lifecycle defect | Medium | Tab-close abandonment can leave stale in-progress attempts |
+| 8 · L | CP-015 | Integration risk | Medium–High | Every uncached solver load depends on one paper mirror |
+| 9 · L | CP-017 | Compatibility risk | Medium | Vendored PDF.js v3 is mixed with npm pdfjs-dist v5 |
+| 10 · L | GAP-001 | Product gap | Medium | Overview rows cannot navigate to their PDF questions |
+| 11 · L | GAP-002 | Product gap | Medium | Paper Generator is not implemented |
+| 12 · M–L | CP-016 | Performance risk | Medium | PDFs are transported as inflated JSON number arrays |
+| 13 · M–L | CP-020 | Standards defect | Medium | Substantial Python tools/tests exist outside the only permitted Python directory |
+| 14 · M–L | GAP-003 | Product gap | Low–Medium | Calendar has no route or data model |
+| 15 · M | CP-007 | Confirmed auth defect | High | Recovery links have no set-new-password workflow; UI entry is now hidden |
+| 16 · M | CP-011 | Production risk | High | Hosted Supabase schema, policies, seed, and function are unverified |
+| 17 · M | CP-012 | Production risk | High | Real deployed Google/OpenRouter grading is unverified |
+| 18 · M | CP-013 | Production risk | High | Hosted OAuth/provider configuration is unverified |
+| 19 · M | CP-019 | Build/performance risk | Low–Medium | Lottie uses eval and ECharts produces a large route dependency |
+| 20 · M | GAP-004 | Product gap | Medium | Profile and Settings workflows are not implemented |
+| 21 · M | GAP-005 | Product gap | Low | Active-question copy is not implemented |
+| 22 · M | GAP-006 | Product gap | Medium | Some Learn topics have no linked practice |
+| 23 · S–M | CP-009 | Confirmed integration defect | Low | The default PDF.js locale bundle is missing |
+| 24 · S–M | GAP-007 | Product gap | Low | Shortcut help has no in-product overlay |
+| 25 · S operational | CP-014 | Production risk | High until exercised | Preview deployment and deep-link behavior are unverified |
 
-CP-010 (contradictory status in historical roadmap documents) was mitigated in
-this pass with prominent historical-status banners and is therefore excluded
-from the unresolved ranking.
+CP-002 (representative PDF parsing coverage) is resolved: the catalogue now
+excludes 2016 and earlier, and all 819 checks across the 19-family golden corpus
+pass. Ambiguous non-linear choices deliberately select through verified A–D
+markers with enlarged label hitboxes instead of claiming unsafe formula/table
+fragment association. CP-010 (contradictory historical roadmap status) was
+also mitigated. Both are excluded from the unresolved ranking.
 
 ## High-severity, high-complexity decisions
 
@@ -81,11 +83,10 @@ small wiring pass.
 | Rank | ID | Issue | Severity | Complexity | Why it is hard |
 |---:|---|---|---|---|---|
 | 1 | CP-001 | Shared answer keys are exposed and first-writer-controlled | Critical | XL | Fixing it changes the trust boundary, RLS/grants, grading contract, existing cached data, and potentially key ingestion. |
-| 2 | CP-002 | Representative golden corpus exposes unsupported PDF layouts | High | XL | The harness now proves several structural failures; closing broad catalogue support still requires layout-aware parsing and rendered hitbox verification across paper generations. |
-| 3 | CP-003 | Completing an attempt is a non-transactional multi-request write with no retry | High | L | A durable solution needs an atomic RPC or resumable idempotent protocol, failure-state UI, and recovery tests. |
-| 4 | CP-004 | Stats filters change only some panels | High | L | Several database views have already aggregated away year/series/variant, so the missing dimensions cannot be restored in Vue. |
-| 5 | CP-005 | The dashboard and solver are not usable at phone widths | High if mobile is launch scope; otherwise Medium | XL | The fixed viewport rail and dense solver/PDF layout need product-level responsive behavior, not isolated media queries. |
-| 6 | CP-006 | Save/resume/restart is absent for in-progress papers | High for long-paper workflows | L–XL | True resume needs durable incremental answers/events, reconciliation, expiry, and a defined attempt state machine. |
+| 2 | CP-003 | Completing an attempt is a non-transactional multi-request write with no retry | High | L | A durable solution needs an atomic RPC or resumable idempotent protocol, failure-state UI, and recovery tests. |
+| 3 | CP-004 | Stats filters change only some panels | High | L | Several database views have already aggregated away year/series/variant, so the missing dimensions cannot be restored in Vue. |
+| 4 | CP-005 | The dashboard and solver are not usable at phone widths | High if mobile is launch scope; otherwise Medium | XL | The fixed viewport rail and dense solver/PDF layout need product-level responsive behavior, not isolated media queries. |
+| 5 | CP-006 | Save/resume/restart is absent for in-progress papers | High for long-paper workflows | L–XL | True resume needs durable incremental answers/events, reconciliation, expiry, and a defined attempt state machine. |
 
 ## Confirmed unresolved defects
 
@@ -119,45 +120,6 @@ small wiring pass.
 - **Likely root cause:** answer extraction moved server-side, but persistence and
   marking retained the original client trust model.
 - **Fixed:** No.
-
-### CP-002 — Golden corpus exposes unsupported PDF layouts
-
-- **Priority:** P0 for claiming all catalogue papers work; P1 for a labelled beta
-- **Severity / complexity:** High / XL
-- **Evidence:** the new checksum-pinned corpus loads 19 QP/MS pairs—one for
-  every solver paper family—through the real extraction, segmentation, option
-  detection and Edge mark-scheme parsing seams. Its 778 checks currently report
-  13 reviewed failures across 10 papers: four old mark-scheme tables return no
-  key, one old A-Level paper produces 44 segments instead of 40, four papers
-  over/under-count options, and three papers associate or order option text
-  incorrectly. See
-  [`tests/fixtures/solver-corpus/README.md`](../tests/fixtures/solver-corpus/README.md).
-- **Actual behavior:** nine representative papers pass all recorded structural,
-  option, geometry and answer checks. Ten have explicit known failures. The
-  audit exits successfully only because those failures are classified and
-  printed; they are not treated as passing functionality. Rendered selection
-  and iframe event behavior remain outside this non-browser corpus.
-- **Expected behavior:** every enabled paper either passes a recorded structural
-  and rendered fixture or fails closed with an actionable error.
-- **Likely fix:** address each recorded root failure with layout-aware marker
-  detection and row/table parsing, promoting each known failure to a pass only
-  after visual review. Add browser screenshot/selection checks for graph and
-  multi-line options, then either gate the catalogue on audited families or
-  expand the corpus before promising every listed year/variant.
-- **Current mitigation:** source identity, page/question counts, all option
-  counts, full answer keys, selected marker geometry and option associations
-  are now executable and regression-gated. Runtime answer-key/question-count
-  validation also rejects obvious partial papers, but the catalogue is not yet
-  restricted to known-good formats.
-- **How to reproduce:** fetch the pinned PDFs and run
-  `node --experimental-strip-types scripts/solver-corpus/validate.ts`; inspect
-  each `KNOWN FAIL` against its rendered question paper and mark scheme.
-- **Fixed:** Corpus creation and automated regression classification are fixed;
-  the 13 parser failures and browser-level rendered-selection coverage are not.
-  no automated suite currently performs that exercise.
-- **Likely root cause:** extraction evolved as document-specific heuristics
-  without a committed representative PDF fixture set.
-- **Fixed:** No; only obvious partial/mismatched keys now fail closed.
 
 ### CP-003 — Attempt completion can persist only part of a result
 
@@ -342,13 +304,11 @@ the launch copy promises program output.
 1. Choose and implement the CP-001 answer-key trust model.
 2. Make CP-003 completion atomic/resumable and implement CP-007 password
    recovery; its broken UI entry is already hidden.
-3. Fix or exclude the CP-002 known-failing layouts before advertising broad
-   paper support, and add rendered selection checks around the golden corpus.
-4. Resolve CP-004 by either changing the data grain or separating global stats.
-5. Deploy a preview and close CP-011 through CP-014 with real hosted tests.
-6. Decide whether mobile and resume are launch promises; if not, keep their
+3. Resolve CP-004 by either changing the data grain or separating global stats.
+4. Deploy a preview and close CP-011 through CP-014 with real hosted tests.
+5. Decide whether mobile and resume are launch promises; if not, keep their
    current limitations explicit.
-7. Address P2/P3 cleanup and product gaps after the integrity gates pass.
+6. Address P2/P3 cleanup and product gaps after the integrity gates pass.
 
 Until the P0 items are resolved or their workflows are removed from the release,
 the recommendation from this review is **not ready for a public production push**.

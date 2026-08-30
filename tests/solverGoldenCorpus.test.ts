@@ -26,7 +26,7 @@ test('golden corpus covers every solver paper family exactly once', async () => 
   assert.equal(new Set(corpus.papers.map((paper) => paper.paperId)).size, corpus.papers.length);
 
   const years = corpus.papers.map((paper) => paper.year);
-  assert.ok(Math.min(...years) <= 2016, 'the old PDF generation must be represented');
+  assert.equal(Math.min(...years), 2017, 'the earliest supported PDF generation must be represented');
   assert.ok(Math.max(...years) >= 2025, 'the current PDF generation must be represented');
   assert.deepEqual(
     [...new Set(corpus.papers.map((paper) => paper.series))].sort(),

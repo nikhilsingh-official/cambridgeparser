@@ -61,8 +61,14 @@ const FULL_VARIANTS: Partial<Record<ExamSeries, number[]>> = {
  * they get s/w only.
  */
 const SW_VARIANTS: Partial<Record<ExamSeries, number[]>> = {
-  s: [1, 2, 3],
-  w: [1, 2, 3],
+  s: [1, 2],
+  w: [1, 2],
+};
+
+/** O Level Economics uses a different pair of zones in each main series. */
+const oLevelEconomicsVariants: Partial<Record<ExamSeries, number[]>> = {
+  s: [1, 2],
+  w: [2, 3],
 };
 
 const ALL_SERIES: ExamSeries[] = ['m', 's', 'w'];
@@ -94,19 +100,55 @@ export const SOLVABLE_PAPERS: SolvablePaper[] = [
   { code: '5090', subject: 'Biology',   qualification: OLEVEL, paperNumber: 1, label: 'Paper 1: Multiple Choice', series: SW_SERIES, variantsBySeries: SW_VARIANTS },
   { code: '5070', subject: 'Chemistry', qualification: OLEVEL, paperNumber: 1, label: 'Paper 1: Multiple Choice', series: SW_SERIES, variantsBySeries: SW_VARIANTS },
   { code: '5054', subject: 'Physics',   qualification: OLEVEL, paperNumber: 1, label: 'Paper 1: Multiple Choice', series: SW_SERIES, variantsBySeries: SW_VARIANTS },
-  { code: '2281', subject: 'Economics', qualification: OLEVEL, paperNumber: 1, label: 'Paper 1: Multiple Choice', series: SW_SERIES, variantsBySeries: SW_VARIANTS },
+  { code: '2281', subject: 'Economics', qualification: OLEVEL, paperNumber: 1, label: 'Paper 1: Multiple Choice', series: SW_SERIES, variantsBySeries: oLevelEconomicsVariants },
 ];
 
 /**
  * Years offered, newest first.
  *
- * The lower bound is where PapaCambridge's `<code>_<series><yy>_qp_<paper>.pdf`
- * naming becomes reliable; the upper bound is the last series whose papers are
- * public. Bump LATEST_YEAR when a new series is released - nothing else needs
- * to change.
+ * The lower bound is a product support boundary: 2016 and earlier mark schemes
+ * use table layouts the answer-key extractor does not support. The upper bound
+ * is the last series whose papers are public. Bump LATEST_YEAR when a new
+ * series is released - nothing else needs to change.
  */
-export const LATEST_YEAR = 2025;
-const EARLIEST_YEAR = 2016;
+export const LATEST_YEAR = 2026;
+const EARLIEST_YEAR = 2017;
+
+/**
+ * Sittings that cannot currently be offered.
+ *
+ * Cambridge cancelled the June 2020 series worldwide, so no question
+ * paper, mark scheme or grade threshold was ever published for it. The
+ * catalogue generates a card for every (paper x year x series x variant)
+ * combination, which meant 57 of its 1,290 cards - 4.4% - opened a paper that
+ * does not exist.
+ *
+ * VERIFIED, NOT ASSUMED. Across the 406 threshold documents scraped by
+ * scripts/gt/build.py: June 2020 has 0 papers, November 2020 has 53, and
+ * February/March 2020 has 5 (against 13 in 2019 and 15 in 2021). So June alone
+ * is excluded - March was disrupted but did run, and dropping it would hide
+ * papers that exist.
+ *
+ * November 2026 is also excluded because, as of the latest catalogue
+ * verification, that future sitting has neither papers nor mark schemes yet.
+ * Keyed `${series}${year}` so each unavailable sitting is one entry.
+ */
+export const unavailableSittings: ReadonlySet<string> = new Set([
+  's2020', // Cancelled worldwide.
+  'w2026', // This future series has not been sat or published yet.
+]);
+
+/** Syllabus-specific sittings absent from the configured paper mirror. */
+const unavailableSeriesByCode: Readonly<Record<string, ReadonlySet<string>>> = {
+  '0654': new Set(['m2017', 's2017', 'w2017', 'm2018', 'm2019', 'm2020']),
+};
+
+/** Individual exceptions left after applying the series and variant rules. */
+const unavailablePapers: ReadonlySet<string> = new Set([
+  '2281_w23_13',
+  '9700_m20_12',
+  '9708_s24_12',
+]);
 
 export const CATALOGUE_YEARS: number[] = Array.from(
   { length: LATEST_YEAR - EARLIEST_YEAR + 1 },
@@ -212,12 +254,20 @@ export function buildPaperEntries(filter: CatalogueFilter): PaperEntry[] {
 
       for (const s of paper.series) {
         if (series.length && !series.includes(s)) continue;
+        // A cancelled sitting has no papers to offer. Filtered here rather
+        // than removed from CATALOGUE_YEARS because 2020 itself is a real
+        // year - November 2020 was sat as normal.
+        if (unavailableSittings.has(`${s}${year}`)) continue;
+        if (unavailableSeriesByCode[paper.code]?.has(`${s}${year}`)) continue;
 
         for (const variant of paper.variantsBySeries[s] ?? []) {
           if (variants.length && !variants.includes(variant)) continue;
 
+          const id = `${paper.code}_${s}${yy}_${paper.paperNumber}${variant}`;
+          if (unavailablePapers.has(id)) continue;
+
           entries.push({
-            id: `${paper.code}_${s}${yy}_${paper.paperNumber}${variant}`,
+            id,
             code: paper.code,
             subject: paper.subject,
             qualification: paper.qualification,
@@ -235,7 +285,7 @@ export function buildPaperEntries(filter: CatalogueFilter): PaperEntry[] {
   }
 
   // Newest first, then subject, then paper - so the default view opens on the
-  // most recent series rather than on 2016.
+  // newest supported year.
   entries.sort(
     (a, b) =>
       b.examYear - a.examYear ||

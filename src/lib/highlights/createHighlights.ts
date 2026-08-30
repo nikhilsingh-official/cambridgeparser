@@ -1,6 +1,12 @@
 import type { DocumentOptionsText, PageOptionsText, SegmentOptionsText, OptionText, textbox } from "../pdf";
 import type { DocumentHighlights, OptionState } from "./highlightTypes";
 
+// label-only parsing is deliberately used when PDF draw order cannot
+// safely associate formula/table fragments. Expand those tiny glyphs into
+// practical click targets without changing the visible option association.
+const labelTargetWidth = 24;
+const labelTargetHeight = 18;
+
 export function createHighlights(options: DocumentOptionsText) {
 
   /*
@@ -35,10 +41,20 @@ export function createHighlights(options: DocumentOptionsText) {
 
           const offset = 4;
 
-          const x: number = highlightItem.x;
-          const y: number = highlightItem.y + offset;
-          const x2: number = highlightItem.x2;
-          const y2: number = highlightItem.y2 + offset;
+          // only expand a single A-D glyph. Text-bearing options retain
+          // their exact boxes so highlights continue to follow visible prose.
+          const isLabelOnly = option.length === 1 && /^[ABCD]$/.test(highlightItem.text.trim());
+          const horizontalPadding = isLabelOnly
+            ? Math.max(0, (labelTargetWidth - (highlightItem.x2 - highlightItem.x)) / 2)
+            : 0;
+          const verticalPadding = isLabelOnly
+            ? Math.max(0, (labelTargetHeight - (highlightItem.y2 - highlightItem.y)) / 2)
+            : 0;
+
+          const x: number = highlightItem.x - horizontalPadding;
+          const y: number = highlightItem.y + offset - verticalPadding;
+          const x2: number = highlightItem.x2 + horizontalPadding;
+          const y2: number = highlightItem.y2 + offset + verticalPadding;
           const state: OptionState = "neutral";
           highlights[pageIndex]![segmentIndex]![optionIndex]!.push({ x, y, x2, y2, state })
         }

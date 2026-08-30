@@ -1,15 +1,77 @@
-import type { DocumentGraphics, DocumentOptionsText, DocumentText, OptionMarker, OptionText, PageOptionsText, PageSegments, QuestionSegment, SegmentedQuestions, SegmentOptionMarkers, SegmentOptionsText, textbox } from "@/lib/pdf/pdfTypes";
+import type { DocumentOptionsText, DocumentText, OptionMarker, OptionText, PageOptionsText, PageSegments, QuestionSegment, SegmentedQuestions, SegmentOptionMarkers, SegmentOptionsText, textbox } from "@/lib/pdf/pdfTypes";
 import { getGraphFont } from "./getGraphFont";
 import { extractGraphics } from "./extractGraphics";
 import { detectOptionFonts } from "./detectOptionFont";
 // import added for the PDFDocumentProxy parameter type.
 import type { PDFDocumentProxy } from "pdfjs-dist";
-import { classifySegmentedQuestions } from "./classifyQuestions";
-import { OPS } from "pdfjs-dist";
 
 const betaTotalTextHighlight = true;
 
+// centralise the supported option alphabet and measured geometry tolerances
+// so the quartet-selection rules below do not drift across code paths.
+const optionLabels = ['A', 'B', 'C', 'D'] as const;
+const duplicateCoordinateTolerance = 0.1;
+const visualLineTolerance = 2;
+const alignedMarkerTolerance = 3;
+const verticalGroupBaseScore = 1000;
+const horizontalGroupBaseScore = 500;
+const spatialGroupBaseScore = 100;
+
+// preserve OptionMarker's narrow label type after trimming PDF text.
+function isOptionLabel(text: string): text is OptionMarker['text'] {
+  return (optionLabels as readonly string[]).includes(text);
+}
+
+// reduce repeated inline/table lettering to the A-B-C-D quartet that has
+// option-like geometry. Complete vertical groups beat prose; complete
+// horizontal groups are ranked by column spread, so a real four-column answer
+// table beats the compact "A, B, C and D" phrase in its stem.
+function selectPlausibleOptionQuartet(
+  detected: SegmentOptionMarkers,
+  segmentText: textbox[],
+): SegmentOptionMarkers {
+  if (detected.length <= optionLabels.length) return detected;
+
+  const groups: SegmentOptionMarkers[] = [];
+  let current: SegmentOptionMarkers = [];
+
+  for (const marker of detected) {
+    if (marker.text === 'A') {
+      current = [marker];
+      continue;
+    }
+    if (current.length > 0 && marker.text === optionLabels[current.length]) {
+      current.push(marker);
+      if (current.length === optionLabels.length) {
+        groups.push(current);
+        current = [];
+      }
+    }
+  }
+
+  if (groups.length === 0) return detected;
+
+  function alignmentScore(group: SegmentOptionMarkers): number {
+    const boxes = group.map(marker => segmentText[marker.index]!);
+    const xs = boxes.map(box => box.x);
+    const ys = boxes.map(box => box.y);
+    const xRange = Math.max(...xs) - Math.min(...xs);
+    const yRange = Math.max(...ys) - Math.min(...ys);
+    if (xRange <= alignedMarkerTolerance) return verticalGroupBaseScore + yRange;
+    if (yRange <= alignedMarkerTolerance) return horizontalGroupBaseScore + xRange;
+    return spatialGroupBaseScore;
+  }
+
+  return groups.sort((a, b) => alignmentScore(b) - alignmentScore(a))[0]!;
+}
+
 function detectSegmentOptions(segmentText: textbox[], fontCandidates: string[]) {
+  // inspect every candidate font and keep the one representing the most
+  // distinct option letters. Returning on the first single A-D glyph let a
+  // diagram/fraction font hide the real four-label option font.
+  let bestDetected: SegmentOptionMarkers = [];
+  let bestDistinctCount = 0;
+
   for (const candidateFont of fontCandidates) {
 
     const detected: SegmentOptionMarkers = [];
@@ -21,167 +83,30 @@ function detectSegmentOptions(segmentText: textbox[], fontCandidates: string[]) 
       const text = box.text.trim();
       const font = box.font.trim();
 
-      if (["A", "B", "C", "D"].includes(text) && font === candidateFont) {
-        detected.push({ text: (text as "A" | "B" | "C" | "D"), index: i });
+      if (isOptionLabel(text) && font === candidateFont) {
+        // some PDFs expose the same drawn glyph twice at identical
+        // coordinates. It is one clickable label, not a fifth option.
+        const duplicate = detected.some((option) => {
+          const previous = segmentText[option.index];
+          return previous?.text.trim() === text
+            && Math.abs(previous.x - box.x) < duplicateCoordinateTolerance
+            && Math.abs(previous.y - box.y) < duplicateCoordinateTolerance;
+        });
+        if (!duplicate) {
+          detected.push({ text, index: i });
+        }
       }
     }
 
-    if (detected.length > 0) return detected;
-  }
-
-  return [];
-}
-
-function entropy(angles: number[], bins = 12): number {
-  if (angles.length === 0) return 0;
-
-  const hist = new Array(bins).fill(0);
-
-  for (const a of angles) {
-    // normalize angle to [0, 2π)
-    const norm = (a + Math.PI * 2) % (Math.PI * 2);
-    const bin = Math.floor((norm / (Math.PI * 2)) * bins);
-    hist[Math.min(bin, bins - 1)]++;
-  }
-
-  const total = angles.length;
-  let e = 0;
-
-  for (const count of hist) {
-    if (count === 0) continue;
-    const p = count / total;
-    e -= p * Math.log2(p);
-  }
-
-  return e;
-}
-
-function dominantClusterRatio(
-  ys: number[],
-  tolerance = 2
-): number {
-  if (ys.length === 0) return 0;
-
-  const clusters: number[] = [];
-
-  for (const y of ys) {
-    let found = false;
-    for (let i = 0; i < clusters.length; i++) {
-      if (Math.abs(clusters[i] - y) <= tolerance) {
-        clusters[i] = (clusters[i] + y) / 2;
-        found = true;
-        break;
-      }
-    }
-    if (!found) clusters.push(y);
-  }
-
-  // Count membership
-  const counts = new Map<number, number>();
-  for (const y of ys) {
-    for (const c of clusters) {
-      if (Math.abs(c - y) <= tolerance) {
-        counts.set(c, (counts.get(c) ?? 0) + 1);
-        break;
-      }
+    const selected = selectPlausibleOptionQuartet(detected, segmentText);
+    const distinctCount = new Set(selected.map(option => option.text)).size;
+    if (distinctCount > bestDistinctCount) {
+      bestDetected = selected;
+      bestDistinctCount = distinctCount;
     }
   }
 
-  const maxCluster = Math.max(...counts.values());
-  return maxCluster / ys.length;
-}
-
-import type { PageText } from "@/lib/pdf/pdfTypes";
-
-function avgTextToStrokeDistance(
-  pageText: PageText,
-  strokeYs: number[]
-): number {
-  if (pageText.length === 0 || strokeYs.length === 0) return Infinity;
-
-  let totalDist = 0;
-  let count = 0;
-
-  for (const t of pageText) {
-    let minDist = Infinity;
-    for (const y of strokeYs) {
-      const d = Math.abs(t.y - y);
-      if (d < minDist) minDist = d;
-    }
-    totalDist += minDist;
-    count++;
-  }
-
-  return totalDist / count;
-}
-
-function summarizeOps(
-  documentGraphics: DocumentGraphics,
-  documentText: DocumentText
-) {
-  const summaries = [];
-
-  const totalPages = Math.min(
-    documentGraphics.length,
-    documentText.length
-  );
-
-  for (let i = 0; i < totalPages; i++) {
-    const pageText = documentText[i];
-    const pageGraphics = documentGraphics[i];
-
-    if (!pageText || !pageGraphics) {
-      summaries.push(null);
-      continue;
-    }
-
-    let strokeCount = 0;
-    let lineToCount = 0;
-    let moveToCount = 0;
-
-    const angles: number[] = [];
-    const strokeYs: number[] = [];
-
-    let currentPoint: { x: number; y: number } | null = null;
-
-    for (const g of pageGraphics) {
-      if (g.fnId === OPS.moveTo) {
-        moveToCount++;
-        // GraphicsItem.args is `unknown[]` (op-specific positional tuple).
-        // moveTo/lineTo carry [x, y] as numbers; narrowed here where fnId is known.
-        const [mx, my] = g.args as [number, number];
-        currentPoint = { x: mx, y: my };
-      }
-
-      else if (g.fnId === OPS.lineTo && currentPoint) {
-        lineToCount++;
-        // see the moveTo note above.
-        const [x, y] = g.args as [number, number];
-        angles.push(Math.atan2(y - currentPoint.y, x - currentPoint.x));
-        currentPoint = { x, y };
-      }
-
-      else if (g.fnId === OPS.stroke || g.fnId === OPS.fill) {
-        strokeCount++;
-        if (currentPoint) strokeYs.push(currentPoint.y);
-        currentPoint = null;
-      }
-    }
-
-    summaries.push({
-      pageIndex: i,
-      strokeCount,
-      lineToCount,
-      moveToCount,
-      avgSegmentsPerStroke:
-        strokeCount > 0 ? lineToCount / strokeCount : 0,
-      angleEntropy: entropy(angles),
-      yClusterStrength: dominantClusterRatio(strokeYs),
-      textStrokeDistance: avgTextToStrokeDistance(pageText, strokeYs)
-    });
-  }
-
-  return summaries;
+  return bestDetected;
 }
 
 // was `pdf: any`. PDFDocumentProxy is pdfjs-dist's own type for a loaded
@@ -191,17 +116,7 @@ export async function getOptions(pdf: PDFDocumentProxy, totalText: DocumentText,
 
   const graphics = await extractGraphics(pdf);
 
-  console.log("Graphics")
-  console.log(graphics)
-
-  console.log("SUMMARY")
-  console.log(summarizeOps(graphics, totalText))
-
   const graphFont = getGraphFont(totalText, graphics);
-
-  const classified = classifySegmentedQuestions(segmentedQuestions, graphics, graphFont)
-  console.log("Classified")
-  console.log(classified)
 
   const optionFonts = detectOptionFonts(totalText);
   const fontCandidates = optionFonts
@@ -211,9 +126,6 @@ export async function getOptions(pdf: PDFDocumentProxy, totalText: DocumentText,
   if (fontCandidates.length === 0) {
     fontCandidates.push(optionFonts[0]!.font);
   }
-
-  console.log("Detected Option Fonts: ", fontCandidates);
-  console.log("Detected Graph Font: ", graphFont);
 
   for(let pageIndex = 0; pageIndex < segmentedQuestions.length; pageIndex++) {
     let pageOptions: PageOptionsText = []
@@ -225,13 +137,30 @@ export async function getOptions(pdf: PDFDocumentProxy, totalText: DocumentText,
 
       const segment: QuestionSegment | undefined = pageSegments[segmentIndex];
       if(!segment) continue;
-      const segmentText: textbox[] = segment.segmentText;
+      // option association follows visual reading order. PDF stream order
+      // can draw the text before its A-D label; sorting by line then x keeps
+      // vertical, horizontal and tabular choices paired with the visible label.
+      const segmentText: textbox[] = [...segment.segmentText].sort((a, b) => {
+        if (Math.abs(a.y - b.y) > visualLineTolerance) return a.y - b.y;
+        return a.x - b.x;
+      });
 
       let segmentOptions: SegmentOptionMarkers = detectSegmentOptions(segmentText, fontCandidates);
 
       let segmentTotalOptionsText: SegmentOptionsText = []
 
-      segmentOptions.forEach((option: OptionMarker, index) => {
+      // diagram choices can be drawn in spatial/content-stream order such
+      // as A,C,B,D. Those labels are the complete choices, so preserve their
+      // boxes but expose them in semantic A-D order instead of slicing between
+      // non-monotonic stream indices.
+      const markerOrder = segmentOptions.map(option => option.text).join('');
+      if (segmentOptions.length === optionLabels.length
+          && markerOrder !== optionLabels.join('')) {
+        segmentOptions = [...segmentOptions]
+          .sort((a, b) => a.text.localeCompare(b.text));
+        segmentTotalOptionsText = segmentOptions
+          .map(option => [segmentText[option.index]!]);
+      } else segmentOptions.forEach((option: OptionMarker, index) => {
         
         let totalOptionText: OptionText = segmentOptions[index + 1]
           ? segmentText.slice(option.index, segmentOptions[index + 1]!.index)
@@ -239,7 +168,6 @@ export async function getOptions(pdf: PDFDocumentProxy, totalText: DocumentText,
       
         for(let l = 0; l < totalOptionText.length; l++) {
           if(totalOptionText[l]!.font === graphFont) {
-            console.log("Graph Question Found")
             totalOptionText = [totalOptionText[0]!];
             break;
           }
@@ -248,6 +176,30 @@ export async function getOptions(pdf: PDFDocumentProxy, totalText: DocumentText,
         segmentTotalOptionsText.push(totalOptionText);
 
       });
+
+      // non-linear layouts cannot safely make formula fragments or table
+      // cells select an answer. Horizontal/spatial labels and vertical labels
+      // without same-line prose therefore expose only the four unambiguous
+      // A-D glyphs as click targets. Ordinary vertical rows keep their text.
+      const markerBoxes = segmentOptions.map(option => segmentText[option.index]!);
+      const markerYs = markerBoxes.map(box => box.y);
+      const markersAreHorizontal = markerYs.length === optionLabels.length
+        && Math.max(...markerYs) - Math.min(...markerYs) <= alignedMarkerTolerance;
+      const everyMarkerHasInlineText = markerBoxes.every(marker =>
+        segmentText.some(item =>
+          item.x > marker.x
+          && Math.abs(item.y - marker.y) <= visualLineTolerance
+          && !isOptionLabel(item.text.trim())));
+      const markerFont = markerBoxes[0]?.font;
+      const sameFontLetterCount = segmentText.filter(item =>
+        item.font === markerFont && isOptionLabel(item.text.trim())).length;
+      const ambiguousHorizontalTable = markersAreHorizontal
+        && sameFontLetterCount > optionLabels.length;
+
+      if (segmentOptions.length === optionLabels.length
+          && (ambiguousHorizontalTable || !everyMarkerHasInlineText)) {
+        segmentTotalOptionsText = segmentOptions.map(option => [segmentText[option.index]!]);
+      }
 
       const anySingle = segmentTotalOptionsText.some(opt => opt.length === 1);
 

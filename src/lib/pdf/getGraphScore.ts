@@ -31,8 +31,6 @@ function getGraphicsProfile(pageGraphics: PageGraphics): GraphicsProfile {
 
 function graphLikenessScore(profile: GraphicsProfile): number {
   const { stroke, rectangle } = profile;
-  console.log("RECTANGLE")
-  console.log(rectangle)
   if (stroke + rectangle === 0) return 0;
 
   const strokeRatio = stroke / (stroke + rectangle + 1);

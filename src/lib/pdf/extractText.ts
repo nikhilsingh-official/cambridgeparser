@@ -42,8 +42,5 @@ export async function extractText(pdf: pdfjsLib.PDFDocumentProxy): Promise<Docum
     totalText.push(pageItems);
   }
 
-  console.log("Text:")
-  console.log(totalText)
-
   return totalText;
 }

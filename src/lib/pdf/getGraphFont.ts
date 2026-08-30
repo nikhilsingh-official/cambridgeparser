@@ -10,9 +10,6 @@ export function getGraphFont(
 
   const fontScores = getGraphScore(filteredText, filteredGraphics);
 
-  console.log("Fonts with probability of being graph font");
-  console.log(fontScores);
-
   const entries = Object.entries(fontScores);
   if (entries.length === 0) return;
 
