@@ -70,3 +70,6 @@ dist/
 
 # local Supabase CLI scratch state, including emulator service-role keys.
 supabase/.temp/
+
+# checksum-pinned Cambridge PDFs are fetched locally for the solver audit.
+tests/fixtures/solver-corpus/cache/

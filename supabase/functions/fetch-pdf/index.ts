@@ -1,5 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import * as pdfjs from "npm:pdfjs-serverless";
+// extracted so the production parser and golden-corpus audit share one implementation.
+import { getAnswersFromPDF } from "./answerKey.ts";
 
 const ALLOWED_HOSTNAMES = new Set([
   "pastpapers.papacambridge.com",
@@ -75,133 +77,6 @@ async function fetchFirstPDF(urls: string[], fetchTimeoutMs = 10000) {
   return null;
 }
 
-interface TableRow {
-  question: number;
-  answer: string;
-  marks: string;
-  page: number;
-  y: number;
-}
-
-interface ColumnStats {
-  x: number;
-  values: number[];
-}
-
-async function getAnswersFromPDF(arrayBuffer: ArrayBuffer, xLeeway = 5, yLeeway = 2): Promise<TableRow[] | null> {
-  const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
-  const pdf = await loadingTask.promise;
-
-  let allItems: { text: string; x: number; y: number; page: number }[] = [];
-
-  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-    const page = await pdf.getPage(pageNum);
-    const content = await page.getTextContent();
-    content.items.forEach((item: any) => {
-      allItems.push({
-        text: item.str,
-        x: item.transform[4],
-        y: item.transform[5],
-        page: pageNum,
-      });
-    });
-  }
-
-  if (allItems.length === 0) {
-    return null;
-  }
-
-  // Group items by approximate Y (rows)
-  allItems.sort((a, b) => a.page - b.page || b.y - a.y || a.x - b.x);
-  allItems = allItems.filter(item => {
-    if (!item.text) return false; // ignore null/undefined
-    // Remove all types of spaces and zero-width chars
-    const normalized = item.text.replace(/[\s\u00A0\u200B\u200C\u200D]/g, '');
-    return normalized !== '';
-  });
-
-  const rows: TableRow[] = [];
-  let tableStarted = false;
-
-  for (let i = 0; i < allItems.length; i++) {
-    const item = allItems[i];
-
-    if (!tableStarted && /Question/i.test(item.text)) {
-      // Heuristic: look for Question / Answer / Marks in the same y row
-      const sameRow = allItems.filter(it => Math.abs(it.y - item.y) < yLeeway && it.page === item.page);
-      const texts = sameRow.map(it => it.text.toLowerCase());
-      if (texts.includes("question") && texts.includes("answer") && texts.includes("marks")) {
-
-        tableStarted = true;
-        i += sameRow.length - 1; // skip header row
-        continue;
-      }
-    }
-
-    if (tableStarted) {
-      // Try to find a row of exactly 3 items on this y
-      const rowItems = allItems.filter(
-        it =>
-          it.page === item.page &&
-          Math.abs(it.y - item.y) < yLeeway &&
-          !rows.some(r => r.y === it.y && r.page === it.page)
-      );
-
-      if (rowItems.length !== 3) continue; // ignore incomplete rows
-
-      if (rows.length > 0) {
-        const prevRow = rows[rows.length - 1];
-        const colX = [rowItems[0].x, rowItems[1].x, rowItems[2].x];
-        const prevX = [prevRow.qX, prevRow.aX, prevRow.mX];
-
-        if (!colX.every((x, i) => Math.abs(x - prevX[i]) <= xLeeway)) continue;
-      }
-
-
-      // Sort row left-to-right by x
-      rowItems.sort((a, b) => a.x - b.x);
-
-      rows.push({
-        question: parseInt(rowItems[0].text) || -1,
-        answer: rowItems[1].text,
-        marks: rowItems[2].text,
-        page: rowItems[0].page,
-        y: rowItems[0].y,
-        qX: rowItems[0].x,
-        aX: rowItems[1].x,
-        mX: rowItems[2].x
-      });
-
-      i += rowItems.length - 1;
-
-    }
-  }
-
-  if (rows.length === 0) {
-    return null;
-  }
-
-  // Validate sequential question numbers & remove outliers
-  const cleanRows: TableRow[] = [];
-  let expectedQ = 1;
-  for (const r of rows) {
-    const qNum = parseInt(r.question, 10);
-    if (isNaN(qNum)) continue; // skip invalid
-    if (qNum === expectedQ) {
-      cleanRows.push(r);
-      expectedQ++;
-    } else if (qNum > expectedQ) {
-      expectedQ = qNum + 1;
-      cleanRows.push(r);
-    }
-  }
-
-
-  
-  return cleanRows.length > 0 ? cleanRows : null;
-}
-
-
 Deno.serve(async (req: any) => {
   try {
     if (req.method !== "POST") {
@@ -230,14 +105,13 @@ Deno.serve(async (req: any) => {
 
     const qpArrayBuffer = await qpResult.response.arrayBuffer();
     const msArrayBuffer = await msResult.response.arrayBuffer();
-    const answers = await getAnswersFromPDF(msArrayBuffer);
+    // inject the Edge runtime's PDF.js adapter into the shared extractor.
+    const answers = await getAnswersFromPDF(pdfjs, msArrayBuffer);
 
     const body = {
       qp:  Array.from(new Uint8Array(qpArrayBuffer)),
       answers: answers
     }
-
-    console.log(body)
 
     return new Response(JSON.stringify(body), {
       status: 200,
