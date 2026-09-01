@@ -77,6 +77,15 @@ markers with enlarged label hitboxes instead of claiming unsafe formula/table
 fragment association. CP-010 (contradictory historical roadmap status) was
 also mitigated. Both are excluded from the unresolved ranking.
 
+The 2026-09-01 low-complexity pass also removed three failure amplifiers that
+are not unresolved entries: topic-practice history is no longer silently cut at
+1,000 rows (the local cap is 10,000 and the read is count-paginated), malformed
+or rubric-inconsistent AI scores are rejected before persistence, and transient
+Google 408/500/502/503/504 or network failures can fall back to OpenRouter after one
+retry. Statistics reads now fail by progress/topics/focus/engagement/IDE group,
+with a visible section-level error, rather than one rejected query clearing the
+whole page. This isolation does **not** resolve CP-004's mixed filter scopes.
+
 ## High-severity, high-complexity decisions
 
 These are the issues most likely to require owner attention rather than another

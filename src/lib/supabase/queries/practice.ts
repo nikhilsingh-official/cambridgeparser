@@ -11,7 +11,9 @@
 
 import type { Db } from '@/lib/types/database';
 import type { PracticeRow } from '@/lib/stats/model';
-import { unwrap } from './core';
+import { fetchCountedPages } from './pagination';
+
+const PRACTICE_PAGE_SIZE = 10_000;
 
 /**
  * Every answered, topic-tagged question the user has completed.
@@ -21,11 +23,10 @@ import { unwrap } from './core';
  * different mastery estimate on every page load. model.ts sorts defensively as
  * well, because "silently different" is the worst failure mode available.
  *
- * SIZE: one row per (question x topic). A student who has sat 50 papers of 40
- * questions with 1.2 topics each is ~2,400 rows - fine for one read, but this
- * is the query to watch if a user ever gets into the thousands of papers. The
- * fix then is a materialised per-topic summary, not pagination: the model
- * needs the whole sequence or none of it.
+ * SIZE: one row per (question x topic). The model needs the whole sequence, so
+ * this read is count-aware and paginated rather than silently accepting the
+ * PostgREST response limit. With max_rows=10,000 current users take one request;
+ * a lower hosted cap is detected through the exact count and read in batches.
  */
 export async function fetchTopicPractice(
   supabase: Db,
@@ -34,13 +35,24 @@ export async function fetchTopicPractice(
 ): Promise<PracticeRow[]> {
   let query = supabase
     .from('v_topic_practice')
-    .select('topic_id, topic_name, subject_code, is_correct, option_count, marks, local_date, started_at, paper_id, paper_number, question_number')
+    .select('topic_id, topic_name, subject_code, is_correct, option_count, marks, local_date, started_at, paper_id, paper_number, question_number', { count: 'exact' })
     .eq('user_id', userId);
 
   if (subjectCodes?.length) query = query.in('subject_code', subjectCodes);
 
-  return unwrap<PracticeRow>(
+  // use stable tie-breakers as range pagination requires a deterministic
+  // order even when several answers share the same attempt timestamp.
+  query = query
+    .order('started_at', { ascending: true })
+    .order('paper_id', { ascending: true })
+    .order('question_number', { ascending: true })
+    .order('topic_id', { ascending: true });
+
+  return fetchCountedPages<PracticeRow>(
     'fetchTopicPractice',
-    query.order('started_at', { ascending: true }),
+    PRACTICE_PAGE_SIZE,
+    // exact count is what distinguishes a complete short result from a
+    // response truncated by a server-side max_rows cap.
+    (from, to) => query.range(from, to),
   );
 }

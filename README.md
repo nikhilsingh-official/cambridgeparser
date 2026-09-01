@@ -170,6 +170,18 @@ variables prefixed with `VITE_` are shipped to browsers. For local functions,
 put provider values in an ignored `supabase/functions/.env`; for hosted
 functions, use `npx supabase secrets set`.
 
+The grader retries one transient Google failure, then falls back to OpenRouter
+for Google rate limits, missing models, network failures, and HTTP
+408/500/502/503/504 responses when `OPENROUTER_API_KEY` is configured. Returned
+scores are validated for types, non-negative bounds, rubric IDs, per-point
+limits, award consistency, and agreement between point totals and the trusted
+question maximum before they are persisted.
+
+Local PostgREST is configured for at most 10,000 rows per response. The
+per-question topic-practice read also uses exact-count range pagination, so it
+remains complete if the hosted project has a lower API row cap; setting the
+hosted API maximum to 10,000 avoids extra round trips for long histories.
+
 The Supabase values are not secret credentials. Authorization depends on RLS.
 Never add a service-role or secret key to browser or Vercel configuration.
 Supabase injects server-only secret credentials into Edge Functions; the code
@@ -189,7 +201,7 @@ npx vue-tsc -b
 npm run build
 ```
 
-The current Node suite contains 121 assertions/tests across `tests/**/*.test.ts`
+The current Node suite contains 129 assertions/tests across `tests/**/*.test.ts`
 and `tests/**/*.test.mjs`. The build repeats the type check before Vite bundles
 the application.
 
@@ -280,7 +292,8 @@ not prove the Vercel rewrite or unified app is live.
 - PapaCambridge's public past-paper mirror. Paper availability and upstream
   response time affect solver startup.
 - Google AI Studio and OpenRouter. Model availability, quotas, response
-  contracts, and keys affect IDE grading.
+  contracts, and keys affect IDE grading. OpenRouter fallback requires its own
+  configured key; it cannot help when only Google credentials are present.
 - Vercel static hosting and history-route rewrites.
 - PDF.js for rendering/annotating papers, CodeMirror for editing, the Rust/WASM
   parser for diagnostics, and ECharts for analytics.

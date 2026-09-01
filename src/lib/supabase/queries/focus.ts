@@ -9,6 +9,7 @@ import type {
   QuestionFlagsView,
 } from '@/lib/types/database';
 import { applyAttemptFilter, unwrap, type StatsFilter } from './core';
+import { fetchCountedPages } from './pagination';
 import { isGuess, isOverconfident, isUnderconfident } from '@/lib/stats/model';
 
 /**
@@ -33,33 +34,21 @@ export async function fetchQuestionFlags(
     to: filter.to,
   };
 
-  // PAGINATED, deliberately. PostgREST caps a response at `max_rows`
-  // (1000 in supabase/config.toml) and truncates SILENTLY - no error, no
-  // header the client checks, just fewer rows. This view is one row per
-  // question answered, so a user passes 1000 after about 25 papers, and every
-  // number in the focus section then quietly describes a subset. It read 1000
-  // of 1840 rows before this fix and reported the shortfall as fact.
-  //
-  // One row per question is also why this is the only query that needs it: the
-  // others read aggregated views that return one row per day, subject or
-  // bucket.
-  const PAGE = 1000;
-  const rows: QuestionFlagsView[] = [];
-  for (let offset = 0; ; offset += PAGE) {
-    const page = await unwrap<QuestionFlagsView>(
-      'fetchQuestionFlags',
-      applyAttemptFilter(
-        supabase.from('v_question_flags').select('*'),
-        userId,
-        narrowed,
-      ).range(offset, offset + PAGE - 1),
-    );
-    rows.push(...page);
-    // A short page is the last page. Guard the pathological case where the
-    // server returns a full page forever rather than looping without end.
-    if (page.length < PAGE || offset > 200_000) break;
-  }
-  return rows;
+  // PAGINATED, deliberately. PostgREST truncates at its max_rows cap.
+  // The local cap is 10,000, while exact-count pagination also stays correct
+  // against a hosted project configured lower. This view passed 1,000 rows
+  // after about 25 papers and previously reported that truncated subset as fact.
+  const query = applyAttemptFilter(
+    supabase.from('v_question_flags').select('*', { count: 'exact' }),
+    userId,
+    narrowed,
+  ).order('question_attempt_id', { ascending: true });
+
+  return fetchCountedPages<QuestionFlagsView>(
+    'fetchQuestionFlags',
+    10_000,
+    (from, to) => query.range(from, to),
+  );
 }
 
 /**

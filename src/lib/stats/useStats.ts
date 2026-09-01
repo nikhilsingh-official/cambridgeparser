@@ -7,9 +7,9 @@
 // The query layer under lib/supabase/queries/ was built in `aec4e13` and had
 // never been called by anything. This is its first consumer.
 //
-// Loading is all-at-once rather than per-panel: the panels share a filter, and
-// staggered per-panel spinners on a page this dense reads as a page that is
-// broken rather than a page that is loading.
+// reads are grouped by the UI section they support. A missing or broken
+// aggregate therefore blanks only its own section instead of erasing every
+// valid statistic returned by the other views.
 // ==========================================================================
 import { computed, reactive, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
@@ -49,6 +49,7 @@ import {
   type PracticeRow, type QueueItem, type MissedQuestion,
   type IdeSubmission,
 } from './model';
+import { loadStatsSections } from './loadStatsSections';
 
 export interface StatsState {
   attempts: AttemptSummaryView[];
@@ -74,6 +75,26 @@ const EMPTY: StatsState = {
   ideTotals: null, ideSubmissions: [],
 };
 
+export type StatsSection = 'progress' | 'topics' | 'focus' | 'engagement' | 'ide';
+
+// each failure clears only the fields owned by that query group. Shared
+// attempt data belongs to progress because it drives the page summary too.
+const EMPTY_BY_SECTION: Record<StatsSection, Partial<StatsState>> = {
+  progress: { attempts: [], subjects: [], options: null },
+  topics: { topics: [], practice: [] },
+  focus: { flags: [], calibration: [], answerChanges: null },
+  engagement: { daily: [], hours: [] },
+  ide: { ideTotals: null, ideSubmissions: [] },
+};
+
+const EMPTY_SECTION_ERRORS: Record<StatsSection, string | null> = {
+  progress: null,
+  topics: null,
+  focus: null,
+  engagement: null,
+  ide: null,
+};
+
 export function useStats() {
   const auth = useAuthStore();
   const { user } = storeToRefs(auth);
@@ -81,7 +102,10 @@ export function useStats() {
   const filter = reactive<StatsFilter>({});
   const state = reactive<StatsState>({ ...EMPTY });
   const loading = ref(true);
-  const error = ref<string | null>(null);
+  const sectionErrors = reactive<Record<StatsSection, string | null>>({ ...EMPTY_SECTION_ERRORS });
+  const error = computed(() => Object.values(sectionErrors).some(Boolean)
+    ? 'Some statistics sections could not load. Unaffected sections are still available.'
+    : null);
   // filter changes can overlap twelve parallel reads. Only the newest load
   // may publish; otherwise a slower, older selection can overwrite the current
   // filter's data and make the controls disagree with every chart.
@@ -94,57 +118,69 @@ export function useStats() {
       // Not an error: the router guard means this only happens in the moment
       // between mount and session restore.
       Object.assign(state, EMPTY);
+      Object.assign(sectionErrors, EMPTY_SECTION_ERRORS);
       loading.value = false;
       return;
     }
     loading.value = true;
-    error.value = null;
+    Object.assign(sectionErrors, EMPTY_SECTION_ERRORS);
     try {
-      // Parallel, not sequential: seven independent reads chained with await
-      // would take seven round trips for no reason.
-      const [attempts, daily, hours, subjects, topics, practice, flags, calibration, answerChanges, options, ideTotals, ideSubmissions] = await Promise.all([
-        fetchAttemptSummaries(supabase, userId, filter),
-        // Not every view carries the full filter. v_daily_activity is keyed
-        // on date only, and v_subject_stats / v_hour_of_day / the calibration
-        // buckets aggregate across papers - so they take what they support and
-        // the rest of the filter is applied to the attempt list. Passing an
-        // unsupported filter silently to a query that ignores it would be
-        // worse: the page would look filtered when it was not.
-        fetchDailyActivity(supabase, userId, filter.from, filter.to),
-        fetchHourOfDay(supabase, userId),
-        fetchSubjectStats(supabase, userId),
-        // read unfiltered on purpose. v_topic_mastery aggregates across
-        // papers so it cannot honour a year or series, and its subject
-        // argument is a single code where the page's filter is a multiselect -
-        // so the narrowing happens in the `topics` computed below, and toggling
-        // a subject costs no round trip.
-        fetchTopicMastery(supabase, userId),
-        // The per-question sequence. Read unfiltered for the same reason as
-        // the line above, and because knowledge tracing needs the WHOLE
-        // history of a topic - a year filter applied here would not narrow the
-        // estimate, it would corrupt it.
-        fetchTopicPractice(supabase, userId),
-        fetchQuestionFlags(supabase, userId, filter),
-        fetchCalibrationCurve(supabase, userId),
-        fetchAnswerChanges(supabase, userId),
-        // Filter options describe what COULD be selected, so they are read
-        // unfiltered - otherwise selecting Chemistry removes every other
-        // subject from the dropdown and the filter becomes a one-way door.
-        fetchFilterOptions(supabase, userId),
-        // The IDE reads are unfiltered: the page's filter is built from
-        // Cambridge paper metadata (subject, year, series, variant) and a
-        // pseudocode question record carries none of it. Narrowing them by a
-        // filter they cannot honour would make the section look filtered when
-        // it was not - the same rule as v_topic_mastery above.
-        fetchIdeStats(supabase, userId),
-        fetchIdeAttempts(supabase, userId),
-      ]);
+      // groups run concurrently, but each has its own rejection boundary.
+      // A focus-view migration failure, for example, no longer discards valid
+      // progress, topic, engagement and IDE responses.
+      const results = await loadStatsSections<StatsSection, Partial<StatsState>>({
+        progress: async () => {
+          const [attempts, subjects, options] = await Promise.all([
+            fetchAttemptSummaries(supabase, userId, filter),
+            // These rollups do not carry the full paper filter; see CP-004.
+            fetchSubjectStats(supabase, userId),
+            // Options remain unfiltered so a selection is never a one-way door.
+            fetchFilterOptions(supabase, userId),
+          ]);
+          return { attempts, subjects, options };
+        },
+        topics: async () => {
+          // both reads need the whole topic history. Subject narrowing is
+          // applied by the computed values below; year/series filtering would
+          // corrupt the sequence after those dimensions were aggregated away.
+          const [topics, practice] = await Promise.all([
+            fetchTopicMastery(supabase, userId),
+            fetchTopicPractice(supabase, userId),
+          ]);
+          return { topics, practice };
+        },
+        focus: async () => {
+          const [flags, calibration, answerChanges] = await Promise.all([
+            fetchQuestionFlags(supabase, userId, filter),
+            fetchCalibrationCurve(supabase, userId),
+            fetchAnswerChanges(supabase, userId),
+          ]);
+          return { flags, calibration, answerChanges };
+        },
+        engagement: async () => {
+          const [daily, hours] = await Promise.all([
+            fetchDailyActivity(supabase, userId, filter.from, filter.to),
+            fetchHourOfDay(supabase, userId),
+          ]);
+          return { daily, hours };
+        },
+        // IDE rows have no Cambridge paper dimensions, so they remain an
+        // explicitly independent, unfiltered section.
+        ide: async () => {
+          const [ideTotals, ideSubmissions] = await Promise.all([
+            fetchIdeStats(supabase, userId),
+            fetchIdeAttempts(supabase, userId),
+          ]);
+          return { ideTotals, ideSubmissions };
+        },
+      });
       if (generation !== loadGeneration) return;
-      Object.assign(state, { attempts, daily, hours, subjects, topics, practice, flags, calibration, answerChanges, options, ideTotals, ideSubmissions });
-    } catch (e) {
-      if (generation !== loadGeneration) return;
-      error.value = e instanceof Error ? e.message : String(e);
-      Object.assign(state, EMPTY);
+      for (const section of Object.keys(EMPTY_BY_SECTION) as StatsSection[]) {
+        const result = results[section];
+        Object.assign(state, EMPTY_BY_SECTION[section]);
+        sectionErrors[section] = result.error;
+        if (result.data) Object.assign(state, result.data);
+      }
     } finally {
       if (generation === loadGeneration) loading.value = false;
     }
@@ -260,7 +296,7 @@ export function useStats() {
   const ide = computed(() => readIde(state.ideTotals, state.ideSubmissions));
 
   return {
-    filter, state, loading, error, hasData, totals, streaks, focus, topics,
+    filter, state, loading, error, sectionErrors, hasData, totals, streaks, focus, topics,
     practice, queue, rankedTopics, missed, readinessByPaper, ide, reload: load,
   };
 }

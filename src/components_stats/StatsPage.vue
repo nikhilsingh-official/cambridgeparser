@@ -23,8 +23,10 @@ import type { ExamSeries } from '@/lib/types/enums';
 // the filters were ['Wade Cooper', 'Arlene Mccoy', ...] and bound to
 // nothing. They now write straight into the query filter, so changing one
 // re-reads the page.
+// sectionErrors is intentionally separate from the page summary so one
+// failed view can be explained beside its own panels without hiding the rest.
 const {
-  filter, state, loading, error, hasData, totals, streaks, focus, topics,
+  filter, state, loading, error, sectionErrors, hasData, totals, streaks, focus, topics,
   rankedTopics, queue, missed, readinessByPaper, ide,
 } = useStats();
 
@@ -161,7 +163,9 @@ const focusRec = computed(() => focusRecommendation({
 
 const subtitle = computed(() => {
   if (loading.value) return 'Reading your attempt history…';
-  if (error.value) return 'Could not load your statistics.';
+  // only a progress-group failure invalidates the header summary; focus,
+  // topic, engagement and IDE errors are reported in their own sections.
+  if (sectionErrors.progress) return 'Could not load your progress summary.';
   if (!hasData.value) return 'No completed papers yet. Sit one and this page fills in.';
   const acc = pct(totals.value.accuracy) ?? '—';
   return `${totals.value.papers} papers · ${totals.value.questions} questions · ${acc} overall accuracy.`;
@@ -245,12 +249,14 @@ const subjectSplitOption = (theme: ChartTheme) => ({
                 <EChart :option="subjectSplitOption" :has-data="hasData" label="marks by subject" />
             </div>
         </div>
+        <!-- section query failures are rendered in the affected panel and
+             do not suppress successful sibling sections. -->
         <!-- first, and deliberately. docs/solver/stats_priority.md ranks
              what students act on: recommendations, self-assessment feedback
              and re-practice outrank every backward-looking chart below, and
              time-on-task - which used to lead this page - ranks last of
              fifteen. The one section that ends in a verb goes at the top. -->
-        <div v-if="queue.length" class="section-container nextsteps-container">
+        <div v-if="queue.length || sectionErrors.topics" class="section-container nextsteps-container">
             <div class="section-header">
                 <h1 class="section-inner-header"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-compass-icon lucide-compass"><path d="m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z"/><circle cx="12" cy="12" r="10"/></svg> next steps</h1>
                 <!-- collapse button controls the section content below. -->
@@ -265,8 +271,9 @@ const subjectSplitOption = (theme: ChartTheme) => ({
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down-icon lucide-chevron-down"><path d="m6 9 6 6 6-6"/></svg>
                 </button>
             </div>
-            <RecommendationBanner v-show="isExpanded('nextSteps')" class="section-rec" :recommendation="queueRec" />
-            <div v-show="isExpanded('nextSteps')" class="section-body">
+            <p v-if="sectionErrors.topics && isExpanded('nextSteps')" class="section-error">Next steps could not load: {{ sectionErrors.topics }}</p>
+            <RecommendationBanner v-show="isExpanded('nextSteps') && !sectionErrors.topics" class="section-rec" :recommendation="queueRec" />
+            <div v-show="isExpanded('nextSteps') && !sectionErrors.topics" class="section-body">
                 <NextStepsOverall :queue="queue" :missed="missed" :readiness="readinessByPaper" />
             </div>
         </div>
@@ -274,7 +281,7 @@ const subjectSplitOption = (theme: ChartTheme) => ({
              empty - docs/stats_page_design.md §6. Topic tagging covers the
              multiple-choice syllabuses only, so a student working through
              9618 sees no section here and that is correct, not broken. -->
-        <div v-if="topics.length" class="section-container topics-container">
+        <div v-if="topics.length || sectionErrors.topics" class="section-container topics-container">
             <div class="section-header">
                 <h1 class="section-inner-header"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-layers-icon lucide-layers"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/></svg> topics</h1>
                 <button
@@ -288,8 +295,9 @@ const subjectSplitOption = (theme: ChartTheme) => ({
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down-icon lucide-chevron-down"><path d="m6 9 6 6 6-6"/></svg>
                 </button>
             </div>
-            <RecommendationBanner v-show="isExpanded('topics')" class="section-rec" :recommendation="topicRec" />
-            <div v-show="isExpanded('topics')" class="section-body">
+            <p v-if="sectionErrors.topics && isExpanded('topics')" class="section-error">Topics could not load: {{ sectionErrors.topics }}</p>
+            <RecommendationBanner v-show="isExpanded('topics') && !sectionErrors.topics" class="section-rec" :recommendation="topicRec" />
+            <div v-show="isExpanded('topics') && !sectionErrors.topics" class="section-body">
                 <TopicsOverall :ranked="rankedTopics" :subjects="state.subjects" />
             </div>
         </div>
@@ -307,8 +315,9 @@ const subjectSplitOption = (theme: ChartTheme) => ({
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down-icon lucide-chevron-down"><path d="m6 9 6 6 6-6"/></svg>
                 </button>
             </div>
-            <RecommendationBanner v-show="isExpanded('progress')" class="section-rec" :recommendation="progressRec" />
-            <div v-show="isExpanded('progress')" class="section-body">
+            <p v-if="sectionErrors.progress && isExpanded('progress')" class="section-error">Progress could not load: {{ sectionErrors.progress }}</p>
+            <RecommendationBanner v-show="isExpanded('progress') && !sectionErrors.progress" class="section-rec" :recommendation="progressRec" />
+            <div v-show="isExpanded('progress') && !sectionErrors.progress" class="section-body">
                 <ProgressOverall :attempts="state.attempts" :subjects="state.subjects" :totals="totals" />
             </div>
         </div>
@@ -318,7 +327,7 @@ const subjectSplitOption = (theme: ChartTheme) => ({
              IDE is a separate app for most of this page's readers, and the
              heading names it so the figures below cannot be mistaken for the
              solver's. -->
-        <div v-if="ide.submissions" class="section-container ide-container">
+        <div v-if="ide.submissions || sectionErrors.ide" class="section-container ide-container">
             <div class="section-header">
                 <h1 class="section-inner-header"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-code-icon lucide-code"><path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/></svg> pseudocode</h1>
                 <button
@@ -332,7 +341,8 @@ const subjectSplitOption = (theme: ChartTheme) => ({
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down-icon lucide-chevron-down"><path d="m6 9 6 6 6-6"/></svg>
                 </button>
             </div>
-            <div v-show="isExpanded('ide')" class="section-body">
+            <p v-if="sectionErrors.ide && isExpanded('ide')" class="section-error">Pseudocode statistics could not load: {{ sectionErrors.ide }}</p>
+            <div v-show="isExpanded('ide') && !sectionErrors.ide" class="section-body">
                 <IdeOverall :reading="ide" :submissions="state.ideSubmissions" />
             </div>
         </div>
@@ -350,8 +360,9 @@ const subjectSplitOption = (theme: ChartTheme) => ({
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down-icon lucide-chevron-down"><path d="m6 9 6 6 6-6"/></svg>
                 </button>
             </div>
-            <RecommendationBanner v-show="isExpanded('focus')" class="section-rec" :recommendation="focusRec" />
-            <div v-show="isExpanded('focus')" class="section-body">
+            <p v-if="sectionErrors.focus && isExpanded('focus')" class="section-error">Focus statistics could not load: {{ sectionErrors.focus }}</p>
+            <RecommendationBanner v-show="isExpanded('focus') && !sectionErrors.focus" class="section-rec" :recommendation="focusRec" />
+            <div v-show="isExpanded('focus') && !sectionErrors.focus" class="section-body">
                 <FocusOverall :calibration="state.calibration" :flags="state.flags" :focus="focus" :answer-changes="state.answerChanges" />
             </div>
         </div>
@@ -369,8 +380,9 @@ const subjectSplitOption = (theme: ChartTheme) => ({
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down-icon lucide-chevron-down"><path d="m6 9 6 6 6-6"/></svg>
                 </button>
             </div>
-            <RecommendationBanner v-show="isExpanded('engagement')" class="section-rec" :recommendation="engagementRec" />
-            <div v-show="isExpanded('engagement')" class="section-body">
+            <p v-if="sectionErrors.engagement && isExpanded('engagement')" class="section-error">Engagement statistics could not load: {{ sectionErrors.engagement }}</p>
+            <RecommendationBanner v-show="isExpanded('engagement') && !sectionErrors.engagement" class="section-rec" :recommendation="engagementRec" />
+            <div v-show="isExpanded('engagement') && !sectionErrors.engagement" class="section-body">
                 <EngagementOverall :attempts="state.attempts" :daily="state.daily" :hours="state.hours" :streaks="streaks" :totals="totals" />
             </div>
         </div>
@@ -378,6 +390,18 @@ const subjectSplitOption = (theme: ChartTheme) => ({
 </template>
 <style lang="scss" scoped>
     .stats-error { margin: 0.25rem 0 0; color: var(--danger); font-family: var(--font-body); font-size: 0.8rem; }
+    // section failures stay beside the panel they affect; successful
+    // sections remain visible instead of being replaced by a page-wide error.
+    .section-error {
+      margin: 0 0 0.75rem;
+      padding: 0.75rem 1rem;
+      border: 1px solid color-mix(in srgb, var(--danger) 38%, transparent);
+      border-radius: 8px;
+      color: var(--danger);
+      background: color-mix(in srgb, var(--danger) 8%, transparent);
+      font-family: var(--font-body);
+      font-size: 0.85rem;
+    }
     // the chart host fills its container, and this grid cell is large, so
     // an unconstrained pie rendered several hundred pixels across and dwarfed
     // the header text beside it. Bound it.

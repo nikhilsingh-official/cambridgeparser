@@ -5,11 +5,10 @@
 //
 // Two rules hold for everything in queries/:
 //
-//   1. Every query takes an explicit `userId` and filters on it. RLS is
-//      deliberately deferred until production (docs/future_work.md §3.2), which
-//      means Postgres will happily return every user's rows to anyone who
-//      asks. Until RLS lands, the user predicate here is the ONLY thing
-//      scoping the data, so it is never optional and never inferred.
+//   1. Every user-owned query takes an explicit `userId` and filters on it.
+//      RLS is the authorization boundary and is exercised by the SQL suites;
+//      the explicit predicate remains defence-in-depth and prevents callers
+//      from accidentally requesting data they can never use.
 //
 //   2. Errors are unwrapped in one place. PostgrestError is not an Error, so
 //      `throw error` produces an object with no stack; unwrap() converts it

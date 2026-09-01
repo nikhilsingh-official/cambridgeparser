@@ -130,9 +130,9 @@ export async function fetchFilterOptions(
  * Reduced client-side rather than with DISTINCT ON: PostgREST cannot express
  * `distinct on (paper_id)`, and the alternative - a dedicated view - would be a
  * migration for something bounded by papers-sat, which is small. The one
- * consequence is PostgREST's max_rows (1000, supabase/config.toml): past a
- * thousand lifetime attempts the oldest ones stop feeding the badges. They are
- * the least interesting ones, and the fix - a view - is cheap when it matters.
+ * consequence is PostgREST's configured 10,000-row response cap: beyond that
+ * many lifetime attempts the oldest ones stop feeding the badges. They are the
+ * least interesting ones, and the fix - a view - is cheap when it matters.
  */
 export interface PaperAttemptState {
   paperId: PaperSchema;

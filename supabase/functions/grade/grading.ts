@@ -18,17 +18,17 @@ type JsonObject = Record<string, any>;
 type FetchLike = typeof fetch;
 
 const gradingProperties = {
-  total_awarded: { type: 'integer' },
-  max_marks: { type: 'integer' },
+  total_awarded: { type: 'integer', minimum: 0 },
+  max_marks: { type: 'integer', minimum: 0 },
   points: {
     type: 'array',
     items: {
       type: 'object',
       additionalProperties: false,
       properties: {
-        marking_point_id: { type: 'string' },
+        marking_point_id: { type: 'string', minLength: 1 },
         awarded: { type: 'boolean' },
-        marks_awarded: { type: 'integer' },
+        marks_awarded: { type: 'integer', minimum: 0 },
         confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
         evidence: { type: 'string' },
         concerns: { type: 'array', items: { type: 'string' } },
@@ -139,30 +139,72 @@ export function extractJsonObject(text: string): JsonObject | null {
   }
 }
 
-export function validateGradingPayload(payload: unknown): string | null {
+export function validateGradingPayload(payload: unknown, trustedRecord?: JsonObject): string | null {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return 'response is not a JSON object';
   const value = payload as JsonObject;
   if (!Number.isInteger(value.total_awarded)) return 'total_awarded must be an integer';
+  if (value.total_awarded < 0) return 'total_awarded must be non-negative';
   if (!Number.isInteger(value.max_marks)) return 'max_marks must be an integer';
+  if (value.max_marks < 0) return 'max_marks must be non-negative';
+  if (value.total_awarded > value.max_marks) return 'total_awarded cannot exceed max_marks';
   if (!Array.isArray(value.points)) return 'points must be a list';
+  const responseIds = new Set<string>();
   for (let index = 0; index < value.points.length; index += 1) {
     const point = value.points[index];
     if (!point || typeof point !== 'object' || Array.isArray(point)) return `points[${index}] is not an object`;
     if (typeof point.marking_point_id !== 'string') return `points[${index}].marking_point_id must be a string`;
+    if (!point.marking_point_id.trim()) return `points[${index}].marking_point_id cannot be empty`;
+    if (responseIds.has(point.marking_point_id)) return `points[${index}].marking_point_id is duplicated`;
+    responseIds.add(point.marking_point_id);
     if (typeof point.awarded !== 'boolean') return `points[${index}].awarded must be a boolean`;
     if (!Number.isInteger(point.marks_awarded)) return `points[${index}].marks_awarded must be an integer`;
+    if (point.marks_awarded < 0) return `points[${index}].marks_awarded must be non-negative`;
+    if (!point.awarded && point.marks_awarded !== 0) return `points[${index}] is unawarded but has marks`;
+    if (point.awarded && point.marks_awarded === 0) return `points[${index}] is awarded but has no marks`;
     if (!['high', 'medium', 'low'].includes(point.confidence)) return `points[${index}].confidence is invalid`;
     if (typeof point.evidence !== 'string') return `points[${index}].evidence must be a string`;
     if (!Array.isArray(point.concerns)) return `points[${index}].concerns must be a list`;
+    if (!point.concerns.every((concern: unknown) => typeof concern === 'string')) {
+      return `points[${index}].concerns must contain only strings`;
+    }
   }
-  return typeof value.overall_explanation === 'string'
+  if (typeof value.overall_explanation !== 'string') return 'overall_explanation must be a string';
+
+  if (!trustedRecord) return null;
+  const cap = resolveMaxMarks(trustedRecord);
+  if (cap !== null && value.max_marks !== cap) return `max_marks must match the trusted maximum of ${cap}`;
+  if (cap !== null && value.total_awarded > cap) return `total_awarded cannot exceed the trusted maximum of ${cap}`;
+
+  const trustedPoints: JsonObject[] = trustedRecord.mark_scheme?.marking_points ?? [];
+  if (trustedPoints.length) {
+    const byId = new Map(trustedPoints.map(point => [String(point.id ?? ''), point]));
+    for (let index = 0; index < value.points.length; index += 1) {
+      const responsePoint = value.points[index];
+      const trustedPoint = byId.get(responsePoint.marking_point_id);
+      if (!trustedPoint) return `points[${index}] references an unknown marking point`;
+      const available = Number.isInteger(trustedPoint.marks) ? trustedPoint.marks : 1;
+      if (responsePoint.marks_awarded > available) {
+        return `points[${index}].marks_awarded exceeds the trusted marking point maximum`;
+      }
+    }
+    const missing = [...byId.keys()].find(id => !responseIds.has(id));
+    if (missing) return `response is missing trusted marking point ${missing}`;
+  }
+
+  const pointTotal = value.points.reduce(
+    (sum: number, point: JsonObject) => sum + point.marks_awarded,
+    0,
+  );
+  return pointTotal === value.total_awarded
     ? null
-    : 'overall_explanation must be a string';
+    : `total_awarded must equal the marking-point sum of ${pointTotal}`;
 }
 
 export function classifyGoogleFailure(code: number, detail: string): string | null {
-  if (code === 429 || detail.includes('RESOURCE_EXHAUSTED')) return 'rate_limit';
-  if (code === 404 || detail.includes('NOT_FOUND')) return 'model_unavailable';
+  const normalizedDetail = detail.toUpperCase();
+  if (code === 429 || normalizedDetail.includes('RESOURCE_EXHAUSTED')) return 'rate_limit';
+  if (code === 404 || normalizedDetail.includes('NOT_FOUND')) return 'model_unavailable';
+  if ([408, 500, 502, 503, 504].includes(code)) return 'provider_unavailable';
   return null;
 }
 
@@ -269,8 +311,8 @@ async function callGoogle(
       if (!response.ok) {
         lastError = `HTTP ${response.status}: ${raw.slice(0, 500)}`;
         const fallback = classifyGoogleFailure(response.status, raw);
+        if (fallback === 'provider_unavailable' && attempt === 0) continue;
         if (fallback) return resultFailure('google-ai-studio', model, lastError, raw, fallback);
-        if ([500, 502, 503].includes(response.status) && attempt === 0) continue;
         return resultFailure('google-ai-studio', model, lastError, raw);
       }
       const envelope = JSON.parse(raw);
@@ -278,10 +320,13 @@ async function callGoogle(
       const payload = extractJsonObject(content);
       const invalid = validateGradingPayload(payload);
       if (invalid) return resultFailure('google-ai-studio', model, `model returned invalid grading JSON: ${invalid}`, content);
+      const normalized = applyMaxMarksCap(payload!, resolveMaxMarks(record));
+      const trustedInvalid = validateGradingPayload(normalized, record);
+      if (trustedInvalid) return resultFailure('google-ai-studio', model, `model returned inconsistent grading JSON: ${trustedInvalid}`, content);
       return {
         schema_version: RESULT_SCHEMA_VERSION, ok: true, dry_run: false,
         model, provider: 'google-ai-studio',
-        result: applyMaxMarksCap(payload!, resolveMaxMarks(record)),
+        result: normalized,
         error: null, raw_response: content,
       };
     } catch (error) {
@@ -289,7 +334,7 @@ async function callGoogle(
       if (attempt === 0) continue;
     }
   }
-  return resultFailure('google-ai-studio', model, lastError, null);
+  return resultFailure('google-ai-studio', model, lastError, null, 'provider_unavailable');
 }
 
 async function callOpenRouter(
@@ -333,10 +378,13 @@ async function callOpenRouter(
       const payload = typeof content === 'string' ? extractJsonObject(content) : null;
       const invalid = validateGradingPayload(payload);
       if (invalid) return resultFailure('openrouter', model, `model returned invalid grading JSON: ${invalid}`, content ?? lastRaw);
+      const normalized = applyMaxMarksCap(payload!, resolveMaxMarks(record));
+      const trustedInvalid = validateGradingPayload(normalized, record);
+      if (trustedInvalid) return resultFailure('openrouter', model, `model returned inconsistent grading JSON: ${trustedInvalid}`, content ?? lastRaw);
       return {
         schema_version: RESULT_SCHEMA_VERSION, ok: true, dry_run: false,
         model, provider: 'openrouter',
-        result: applyMaxMarksCap(payload!, resolveMaxMarks(record)),
+        result: normalized,
         error: null, raw_response: content,
       };
     } catch (error) {
@@ -374,6 +422,7 @@ export async function gradeTrustedRecord(
   fetcher: FetchLike = fetch,
 ): Promise<JsonObject> {
   const attempts: JsonObject[] = [];
+  let lastGoogleFailure: JsonObject | null = null;
   if (environment.googleKey) {
     const models = await rotatedModels(record.id, environment.googleModels?.length
       ? environment.googleModels
@@ -389,6 +438,11 @@ export async function gradeTrustedRecord(
         return result;
       }
       attempts.push({ provider: result.provider, model, reason: result.fallback_reason, error: result.error });
+      lastGoogleFailure = result;
+      // an HTTP/network outage is provider-wide. Trying every configured
+      // Google model would multiply latency and requests before reaching the
+      // independent fallback without increasing the chance of success.
+      if (result.fallback_reason === 'provider_unavailable') break;
     }
   }
 
@@ -405,6 +459,11 @@ export async function gradeTrustedRecord(
       result.fallback_chain = attempts;
     }
     return result;
+  }
+
+  if (lastGoogleFailure) {
+    lastGoogleFailure.fallback_chain = attempts;
+    return lastGoogleFailure;
   }
 
   return resultFailure(
