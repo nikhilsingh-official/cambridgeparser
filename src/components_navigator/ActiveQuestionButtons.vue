@@ -17,6 +17,9 @@ import { getExamSession } from './composable';
 
 const { eventLogs, activeQuestionNumber } = getExamSession();
 
+// review mode renders the saved state without permitting further changes.
+const props = defineProps<{ disabled?: boolean }>();
+
 // one Button record per type, matching the shape lib/buttons expects.
 // `parent` carries the question number that handleButtonClick logs against; it
 // is refreshed on every click so the log always names the focused question.
@@ -48,6 +51,7 @@ const activeFlags = computed(() => {
 });
 
 function onButtonClick(type: ButtonType) {
+  if (props.disabled) return;
   const questionNum = activeQuestionNumber();
   const button = buttons.value[type];
   button.parent = { y: 0, questionNum, buttons: [] };
@@ -62,10 +66,33 @@ function onButtonClick(type: ButtonType) {
 <div class="flex-wrapper">
     <!-- bound to activeFlags, which is per question. These previously read
          buttons.X.state, a single global toggle that stayed lit across questions. -->
-    <button class="copy-question-btn" @click="onButtonClick('Copy')"><Copy></Copy></button>
-    <button class="flag-question-btn" :class="{ 'btn-active': activeFlags.Flag }" @click="onButtonClick('Flag')"><Flag></Flag></button>
-    <button class="star-question-btn" :class="{ 'btn-active': activeFlags.Star }" @click="onButtonClick('Star')"><Star></Star></button>
-    <button class="save-question-btn" :class="{ 'btn-active': activeFlags.Save }" @click="onButtonClick('Save')"><Save></Save></button>
+    <button
+      class="copy-question-btn"
+      aria-label="Copy active question is not available yet"
+      title="Copy question is not available yet"
+      disabled
+    ><Copy></Copy></button>
+    <button
+      class="flag-question-btn"
+      aria-label="Flag active question"
+      :class="{ 'btn-active': activeFlags.Flag }"
+      :disabled="props.disabled"
+      @click="onButtonClick('Flag')"
+    ><Flag></Flag></button>
+    <button
+      class="star-question-btn"
+      aria-label="Mark active question as difficult"
+      :class="{ 'btn-active': activeFlags.Star }"
+      :disabled="props.disabled"
+      @click="onButtonClick('Star')"
+    ><Star></Star></button>
+    <button
+      class="save-question-btn"
+      aria-label="Save active question"
+      :class="{ 'btn-active': activeFlags.Save }"
+      :disabled="props.disabled"
+      @click="onButtonClick('Save')"
+    ><Save></Save></button>
 </div>
 </template>
 <style lang="scss" scoped>
@@ -79,6 +106,11 @@ function onButtonClick(type: ButtonType) {
         background-color: transparent;
         border: none;
         cursor: pointer;
+
+        &:disabled {
+            cursor: not-allowed;
+            opacity: 0.35;
+        }
     }
     .copy-question-btn {
         svg {

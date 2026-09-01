@@ -6,6 +6,12 @@ import Hero from './Hero.vue';
 import StatsPrev from './StatsPrev.vue';
 import QuickView from './QuickView.vue';
 import MetaBar from '@/components/MetaBar.vue';
+// the dashboard reads once here and hands the result to both panels, so
+// they cannot show figures from two different fetches. See
+// lib/dashboard/useDashboard.ts for why this is not useStats().
+import { useDashboard } from '@/lib/dashboard/useDashboard';
+
+const { loading, totals, streaks, recent } = useDashboard();
 </script>
 <template>
     <div class = "main-grid">
@@ -13,8 +19,15 @@ import MetaBar from '@/components/MetaBar.vue';
           <MetaBar></MetaBar>
         </div>
         <Hero></Hero>
-        <StatsPrev></StatsPrev>
-        <QuickView></QuickView>
+        <StatsPrev :recent="recent" :loading="loading"></StatsPrev>
+        <QuickView
+          :papers="totals.papers"
+          :marks-awarded="totals.marksAwarded"
+          :marks-total="totals.marksTotal"
+          :time-ms="totals.timeMs"
+          :streak="streaks"
+          :loading="loading"
+        ></QuickView>
     </div>
 </template>
 <style lang="scss" scoped>

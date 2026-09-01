@@ -218,6 +218,27 @@ export function subjectCodeFromSchema(schema: string): string {
   return schema.split('_')[0] ?? '';
 }
 
+/**
+ * paper number from a schema string - '0625_s25_22' -> 2.
+ *
+ * The third field is {paper}{variant}, so the paper is its leading digit. A
+ * handful of older syllabuses wrote a bare paper number with no variant
+ * ('5054_w16_1'), which is the single-digit case.
+ *
+ * Needed because grade thresholds are published per COMPONENT: Paper 1 of an
+ * IGCSE science is Core and cannot award above a C, Paper 2 is Extended and
+ * can. Grading an attempt without knowing which it was would use the wrong
+ * scale. Returns null rather than guessing when the schema does not parse.
+ */
+export function paperNumberFromSchema(schema: string): number | null {
+  const field = schema.split('_')[2];
+  if (!field) return null;
+  const digits = field.match(/^\d+/)?.[0];
+  if (!digits) return null;
+  const n = digits.length >= 2 ? Number(digits[0]) : Number(digits);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
 // display name for a schema string, falling back to the bare code so an
 // unknown/new syllabus still renders something meaningful.
 export function subjectNameFromSchema(schema: string): string {

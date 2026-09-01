@@ -27,4 +27,13 @@ export {
 export type { CalibrationPoint, FocusTotals, ScatterPoint, AnswerChangeSummary } from './focus';
 
 export { fetchSubjectStats, fetchTopicMastery } from './subjects';
+export { fetchTopicPractice } from './practice';
 export { fetchActiveGoals } from './goals';
+
+export {
+  fetchIdeStats,
+  fetchIdeDaily,
+  fetchIdeAttempts,
+  fetchIdeSubmissions,
+  fetchIdeProgress,
+} from './ide';

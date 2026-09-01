@@ -25,9 +25,9 @@ export async function fetchSubjectStats(
  *
  * returns [] for any paper outside the tagged set - supabase/seeds/03_topics.sql
  * covers the multiple-choice syllabuses only, and 82% of the browsable years
- * within them. The caller should HIDE the topic section on an empty result
- * rather than render an empty radar, which reads as broken. See
- * docs/stats_page_design.md §6.
+ * within them. The caller must HIDE the topic section on an empty result rather
+ * than render an empty one, which reads as broken - StatsPage.vue does this
+ * with a v-if. See docs/stats_page_design.md §6.
  *
  * A question can carry more than one topic, so marks_total summed across
  * topics can exceed the paper's marks. Read it per topic; v_subject_stats is

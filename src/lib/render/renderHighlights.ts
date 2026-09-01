@@ -3,12 +3,10 @@ import type { DocumentHighlights, PageHighlights, SegmentHighlights, OptionHighl
 import { markNeutral, selectOption } from "@/lib/highlights/selectOption";
 import type { EventLogs } from "@/lib/utils/utilsTypes";
 
-export function renderHighlights(highlightMode: Ref<"correct" | "eliminated">, eventLogs: EventLogs, highlights: DocumentHighlights, totalScale: Ref<number>, pageIndexes?: number[]) {
+export function renderHighlights(highlightMode: Ref<"correct" | "eliminated">, eventLogs: EventLogs, highlights: DocumentHighlights, totalScale: Ref<number>, pageIndexes?: number[], readOnly?: Readonly<Ref<boolean>>) {
 
   const pdfViewer: HTMLIFrameElement = document.querySelector("#pdf-viewer") as HTMLIFrameElement;
   const viewer: Element | null | undefined = pdfViewer?.contentDocument?.querySelector(`#viewer`);
-
-  console.log("Rendering Highlights for Pages ", pageIndexes);
 
   for(let pageIndex = 0; pageIndex < highlights.length; pageIndex++) {
 
@@ -72,6 +70,9 @@ export function renderHighlights(highlightMode: Ref<"correct" | "eliminated">, e
           highlights[pageIndex]![segmentIndex]![optionIndex]![itemIndex]!.el = highlightDiv;
 
           highlightDiv.addEventListener('click', () => {
+            // completed attempts remain scrollable in review mode, but their
+            // answers must not be mutable or a second finish can rewrite history.
+            if (readOnly?.value) return;
             const groupHighlights = highlights[pageIndex]![segmentIndex]![optionIndex]!
               .map(h => h.el)
               .filter(el => el !== null && el !== undefined);

@@ -1,15 +1,9 @@
 <script setup lang="ts">
-import { defineProps, withDefaults } from 'vue'
-
-// `color` is still a declared prop; it was destructured into a name the
-// template never read.
-const { text } = withDefaults(defineProps<{
+// use Vue's reactive-destructure default syntax. The removed `color` prop
+// had no template use and no caller, and withDefaults disabled this transform.
+const { text = 'hi' } = defineProps<{
   text?: string;
-  color?: string;
-}>(), {
-  text: "hi",
-  color: "blue"
-});
+}>();
 </script>
 
 <template>

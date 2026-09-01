@@ -11,6 +11,11 @@
 
 # CambridgeParser — Roadmap
 
+> **Historical document.** This file preserves pre-merge decisions and can
+> contradict the current repository. Use [`README.md`](../README.md) for the
+> implemented system and [`docs/preproduction_issues.md`](preproduction_issues.md)
+> for the current ranked backlog and release gates.
+
 **What exists.** Two working applications and a pipeline that feeds one of them.
 
 - **The pseudocode IDE** (`src/website/`) — landing, login, problem explorer,
@@ -58,8 +63,8 @@ subtree at `users/$uid/` became two tables.
 |---|---|---|
 | Firebase Auth | Supabase Auth, PKCE flow (implicit-flow tokens land in the fragment, which collides with hash routing) | **yes** |
 | RTDB `users/$uid/profile` | `ide_profiles` | **no — nothing writes it** |
-| RTDB `users/$uid/progress/$recordId` | `ide_progress`, with the best-score / never-un-solve rule moved from a client `runTransaction` into `record_ide_attempt()` | **no — `record_ide_attempt` has zero callers** |
-| RTDB `users/$uid/stats` | `v_ide_stats`, a view — counters that cannot drift from the rows they count | **no — reads an empty table, always 0 rows** |
+| RTDB `users/$uid/progress/$recordId` | `ide_progress`, with the best-score / never-un-solve rule moved from a client `runTransaction` into `record_ide_attempt()`; plus `ide_attempts`, the append-only log | **yes** — written by `api/_progress.py`, read by `lib/ide/useIdeProgress.ts` |
+| RTDB `users/$uid/stats` | `v_ide_stats`, a view — counters that cannot drift from the rows they count; `v_ide_daily` beside it | **yes** — `lib/supabase/queries/ide.ts` |
 | RTDB `gradingQuotas/$uid` + rule expressions | `grading_quotas` + `consume_grading_quota()`, `security definer`, no client-writable policy | **yes** — `api/_quota.py` |
 | Firebase ID token verified via `accounts:lookup` | Supabase access token resolved via `/auth/v1/user` | **yes** — `lib/ide/grading.js` |
 | `firebase.json`, `database.rules.json`, `.firebaserc` | deleted | — |
@@ -72,6 +77,26 @@ returns nothing. So `ide_profiles` and `ide_progress` are empty tables with
 policies on them, and everything downstream of them — `v_ide_stats`, A4, any
 cross-app stat — is blocked on a writer that was never built, not on the
 schema.
+
+**Resolved (2026-08-23), except `ide_profiles`.** The writer exists, and it is
+**on the server, not in the browser**: `api/_progress.py` calls
+`record_ide_attempt()` from the same Vercel function that graded the answer,
+with the caller's own token and the public anon key — so it holds no secret,
+and the score is written by the code that computed it rather than by a client
+that could invent one. That is the B4 property, obtained for the IDE up front
+instead of retrofitted.
+
+`ide_attempts` (migration `00000000000006`) landed **before** the writer, on
+purpose: an upsert-only history is unrecoverable, so the log had to exist
+before the first submission was recorded, not after. It is append-only at both
+gates — select+insert policies with no update or delete policy, and
+select+insert grants — so a past submission cannot be revised or erased through
+the API. Covered by `tests/test_ide_attempts.sql`, and the RPC was exercised
+end-to-end through PostgREST against the local stack.
+
+`ide_profiles` is still written by nothing. It holds email and display name,
+both already on `auth.users`, so it is the one row of this migration with no
+consumer waiting on it.
 
 Two properties were deliberately preserved. Vercel still holds **no admin
 credential** — the anon key and the caller's own token are the whole credential
@@ -118,18 +143,31 @@ Running it found three defects that reading it had not:
 - Old Firebase accounts were **not migrated** — a deliberate choice; there was
   nothing worth keeping. Anyone who had an account signs up again.
 
-### A4. The stats page covers Soluer only
+### A4. The stats page covers Soluer only — **done (2026-08-23)**
 
-The page reads `exam_attempts` and friends. `ide_progress` is not on it, so a
-user's pseudocode work is invisible beside their MCQ work, and "accuracy" there
-silently means "MCQ accuracy".
+The page read `exam_attempts` and friends only, so a user's pseudocode work was
+invisible beside their MCQ work and "accuracy" there silently meant "MCQ
+accuracy".
 
-Two things are needed. The smaller is queries and tiles. The larger is that **the
-IDE keeps no attempt history**: `record_ide_attempt` upserts, so a 3/6 followed by
-a 6/6 leaves one row and nothing to plot over time. An append-only `ide_attempts`
-log - a sibling of the solver's `attempt_events` - is the prerequisite for any IDE
-trend line, and that history is unrecoverable for every submission made before it
-exists.
+Both halves are now built. The prerequisite — an append-only `ide_attempts` log,
+the sibling of `attempt_events` — is migration `00000000000006`; see A1. On top
+of it:
+
+- `lib/supabase/queries/ide.ts`, the first consumers `v_ide_stats` has ever had.
+- `model.ts` §I (`readIde`), so the IDE's figures are computed in the same file
+  as every other claim this app makes about a student.
+- `Ide-Overall.vue`, its own section on the stats page — **not** extra tiles on
+  Progress. An MCQ question is right or wrong against one key and carries a
+  20–25% chance floor; a pseudocode answer is marked against a rubric, can be
+  half right, and has no chance floor. Averaging them produces a number that
+  means nothing, and one shared axis invites the reader to average them anyway.
+- Solved/attempted badges in the problem explorer, which is where the answer is
+  actually useful — while choosing what to work on next.
+
+Two things the section deliberately withholds rather than guesses. The
+first-try rate is null when the attempt log came back truncated, because the cap
+reads oldest-first and would report a biased sample as fact; and a student with
+no submissions gets no section at all rather than a row of zeros.
 
 ### A2. One deployment
 
@@ -213,6 +251,7 @@ The state this replaced, for the record:
 | Tables | `relrowsecurity` | Policies |
 |---|---|---|
 | `ide_profiles`, `ide_progress`, `grading_quotas` | **on** | 3 / 3 / 1 |
+| `ide_attempts` (added 2026-08-23) | **on** | 2 — select and insert only, by design |
 | `exam_attempts`, `question_attempts`, `attempt_events`, `question_metrics`, `goals`, `profiles`, `paper_answer_keys`, `paper_answers`, `subjects`, `topics`, `metrics_versions` | **off** | none |
 
 So the half of the app that stores nothing is locked down, and the half holding
@@ -387,8 +426,8 @@ Also open, from `future_work.md` §5:
 | ~~Answer-change quality~~ | **built** | `v_answer_changes` / `v_answer_change_summary` classify every consecutive pair of chosen options against the key. The Focus section shows the three outcomes and the net marks changing won or cost |
 | Elimination precision | not built | `eliminated_mask` × `correct_option` — how often a ruled-out option really was wrong, and how often the *correct* one got eliminated |
 | Pacing / fatigue | not built | `attempt_events` gives true answering order, which `question_number` cannot |
-| Topic mastery | **done** | 734 topics and 57,145 question tags seeded from `structure.json` + `question_topics.json` by `scripts/buildTopics.ts`; `v_topic_mastery` reads `question_topics`. Covers the 14 multiple-choice syllabuses only |
-| Exam readiness / predicted grade | not built | a grade-threshold table per subject; thin layer over accuracy + topic mastery |
+| Topic mastery | **done** | 734 topics and 57,145 question tags seeded from `structure.json` + `question_topics.json` by `scripts/buildTopics.ts`; `v_topic_mastery` reads `question_topics`, rendered by the stats page’s Topics section. Covers the 14 multiple-choice syllabuses only |
+| Exam readiness / predicted grade | **done** | Component-level grade estimate with an 80% interval (`model.ts` §F), against real Cambridge thresholds — 406 published documents scraped and averaged by `scripts/gt/build.py` |
 
 Once a few hundred questions exist, **check the three thresholds against data**.
 A "guess" rule that fires on 40% of questions is measuring reading speed.

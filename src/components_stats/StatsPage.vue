@@ -1,24 +1,32 @@
 <script setup lang="ts">
+import NextStepsOverall from './NextSteps-Overall.vue';
 import ProgressOverall from './Progress-Overall.vue';
+import TopicsOverall from './Topics-Overall.vue';
 import EngagementOverall from './Engagement-Overall.vue';
 import FocusOverall from './Focus-Overall.vue';
+import IdeOverall from './Ide-Overall.vue';
 import CardStrip from './CardStrip.vue';
 import Multiselect from '@vueform/multiselect';
 import EChart from './EChart.vue';
 import RecommendationBanner from './RecommendationBanner.vue';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useStats } from '@/lib/stats/useStats';
 import { baseTooltip, type ChartTheme } from '@/lib/charts/echarts';
 import { pct, subjectLabel } from '@/lib/stats/format';
 import {
-  progressRecommendation, engagementRecommendation, focusRecommendation,
+  progressRecommendation, queueRecommendation, topicRecommendation,
+  engagementRecommendation, focusRecommendation,
 } from '@/lib/stats/recommendations';
+import { accuracyTrend as modelAccuracyTrend } from '@/lib/stats/model';
 import type { ExamSeries } from '@/lib/types/enums';
 
 // the filters were ['Wade Cooper', 'Arlene Mccoy', ...] and bound to
 // nothing. They now write straight into the query filter, so changing one
 // re-reads the page.
-const { filter, state, loading, error, hasData, totals, streaks, focus } = useStats();
+const {
+  filter, state, loading, error, hasData, totals, streaks, focus, topics,
+  rankedTopics, queue, missed, readinessByPaper, ide,
+} = useStats();
 
 // Options come from what the user has actually sat - an exam year with no
 // attempts behind it is a dead end, and offering it makes the filter feel
@@ -62,6 +70,22 @@ const selectedSeries = computed({
   set: v => { filter.series = v.length ? (v as ExamSeries[]) : undefined; },
 });
 
+// the section chevrons now control their content instead of advertising
+// an inert collapse action.
+type SectionId = 'nextSteps' | 'topics' | 'progress' | 'ide' | 'focus' | 'engagement';
+const collapsedSections = ref<Set<SectionId>>(new Set());
+
+function isExpanded(section: SectionId) {
+  return !collapsedSections.value.has(section);
+}
+
+function toggleSection(section: SectionId) {
+  const next = new Set(collapsedSections.value);
+  if (next.has(section)) next.delete(section);
+  else next.add(section);
+  collapsedSections.value = next;
+}
+
 // the three section readings.
 //
 // Computed here rather than inside each section component because this is where
@@ -73,15 +97,10 @@ const selectedSeries = computed({
 const rankedSubjects = computed(() =>
   [...state.subjects].filter(s => s.accuracy != null).sort((a, b) => (b.accuracy ?? 0) - (a.accuracy ?? 0)));
 
-const accuracyTrend = computed(() => {
-  const chron = [...state.attempts]
-    .filter(a => a.accuracy != null)
-    .sort((a, b) => a.local_date.localeCompare(b.local_date));
-  if (chron.length < 6) return null;
-  const take = Math.min(5, Math.floor(chron.length / 2));
-  const mean = (xs: typeof chron) => xs.reduce((n, a) => n + (a.accuracy ?? 0), 0) / xs.length;
-  return mean(chron.slice(-take)) - mean(chron.slice(0, take));
-});
+// was computed here, and identically in Progress-Overall.vue. Both now
+// call the one definition in model.ts - two copies of a claim about the
+// student is two chances for the page to contradict itself.
+const accuracyTrend = computed(() => modelAccuracyTrend(state.attempts));
 
 const daysSinceLast = computed(() => {
   const latest = state.attempts.reduce<string | null>(
@@ -104,6 +123,23 @@ const progressRec = computed(() => progressRecommendation({
   trend: accuracyTrend.value,
   strongest: asSubject(rankedSubjects.value[0]),
   weakest: asSubject(rankedSubjects.value[rankedSubjects.value.length - 1]),
+}));
+
+// topic mastery reads its own rows rather than the subject rollup - a
+// topic is not a subject and the two disagree by design (a question tagged with
+// two topics counts its marks toward both, so the topic totals do not sum to
+// the paper's). See the header of 00000000000004_question_topics.sql.
+const topicRec = computed(() => topicRecommendation({
+  topics: topics.value.map(t => ({
+    name: t.topic_name, questions: t.questions, accuracy: t.accuracy,
+  })),
+}));
+
+// the Next steps banner reads the queue, not the topic list - it has to
+// name the same item the panel beneath it ranks first, or the section
+// contradicts itself in its own header.
+const queueRec = computed(() => queueRecommendation({
+  queue: queue.value, missed: missed.value.length,
 }));
 
 const engagementRec = computed(() => engagementRecommendation({
@@ -173,9 +209,6 @@ const subjectSplitOption = (theme: ChartTheme) => ({
               :streaks="streaks"
               :totals="totals" />
         </div>
-        <!--<div class="questions-list-container">
-            <QuestionsList></QuestionsList>
-        </div>-->
         <div class="header-container">
             <div class="text-container">
                 <div class="header-box">
@@ -212,40 +245,133 @@ const subjectSplitOption = (theme: ChartTheme) => ({
                 <EChart :option="subjectSplitOption" :has-data="hasData" label="marks by subject" />
             </div>
         </div>
+        <!-- first, and deliberately. docs/solver/stats_priority.md ranks
+             what students act on: recommendations, self-assessment feedback
+             and re-practice outrank every backward-looking chart below, and
+             time-on-task - which used to lead this page - ranks last of
+             fifteen. The one section that ends in a verb goes at the top. -->
+        <div v-if="queue.length" class="section-container nextsteps-container">
+            <div class="section-header">
+                <h1 class="section-inner-header"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-compass-icon lucide-compass"><path d="m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z"/><circle cx="12" cy="12" r="10"/></svg> next steps</h1>
+                <!-- collapse button controls the section content below. -->
+                <button
+                  type="button"
+                  class="expand-btn"
+                  :class="{ 'is-collapsed': !isExpanded('nextSteps') }"
+                  :aria-expanded="isExpanded('nextSteps')"
+                  aria-label="Toggle next steps section"
+                  @click="toggleSection('nextSteps')"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down-icon lucide-chevron-down"><path d="m6 9 6 6 6-6"/></svg>
+                </button>
+            </div>
+            <RecommendationBanner v-show="isExpanded('nextSteps')" class="section-rec" :recommendation="queueRec" />
+            <div v-show="isExpanded('nextSteps')" class="section-body">
+                <NextStepsOverall :queue="queue" :missed="missed" :readiness="readinessByPaper" />
+            </div>
+        </div>
+        <!-- hidden entirely when nothing is tagged, rather than rendered
+             empty - docs/stats_page_design.md §6. Topic tagging covers the
+             multiple-choice syllabuses only, so a student working through
+             9618 sees no section here and that is correct, not broken. -->
+        <div v-if="topics.length" class="section-container topics-container">
+            <div class="section-header">
+                <h1 class="section-inner-header"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-layers-icon lucide-layers"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/></svg> topics</h1>
+                <button
+                  type="button"
+                  class="expand-btn"
+                  :class="{ 'is-collapsed': !isExpanded('topics') }"
+                  :aria-expanded="isExpanded('topics')"
+                  aria-label="Toggle topics section"
+                  @click="toggleSection('topics')"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down-icon lucide-chevron-down"><path d="m6 9 6 6 6-6"/></svg>
+                </button>
+            </div>
+            <RecommendationBanner v-show="isExpanded('topics')" class="section-rec" :recommendation="topicRec" />
+            <div v-show="isExpanded('topics')" class="section-body">
+                <TopicsOverall :ranked="rankedTopics" :subjects="state.subjects" />
+            </div>
+        </div>
         <div class="section-container progress-container">
             <div class="section-header">
                 <h1 class="section-inner-header progress-header"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trending-up-down-icon lucide-trending-up-down"><path d="M14.828 14.828 21 21"/><path d="M21 16v5h-5"/><path d="m21 3-9 9-4-4-6 6"/><path d="M21 8V3h-5"/></svg> progress</h1>
-                <div class="expand-btn">
+                <button
+                  type="button"
+                  class="expand-btn"
+                  :class="{ 'is-collapsed': !isExpanded('progress') }"
+                  :aria-expanded="isExpanded('progress')"
+                  aria-label="Toggle progress section"
+                  @click="toggleSection('progress')"
+                >
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down-icon lucide-chevron-down"><path d="m6 9 6 6 6-6"/></svg>
-                </div>
+                </button>
             </div>
-            <RecommendationBanner class="section-rec" :recommendation="progressRec" />
-            <div class="section-body">
+            <RecommendationBanner v-show="isExpanded('progress')" class="section-rec" :recommendation="progressRec" />
+            <div v-show="isExpanded('progress')" class="section-body">
                 <ProgressOverall :attempts="state.attempts" :subjects="state.subjects" :totals="totals" />
             </div>
         </div>
-        <div class="section-container engagement-container">
+        <!-- hidden entirely for a student who has never submitted
+             pseudocode, on the same rule as Topics above - an empty section
+             says "this feature is broken", an absent one says nothing. The
+             IDE is a separate app for most of this page's readers, and the
+             heading names it so the figures below cannot be mistaken for the
+             solver's. -->
+        <div v-if="ide.submissions" class="section-container ide-container">
             <div class="section-header">
-                <h1 class="section-inner-header"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-activity-icon lucide-activity"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/></svg> engagement</h1>
-                <div class="expand-btn">
+                <h1 class="section-inner-header"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-code-icon lucide-code"><path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/></svg> pseudocode</h1>
+                <button
+                  type="button"
+                  class="expand-btn"
+                  :class="{ 'is-collapsed': !isExpanded('ide') }"
+                  :aria-expanded="isExpanded('ide')"
+                  aria-label="Toggle pseudocode section"
+                  @click="toggleSection('ide')"
+                >
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down-icon lucide-chevron-down"><path d="m6 9 6 6 6-6"/></svg>
-                </div>
+                </button>
             </div>
-            <RecommendationBanner class="section-rec" :recommendation="engagementRec" />
-            <div class="section-body">
-                <EngagementOverall :attempts="state.attempts" :daily="state.daily" :hours="state.hours" :streaks="streaks" :totals="totals" />
+            <div v-show="isExpanded('ide')" class="section-body">
+                <IdeOverall :reading="ide" :submissions="state.ideSubmissions" />
             </div>
         </div>
         <div class="section-container focus-container">
             <div class="section-header">
                 <h1 class="section-inner-header"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-crosshair-icon lucide-crosshair"><circle cx="12" cy="12" r="10"/><line x1="22" x2="18" y1="12" y2="12"/><line x1="6" x2="2" y1="12" y2="12"/><line x1="12" x2="12" y1="6" y2="2"/><line x1="12" x2="12" y1="22" y2="18"/></svg> focuses</h1>
-                <div class="expand-btn">
+                <button
+                  type="button"
+                  class="expand-btn"
+                  :class="{ 'is-collapsed': !isExpanded('focus') }"
+                  :aria-expanded="isExpanded('focus')"
+                  aria-label="Toggle focuses section"
+                  @click="toggleSection('focus')"
+                >
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down-icon lucide-chevron-down"><path d="m6 9 6 6 6-6"/></svg>
-                </div>
+                </button>
             </div>
-            <RecommendationBanner class="section-rec" :recommendation="focusRec" />
-            <div class="section-body">
+            <RecommendationBanner v-show="isExpanded('focus')" class="section-rec" :recommendation="focusRec" />
+            <div v-show="isExpanded('focus')" class="section-body">
                 <FocusOverall :calibration="state.calibration" :flags="state.flags" :focus="focus" :answer-changes="state.answerChanges" />
+            </div>
+        </div>
+        <div class="section-container engagement-container">
+            <div class="section-header">
+                <h1 class="section-inner-header"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-activity-icon lucide-activity"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/></svg> engagement</h1>
+                <button
+                  type="button"
+                  class="expand-btn"
+                  :class="{ 'is-collapsed': !isExpanded('engagement') }"
+                  :aria-expanded="isExpanded('engagement')"
+                  aria-label="Toggle engagement section"
+                  @click="toggleSection('engagement')"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down-icon lucide-chevron-down"><path d="m6 9 6 6 6-6"/></svg>
+                </button>
+            </div>
+            <RecommendationBanner v-show="isExpanded('engagement')" class="section-rec" :recommendation="engagementRec" />
+            <div v-show="isExpanded('engagement')" class="section-body">
+                <EngagementOverall :attempts="state.attempts" :daily="state.daily" :hours="state.hours" :streaks="streaks" :totals="totals" />
             </div>
         </div>
     </div>
@@ -274,6 +400,8 @@ const subjectSplitOption = (theme: ChartTheme) => ({
   column-gap: 10px;
 
   .multiselect {
+    /* Vue 3's functional :deep() syntax replaces deprecated ::v-deep
+       combinators for the third-party multiselect internals below. */
     background: $secondary-background;
     border-radius: 10px;
     padding: 6px 10px;
@@ -285,44 +413,44 @@ const subjectSplitOption = (theme: ChartTheme) => ({
 
     &:hover {
         background-color: $tertiary-background;
-        ::v-deep .multiselect-search {
+        :deep(.multiselect-search) {
             background-color: $tertiary-background;
         }
     }
 
-    ::v-deep .multiselect-search {
+    :deep(.multiselect-search) {
         transition: background 1s ease;
         background: $secondary-background;
         font-family: 'Lexend';
         color: $text;
     }
-    ::v-deep .multiselect-placeholder {
+    :deep(.multiselect-placeholder) {
         font-family: 'Lexend';
     }
-    ::v-deep .multiselect-dropdown {
+    :deep(.multiselect-dropdown) {
         background-color: $tertiary-background;
         border: none;
     }
-    ::v-deep .multiselect-option {
+    :deep(.multiselect-option) {
         background-color: $tertiary-background;
         color: $text;
         font-family: 'Lexend';
     }
-    ::v-deep .multiselect-option.is-pointed {
+    :deep(.multiselect-option.is-pointed) {
       background-color: $secondary-background;
       color: white !important;
     }
 
-    ::v-deep .multiselect-no-results {
+    :deep(.multiselect-no-results) {
       font-family: 'Lexend';
       color: $text !important;
     }
 
-    ::v-deep .multiselect-single-label {
+    :deep(.multiselect-single-label) {
         font-family: 'Lexend';
     }
 
-    ::v-deep .multiselect-clear .multiselect-clear-icon {
+    :deep(.multiselect-clear .multiselect-clear-icon) {
         &:hover {
             background-color: white !important;
         }
@@ -348,7 +476,8 @@ const subjectSplitOption = (theme: ChartTheme) => ({
        pinning them to ten 90px rows each made the Focus section overflow its
        box and draw on top of Engagement's calendar. A section that needs
        1,050px now gets 1,050px. */
-    grid-template-rows: repeat(10, 90px) auto auto auto;
+    /* five `auto` rows - Next steps and Topics joined the original three. */
+    grid-template-rows: repeat(10, 90px) auto auto auto auto auto;
     background-color: $background;
     /* Nothing here should ever scroll the page sideways. */
     overflow-x: hidden;
@@ -402,17 +531,42 @@ const subjectSplitOption = (theme: ChartTheme) => ({
         border-radius: 20px;
     }
 }
+/* order follows docs/solver/stats_priority.md SS2 - what a student acts
+   on first, not what got built first. Engagement moved from second to last
+   because it is carried by time-on-task, which the one ranked study of
+   student preferences puts at the bottom of fifteen features.
+   The TEMPLATE is in this order too: placing sections by grid-row alone would
+   leave the DOM - and so the tab order and every screen reader - disagreeing
+   with what the page looks like. */
 .focus-container {
     grid-column: 1/21;
-    grid-row: 13/14;
+    grid-row: 15/16;
 }
 .engagement-container {
+    grid-column: 1/21;
+    grid-row: 16/17;
+}
+/* between Progress and Focus. Backward-looking like Progress, so it does
+   not belong above it; ahead of Focus and Engagement because "how is my
+   pseudocode going" is a subject question and those two are study-habit
+   questions - stats_priority.md SS2 ranks subject outcomes above habits. */
+.ide-container {
+    grid-column: 1/21;
+    grid-row: 14/15;
+}
+/* Each of these rows is `auto`, so a hidden section collapses to nothing
+   rather than leaving a gap where it would have been. */
+.nextsteps-container {
+    grid-column: 1/21;
+    grid-row: 11/12;
+}
+.topics-container {
     grid-column: 1/21;
     grid-row: 12/13;
 }
 .progress-container {
     grid-column: 1/21;
-    grid-row: 11/12;
+    grid-row: 13/14;
 }
 .section-container {
     display: flex;
@@ -424,7 +578,6 @@ const subjectSplitOption = (theme: ChartTheme) => ({
         align-items: center;
         color: $text;
         padding: 2.5rem 3rem;
-        cursor: pointer;
         .section-inner-header {
             display: flex;
             align-items: center;
@@ -442,8 +595,17 @@ const subjectSplitOption = (theme: ChartTheme) => ({
             }
         }
         .expand-btn {
+            /* real button reset plus a visible collapsed state. */
             margin-left: auto;
             color: $accent;
+            padding: 0.4rem;
+            border: 0;
+            background: transparent;
+            cursor: pointer;
+            line-height: 0;
+
+            svg { transition: transform 0.2s ease; }
+            &.is-collapsed svg { transform: rotate(-90deg); }
         }
     }
     .section-body {

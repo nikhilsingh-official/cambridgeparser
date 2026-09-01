@@ -2,6 +2,57 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import * as pdfjs from "npm:pdfjs-serverless";
 // extracted so the production parser and golden-corpus audit share one implementation.
 import { getAnswersFromPDF } from "./answerKey.ts";
+// the Edge Function, not the browser, now owns the shared key write.
+import { normalizeTrustedAnswerKey, sha256Hex } from "./trustedAnswerKey.ts";
+
+const ANSWER_KEY_PARSER_VERSION = 1;
+
+// new hosted projects expose named secret keys as JSON; the legacy local
+// stack exposes SUPABASE_SERVICE_ROLE_KEY. Both are server-only and bypass RLS.
+function getServerKey(): string | null {
+  const named = Deno.env.get('SUPABASE_SECRET_KEYS');
+  if (named) {
+    try {
+      const parsed = JSON.parse(named) as Record<string, string>;
+      if (parsed.default) return parsed.default;
+    } catch {
+      return null;
+    }
+  }
+  return Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? null;
+}
+
+async function persistAnswerKey(
+  paperId: string,
+  sourceUrl: string,
+  sourceSha256: string,
+  answers: ReturnType<typeof normalizeTrustedAnswerKey>,
+): Promise<{ persisted: boolean; error?: string }> {
+  if (!answers) return { persisted: false, error: 'The mark scheme answer table was incomplete.' };
+  const url = Deno.env.get('SUPABASE_URL');
+  const key = getServerKey();
+  if (!url || !key) return { persisted: false, error: 'Trusted database credentials are unavailable.' };
+
+  const headers: Record<string, string> = {
+    apikey: key,
+    'Content-Type': 'application/json',
+  };
+  if (!key.startsWith('sb_secret_')) headers.Authorization = `Bearer ${key}`;
+  const response = await fetch(`${url}/rest/v1/rpc/install_verified_answer_key`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      p_paper_id: paperId,
+      p_source_url: sourceUrl,
+      p_source_sha256: sourceSha256,
+      p_parser_version: ANSWER_KEY_PARSER_VERSION,
+      p_answers: answers,
+    }),
+  });
+  return !response.ok
+    ? { persisted: false, error: 'The verified answer key could not be saved.' }
+    : { persisted: true };
+}
 
 const ALLOWED_HOSTNAMES = new Set([
   "pastpapers.papacambridge.com",
@@ -105,12 +156,20 @@ Deno.serve(async (req: any) => {
 
     const qpArrayBuffer = await qpResult.response.arrayBuffer();
     const msArrayBuffer = await msResult.response.arrayBuffer();
+    // hash before PDF.js sees the buffer; some PDF runtimes transfer and
+    // detach input buffers as an optimization.
+    const markSchemeSha256 = await sha256Hex(msArrayBuffer);
     // inject the Edge runtime's PDF.js adapter into the shared extractor.
     const answers = await getAnswersFromPDF(pdfjs, msArrayBuffer);
+    const trustedAnswers = normalizeTrustedAnswerKey(answers);
+    const answerKey = await persistAnswerKey(
+      schema, msResult.url, markSchemeSha256, trustedAnswers,
+    );
 
     const body = {
       qp:  Array.from(new Uint8Array(qpArrayBuffer)),
-      answers: answers
+      answers,
+      answerKey,
     }
 
     return new Response(JSON.stringify(body), {

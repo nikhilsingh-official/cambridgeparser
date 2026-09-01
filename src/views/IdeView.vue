@@ -18,9 +18,13 @@ import {
 import { formatPseudocode } from '@/lib/ide/staticParser'
 import { parsePseudocode } from '@/lib/ide/wasmParser'
 import { gradeSubmission } from '@/lib/ide/grading'
+// read-only. The submission itself is recorded server-side by
+// the grade Edge Function, so this only asks what the database now says.
+import { useIdeProgress } from '@/lib/ide/useIdeProgress'
 
 const route = useRoute()
 const router = useRouter()
+const { progress, refresh: refreshProgress } = useIdeProgress()
 
 const state = reactive({
   loading: true,
@@ -175,6 +179,11 @@ async function submitAnswer() {
       parse,
       isFillBlank.value ? 'fill_blank_sheet' : 'pseudocode',
     )
+    // the endpoint has already written the attempt by the time it answers,
+    // so re-reading here is what moves the explorer badge. Not awaited into the
+    // same try as the grade: a stale badge must not turn a successful marking
+    // into an error message.
+    refreshProgress().catch(() => {})
   } catch (error) {
     results.error = String(error.message || error)
   } finally {
@@ -237,6 +246,7 @@ watch(
       <ProblemExplorer
         :records="state.records"
         :selected-id="state.selectedId"
+        :progress="progress"
         @select="selectRecord"
       />
 

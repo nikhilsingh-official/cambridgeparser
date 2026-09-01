@@ -14,6 +14,14 @@ const props = defineProps({
     type: Number,
     default: null,
   },
+  // per-question status, keyed by record id as a string. A Map rather than
+  // an object because the explorer does one lookup per rendered row against a
+  // list of hundreds. Empty signed out, which is why the badge is v-if'd rather
+  // than rendered as an empty state.
+  progress: {
+    type: Map,
+    default: () => new Map(),
+  },
 })
 
 const emit = defineEmits(['select'])
@@ -27,13 +35,34 @@ const filteredRecords = computed(() => filterRecords(props.records, {
   tags: tags.value,
   mode: mode.value,
 }))
+
+// 'not_started' rows exist in the table but mean the same thing as no row
+// at all, so both come back as null and the badge is not rendered.
+function statusOf(record) {
+  const row = props.progress.get(String(record.id))
+  if (!row || row.status === 'not_started') return null
+  return row.status
+}
+
+function statusTitle(record) {
+  const row = props.progress.get(String(record.id))
+  if (!row) return ''
+  const tries = `${row.attempts} submission${row.attempts === 1 ? '' : 's'}`
+  return `Best ${row.best_score}/${row.max_marks} over ${tries}`
+}
+
+// Counted over every record, not over the filtered view: "8 solved" should not
+// change because a search box is narrowing the list below it.
+const solvedCount = computed(() => props.records.reduce(
+  (n, record) => n + (statusOf(record) === 'solved' ? 1 : 0), 0,
+))
 </script>
 
 <template>
   <aside class="explorer">
     <div class="explorer-header">
       <h2>Problems</h2>
-      <span>{{ records.length }}</span>
+      <span>{{ solvedCount ? `${solvedCount} / ${records.length} solved` : records.length }}</span>
     </div>
 
     <FilterPanel
@@ -57,7 +86,18 @@ const filteredRecords = computed(() => filterRecords(props.records, {
         type="button"
         @click="emit('select', record.id)"
       >
-        <strong>{{ recordSummary(record).paperCode }}</strong>
+        <span class="problem-title">
+          <strong>{{ recordSummary(record).paperCode }}</strong>
+          <!-- The status of a question is worth more than the paper it came
+               from when you are scanning for what to do next, so it sits on
+               the same line rather than below the tags. -->
+          <span
+            v-if="statusOf(record)"
+            class="problem-status"
+            :class="statusOf(record)"
+            :title="statusTitle(record)"
+          >{{ statusOf(record) === 'solved' ? 'solved' : 'tried' }}</span>
+        </span>
         <span>{{ recordSummary(record).label }} | {{ recordSummary(record).marks }} mark(s)</span>
         <small>{{ recordSummary(record).questionText.slice(0, 90) }}</small>
         <!-- Two chips keep the row to a scannable height; the rest are on the

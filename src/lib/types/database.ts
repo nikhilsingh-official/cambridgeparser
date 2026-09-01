@@ -93,6 +93,9 @@ export interface PaperAnswerKeyRow {
   source_url: string | null;
   question_count: number | null;
   parsed_at: IsoTimestamp;
+  source_sha256: string | null;
+  verified_at: IsoTimestamp | null;
+  parser_version: number | null;
 }
 
 export type PaperAnswerKeyInsert = Omit<PaperAnswerKeyRow, 'parsed_at'> &
@@ -146,6 +149,7 @@ export interface ExamAttemptRow {
   finished_at: IsoTimestamp | null;
   /** Milliseconds. */
   duration_ms: number | null;
+  completion_id: string | null;
 
   questions_total: number | null;
   questions_answered: number;
@@ -166,14 +170,6 @@ export interface ExamAttemptInsert {
   client_timezone: string;
   local_date: IsoDate;
   questions_total?: number;
-}
-
-/** What finishExamAttempt() sends when closing one. */
-export interface ExamAttemptFinish {
-  status: AttemptStatus;
-  finished_at: IsoTimestamp;
-  questions_answered: number;
-  duration_ms?: number;
 }
 
 export interface QuestionAttemptRow {
@@ -319,12 +315,12 @@ export interface QuestionFlagsView {
   time_spent_ms: number;
   hesitation_ms: number | null;
   median_time_ms: number;
-  /** Fast, no eliminations, essentially no interaction. */
-  is_guess: boolean;
-  /** Confident and wrong - the questions a student will not think to revise. */
-  is_overconfident: boolean | null;
-  /** Unsure and right - wasted time, or exam anxiety. */
-  is_underconfident: boolean | null;
+  // is_guess / is_overconfident / is_underconfident were dropped from the
+  // view by migration 00000000000007. The view reports; model.ts decides -
+  // isGuess(), isOverconfident() and isUnderconfident() read the two columns
+  // below, which the old view consumed internally and never exposed.
+  exploration_depth: number | null;
+  eliminated_mask: number | null;
 }
 
 export interface CalibrationPointView {
@@ -355,6 +351,59 @@ export interface HourOfDayView {
   local_hour: number;
   papers: number;
   total_time_ms: number | null;
+}
+
+// the IDE's side of the house. Both views are per-user aggregates over
+// ide_progress / ide_attempts - see supabase/migrations/00000000000006.
+export interface IdeStatsView {
+  user_id: string;
+  /** Questions with at least one submission. */
+  attempted: number;
+  solved: number;
+  /** Submissions, not questions - four tries at one question count four. */
+  submissions: number;
+  best_marks: number;
+  best_marks_possible: number;
+  last_attempt_at: string | null;
+}
+
+// deliberately shares local_date with DailyActivityView so IDE days and
+// solver days can be put on one timeline without a translation layer.
+export interface IdeDailyView {
+  user_id: string;
+  local_date: IsoDate;
+  submissions: number;
+  /** Distinct questions worked on that day. */
+  questions: number;
+  solved_submissions: number;
+  marks_awarded: number;
+  marks_possible: number;
+}
+
+// one graded submission, append-only. The row a trend line is built from.
+export interface IdeAttemptRow {
+  id: number;
+  user_id: string;
+  record_id: string;
+  score: number;
+  max_marks: number;
+  answer_kind: string | null;
+  source: string | null;
+  points: unknown;
+  local_date: IsoDate;
+  client_timezone: string | null;
+  created_at: string;
+}
+
+export interface IdeProgressRow {
+  user_id: string;
+  record_id: string;
+  status: 'not_started' | 'attempted' | 'solved';
+  best_score: number;
+  max_marks: number;
+  attempts: number;
+  last_source: string | null;
+  updated_at: string;
 }
 
 export interface SubjectStatsView {

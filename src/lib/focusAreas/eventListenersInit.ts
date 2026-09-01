@@ -100,6 +100,4 @@ export function eventListenersInit(
     }
     lastHoverPerPage.clear();
   });
-
-  console.log("Unified viewer event listeners attached (click/mousemove/mouseleave).");
 }

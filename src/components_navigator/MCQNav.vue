@@ -22,18 +22,11 @@ import { enrichAnalytics } from '@/lib/processing/enrichAnalytics';
 import { resetExamState, seedQuestions } from '@/lib/state/examState';
 import { computeGlobalIndex } from '@/lib/utils/computeGlobalIndex';
 import { getQuestionsAnalytics } from '@/lib/processing/getQuestionAnalytics';
-// pushQuestionMetrics added - the weighted scores now live in their own
-// versioned table rather than inline on question_attempts.
-import { pushToAttemptsTable, pushQuestionMetrics } from '@/lib/supabase/pushToAttemptsTable';
-// the one-shot pushToExamTable is replaced by the two-phase lifecycle.
-import { startExamAttempt, finishExamAttempt } from '@/lib/supabase/pushToExamTable';
-// new writers for the raw event stream and the cached mark-scheme key.
-import { pushEventLogs } from '@/lib/supabase/pushEventLogs';
-import { cacheAnswerKey } from '@/lib/supabase/cacheAnswerKey';
+// direct table writers are replaced by one transactional completion RPC.
+import { startExamAttempt, abandonExamAttempt, finalizeExamAttempt } from '@/lib/supabase/pushToExamTable';
 // exam-relative event timing, and the shared session the flag buttons read.
 import { setEventEpoch } from '@/lib/utils/addEventLog';
 // the attempt_status values, so 'completed'/'abandoned' are not bare strings.
-import { AttemptStatus } from '@/lib/types/enums';
 import { registerExamSession, registerExamHighlights, getHighlightMode } from './composable';
 import router from '@/router/router';
 // types for the vendored pdf.js viewer and the fetch-pdf contract.
@@ -45,18 +38,26 @@ import type { FetchPdfResponse, LoadedPaper } from '@/lib/types/fetchPdf';
 import { buildExamSummary, type ExamSummary } from '@/lib/types/examSummary';
 import { renderHighlights } from '@/lib/render/renderHighlights';
 import { renderFocusAreas } from '@/lib/render/renderFocusAreas';
+// fail closed when the edge function returns a partial or malformed key.
+import { validateAnswerKey } from '@/lib/pdf/validateAnswerKey';
 
 const { showOverview } = getShowStates();
   
 let perfStart: number | null;
 const examLoaded = ref(false);
 const examStarted = ref(false);
+// drives the real distraction-free layout rather than a local switch that
+// nothing outside ZenMode could observe.
+const zenMode = ref(false);
 // the paper failed to load. Added because the Paper Browser is now the only
 // way into the solver, so a student can pick any catalogue combination - and
 // fetch-pdf 404s when that series/variant was never sat. setup() previously ran
 // unawaited and uncaught, so a 404 left the loading screen cycling
 // "Preparing the PDF..." forever with no way to tell it had failed.
 const loadError = ref<string | null>(null);
+// a paper can still be used locally when its verified key cannot persist,
+// but that session must be labelled and excluded from authoritative history.
+const practiceWarning = ref<string | null>(null);
 
 const iframeRef = ref<HTMLIFrameElement | null>(null);
 let observer: MutationObserver | null = null;
@@ -73,6 +74,12 @@ let eventLogs: EventLogs = [];
 let highlights: DocumentHighlights = [];
 let focusAreas: DocumentFocusAreas = [];
 const totalScale = ref(1);
+// resources created outside Vue's component scope need explicit teardown.
+let stopFocusTimer: (() => void) | null = null;
+let pdfObjectUrl: string | null = null;
+// retain the exact iframe callback so teardown can remove it if the route
+// changes before the one-shot load event fires.
+let iframeLoadHandler: (() => void) | null = null;
 
 const { register, unregister } = createKeydownHandlers(highlightMode);
 const { session } = useAuthStore();
@@ -84,6 +91,8 @@ let answers: TableRow[] | null = null;
 // held for the duration of the attempt - opened in startExam(), written to
 // throughout, closed in endExam().
 let examAttemptId: string | null = null;
+let completionId: string | null = null;
+let lastCompletion: { durationMs: number; questions: ReturnType<typeof enrichAnalytics> } | null = null;
 
 // end-screen state. `examFinished` drives the overlay; `summary` is null
 // until endExam() has marked the paper, which is what shows the interim
@@ -92,10 +101,14 @@ const examFinished = ref(false);
 const summary = ref<ExamSummary | null>(null);
 const saving = ref(false);
 const saveError = ref<string | null>(null);
+// review mode permits PDF scrolling/zooming but freezes attempt state.
+const reviewOnly = ref(false);
+// distinguishes a fully persisted attempt from the in-progress row.
+const attemptSaved = ref(false);
 
 // the fetch-pdf edge function's response had no type at all - `answers`
 // was `any`, so the mark-scheme rows flowed untyped into getQuestionsAnalytics
-// and cacheAnswerKey. FetchPdfResponse/LoadedPaper name that contract.
+// and persistence. FetchPdfResponse/LoadedPaper name that contract.
 async function getPDF(): Promise<LoadedPaper> {
 
   const { data, error } = await supabase.functions.invoke("fetch-pdf", {
@@ -112,7 +125,8 @@ async function getPDF(): Promise<LoadedPaper> {
   // `functions.invoke` returns `any`, so the response is named here at the
   // boundary. Everything downstream of this line is typed.
   const body = data as FetchPdfResponse;
-  const answers = body.answers;
+  const answers = validateAnswerKey(body.answers);
+  if (!answers) throw new Error('The mark scheme did not contain a complete answer key');
 
   const pdfBytes = new Uint8Array(
     Array.isArray(body.qp)
@@ -126,7 +140,13 @@ async function getPDF(): Promise<LoadedPaper> {
 
   const pdfUrl = URL.createObjectURL(pdfBlob);
 
-  return { answers, pdfBytes, pdfUrl };
+  return {
+    answers,
+    pdfBytes,
+    pdfUrl,
+    answerKeyPersisted: body.answerKey?.persisted === true,
+    answerKeyError: body.answerKey?.error,
+  };
 }
 
 
@@ -134,6 +154,9 @@ async function getPDF(): Promise<LoadedPaper> {
 // abandoned paper is still recorded and started_at is an observation instead of
 // a value the client back-dates at the end.
 async function startExam() {
+  // a fresh attempt begins mutable and is not fully saved yet.
+  reviewOnly.value = false;
+  attemptSaved.value = false;
   perfStart = performance.now();
   // anchor event timing to exam start so stored elapsed_ms is meaningful.
   setEventEpoch(perfStart);
@@ -142,6 +165,8 @@ async function startExam() {
   registerExamSession(eventLogs, focusAreas);
   examStarted.value = true;
 
+  if (practiceWarning.value) return;
+
   try {
     // `session` is Session | null - typing startExamAttempt surfaced that it
     // was being passed unchecked. It is also captured once at setup (Pinia
@@ -149,8 +174,6 @@ async function startExam() {
     // this null; see docs/future_work.md.
     if (!session) throw new Error('No Supabase session; attempt not persisted');
     examAttemptId = await startExamAttempt(supabase, props, session, answers?.length);
-    // cache the mark-scheme key so the DB can decide correctness itself.
-    if (answers) await cacheAnswerKey(supabase, props.schema, answers);
   } catch (err) {
     // a failed open must not block the student from sitting the paper. The
     // attempt simply is not persisted; endExam() detects the null id.
@@ -159,9 +182,17 @@ async function startExam() {
 }
 
 async function endExam() {
+  // reopening results after review must not serialize the closed attempt a
+  // second time. This is a persistence guard as well as a UI guard.
+  if (attemptSaved.value) {
+    examFinished.value = true;
+    return;
+  }
+
   // the results screen goes up immediately, before any network work, so
   // the candidate is never left looking at the paper wondering if it worked.
   examFinished.value = true;
+  reviewOnly.value = true;
   saving.value = true;
   saveError.value = null;
 
@@ -192,6 +223,12 @@ async function endExam() {
     // which uses the real stored exploration_depth. enrichAnalytics returns
     // `{ ...q, ... }`, so enrichedData is a strict superset and nothing is lost.
     summary.value = buildExamSummary(props.schema, enrichedData, answers, elapsedMs);
+    lastCompletion = { durationMs: elapsedMs, questions: enrichedData };
+
+    if (practiceWarning.value) {
+      saveError.value = practiceWarning.value;
+      return;
+    }
 
     // fall back to opening one now if startExam() could not.
     if (!examAttemptId) {
@@ -200,31 +237,16 @@ async function endExam() {
       examAttemptId = await startExamAttempt(supabase, props, session, answers.length);
     }
 
-    // the answer key MUST be cached before question_attempts are written.
-    // set_question_correctness() fires per row on insert and reads
-    // paper_answers; if the key is not there yet the trigger sets is_correct to
-    // null for every question and the attempt is permanently unmarked until
-    // someone re-runs remark_attempt() by hand.
-    //
-    // startExam() normally does this, but not always: if startExamAttempt()
-    // threw, cacheAnswerKey() on the line after it never ran, and the fallback
-    // open just above did not cache either. The upsert is idempotent and keyed
-    // on (paper_id, question_number), so repeating it here costs one no-op
-    // round trip in the common case and rescues correctness in the uncommon one.
-    await cacheAnswerKey(supabase, props.schema, answers);
-
-    const answeredCount = questionsData.filter(q => q.selectedOption != null).length;
-
-    const insertedQuestions = await pushToAttemptsTable(supabase, examAttemptId, enrichedData);
-    // weighted scores go to the versioned question_metrics table.
-    await pushQuestionMetrics(supabase, insertedQuestions ?? [], enrichedData);
-    // persist the raw stream - previously discarded at this exact point.
-    await pushEventLogs(supabase, examAttemptId, eventLogs);
-    await finishExamAttempt(
-      supabase, examAttemptId, elapsedMs, answeredCount, AttemptStatus.Completed,
+    // keep one idempotency key across retries. A response lost after the
+    // transaction commits can therefore be retried without duplicate rows.
+    completionId ??= crypto.randomUUID();
+    await finalizeExamAttempt(
+      supabase, examAttemptId, completionId, elapsedMs, enrichedData, eventLogs,
     );
+    // set only after every write and the final status update succeed.
+    attemptSaved.value = true;
 
-    return { examAttemptId, insertedCount: Array.isArray(insertedQuestions) ? insertedQuestions.length : 0 };
+    return { examAttemptId, insertedCount: enrichedData.length };
   } catch (err) {
     // a persistence failure must not hide the result. The screen stays up
     // and says so; it no longer rethrows, which would have left the overlay in
@@ -247,10 +269,33 @@ function reviewPaper() {
   examFinished.value = false;
 }
 
+// retry the frozen payload with the same completion id. Rebuilding it from
+// review-mode UI would make a retry a different submission.
+async function retrySave() {
+  if (!examAttemptId || !completionId || !lastCompletion || attemptSaved.value) return;
+  saving.value = true;
+  saveError.value = null;
+  try {
+    await finalizeExamAttempt(
+      supabase,
+      examAttemptId,
+      completionId,
+      lastCompletion.durationMs,
+      lastCompletion.questions,
+      eventLogs,
+    );
+    attemptSaved.value = true;
+  } catch (err) {
+    saveError.value = err instanceof Error ? err.message : String(err);
+  } finally {
+    saving.value = false;
+  }
+}
+
 // NEW - closes an attempt the student walks away from.
 //
 // The lifecycle had only two of its three exits implemented: startExamAttempt()
-// opened the row and finishExamAttempt() closed it on End Exam, but leaving the
+// opened the row and finalizeExamAttempt() closed it on End Exam, but leaving the
 // page mid-paper left status pinned at 'in_progress' forever. Those rows are
 // indistinguishable from an exam still being sat, so every dashboard query has
 // to either count half-finished papers or exclude live ones.
@@ -260,21 +305,16 @@ function reviewPaper() {
 // better than never, and duration_ms is recorded so a paper closed after two
 // minutes is distinguishable from one closed after an hour.
 async function abandonExam() {
-  if (!examAttemptId || examFinished.value) return;
+  // reviewPaper() hides the results overlay, so examFinished becomes false
+  // again. A fully saved attempt is still complete and must never be demoted.
+  if (!examAttemptId || examFinished.value || attemptSaved.value) return;
   const id = examAttemptId;
   // cleared first so a route change racing beforeunload cannot send twice.
   examAttemptId = null;
 
   const elapsedMs = perfStart == null ? null : Math.round(performance.now() - perfStart);
-  const answeredCount = answers
-    ? getQuestionsAnalytics(highlights, focusAreas, answers)
-        .filter(q => q.selectedOption != null).length
-    : 0;
-
   try {
-    await finishExamAttempt(
-      supabase, id, elapsedMs, answeredCount, AttemptStatus.Abandoned,
-    );
+    await abandonExamAttempt(supabase, id, elapsedMs);
   } catch (err) {
     // nothing useful to do - the page is going away regardless.
     console.error('abandonExam: could not close attempt', err);
@@ -539,23 +579,15 @@ function observePageLoadState(
         const isLoaded = pageEl.hasAttribute("data-loaded");
 
         if (!isLoaded) {
-          console.log(
-            "Page became unloaded:",
-            pageIndex
-          );
           pageLoadedState.set(pageIndex, false);
         } else {
-          console.log(
-            "Page became loaded:",
-            pageIndex
-          );
-
           renderHighlights(
             highlightMode,
             eventLogs,
             highlights,
             totalScale,
-            [pageIndex]
+            [pageIndex],
+            reviewOnly
           );
 
           renderFocusAreas(
@@ -625,7 +657,8 @@ const onLoad = async (pdfBytes: Uint8Array) => {
           eventLogs,
           highlights,
           totalScale,
-          [index]
+          [index],
+          reviewOnly
         );
         renderFocusAreas(
           focusAreas,
@@ -645,7 +678,6 @@ const onLoad = async (pdfBytes: Uint8Array) => {
     if (!Number.isFinite(scale)) return;
 
     totalScale.value = scale;
-    console.log(`New Scale: ${scale}`);
 
     const loadedPageIndexes = Array.from(pageLoadedState.entries())
       .filter(([_, isLoaded]) => isLoaded)
@@ -656,7 +688,8 @@ const onLoad = async (pdfBytes: Uint8Array) => {
       eventLogs,
       highlights,
       totalScale,
-      loadedPageIndexes
+      loadedPageIndexes,
+      reviewOnly
     );
 
     renderFocusAreas(
@@ -675,6 +708,18 @@ const onLoad = async (pdfBytes: Uint8Array) => {
     const optionsText = await getOptions(pdf, text, segmentedQuestions);
 
     highlights = createHighlights(optionsText);
+    // a contiguous answer key can still be a truncated prefix. Comparing it
+    // with the independently parsed question paper prevents missing questions
+    // from being silently scored as wrong with default marks.
+    const parsedQuestionCount = highlights.reduce(
+      (count, pageHighlights) => count + pageHighlights.length,
+      0,
+    );
+    if (answers?.length !== parsedQuestionCount) {
+      loadError.value =
+        `This paper could not be marked safely: found ${parsedQuestionCount} questions but ${answers?.length ?? 0} answers.`;
+      return;
+    }
     // hand the parsed tree to the shared session so the Overview panel can
     // show real per-question state instead of placeholder rows.
     registerExamHighlights(highlights);
@@ -697,7 +742,8 @@ const onLoad = async (pdfBytes: Uint8Array) => {
     eventBus.dispatch("pagesinit");
 
     eventListenersInit(focusAreas, totalScale, eventLogs);
-    startFocusAreaTimer(0, focusAreas);
+    stopFocusTimer?.();
+    stopFocusTimer = startFocusAreaTimer(0, focusAreas);
 
     examLoaded.value = true;
   });
@@ -711,13 +757,34 @@ async function setup() {
   iframe.setAttribute('allowtransparency', 'true');
 
   try {
-    const { answers: answersFromPDF, pdfBytes, pdfUrl } = await getPDF();
+    const {
+      answers: answersFromPDF,
+      pdfBytes,
+      pdfUrl,
+      answerKeyPersisted,
+      answerKeyError,
+    } = await getPDF();
     answers = answersFromPDF;
+    practiceWarning.value = answerKeyPersisted
+      ? null
+      : answerKeyError ?? 'Trusted marking is unavailable; this practice result will not be saved.';
 
-    if (!iframeRef.value) return;
+    // an in-flight fetch can finish after route teardown; release its URL
+    // immediately instead of storing it on an already-unmounted component.
+    if (!iframeRef.value) {
+      URL.revokeObjectURL(pdfUrl);
+      return;
+    }
+    // retain the blob URL so route teardown can release its backing bytes.
+    if (pdfObjectUrl) URL.revokeObjectURL(pdfObjectUrl);
+    pdfObjectUrl = pdfUrl;
+    // listen before navigation so a fast cached viewer cannot win the race.
+    iframeLoadHandler = () => {
+      iframeLoadHandler = null;
+      void onLoad(pdfBytes);
+    };
+    iframe.addEventListener('load', iframeLoadHandler, { once: true });
     iframeRef.value.src = '/web/viewer.html?file=' + encodeURIComponent(pdfUrl);
-
-    iframe.addEventListener('load', () => onLoad(pdfBytes));
   } catch (err) {
     // fetch-pdf returns 404 when the question paper or the mark scheme is
     // not on the upstream mirror - a real outcome for an uncommon
@@ -737,8 +804,18 @@ onBeforeUnmount(() => {
   window.removeEventListener('beforeunload', handleBeforeUnload);
   void abandonExam();
 
+  stopFocusTimer?.();
+  stopFocusTimer = null;
+  if (pdfObjectUrl) {
+    URL.revokeObjectURL(pdfObjectUrl);
+    pdfObjectUrl = null;
+  }
+
   if(!iframeRef.value) return;
-  iframeRef.value.removeEventListener('load', () => onLoad);
+  if (iframeLoadHandler) {
+    iframeRef.value.removeEventListener('load', iframeLoadHandler);
+    iframeLoadHandler = null;
+  }
   if (observer) {
     observer.disconnect();
     observer = null;
@@ -785,6 +862,7 @@ onMounted(async () => {
     :state="examLoaded"
     :schema="props.schema"
     :load-error="loadError"
+    :practice-warning="practiceWarning"
     @start="startExam"
     @back="router.push('/browser')"
   ></LoadingScreen>
@@ -796,30 +874,40 @@ onMounted(async () => {
       :summary="summary"
       :saving="saving"
       :save-error="saveError"
+      :can-retry="!!completionId && !!lastCompletion && !attemptSaved"
       @dashboard="goToDashboard"
       @review="reviewPaper"
+      @retry="retrySave"
     />
   </Transition>
 
-  <main class="solver-container">
-    <ToolsContainer></ToolsContainer>
+  <main class="solver-container" :class="{ 'solver-container--zen': zenMode }">
+    <!-- review keeps navigation available but disables mutating tools. -->
+    <ToolsContainer
+      v-if="!zenMode"
+      :read-only="reviewOnly"
+      @end-exam="endExam"
+    ></ToolsContainer>
     <header class="top-bar">
-      <TopBar/>
+      <!-- the timer starts with the exam and freezes when review begins. -->
+      <TopBar v-model:zen-mode="zenMode" :running="examStarted && !reviewOnly"/>
     </header>
 
     <section class="main-area">
 
       <div class="pdf-wrapper">
+        <!-- the selected paper is assigned only after fetch-pdf succeeds. -->
         <iframe ref="iframeRef"
             id="pdf-viewer" 
             width="100%" 
             height="100%"
-            src="/web/viewer.html?file=/9608_w21_qp_11.pdf"
+            src="about:blank"
             >
         </iframe>      
       </div>
 
       <aside
+        v-if="!zenMode"
         class="overview-drawer"
         :class="{ 'overview-drawer--open': showOverview }"
       >
@@ -828,7 +916,13 @@ onMounted(async () => {
     </section>
 
     <!-- BottomBar had no End Exam control, so endExam() was unreachable. -->
-    <BottomBar @end-exam="endExam"></BottomBar>
+    <BottomBar
+      v-if="!zenMode"
+      :schema="props.schema"
+      :read-only="reviewOnly"
+      :saved="attemptSaved"
+      @end-exam="endExam"
+    ></BottomBar>
   </main>
 </template>
 <style lang="scss" scoped>

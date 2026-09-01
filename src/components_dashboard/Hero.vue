@@ -3,13 +3,22 @@
 // The images were 1024x1024 RGBA PNGs totalling 2.29 MB; as WebP they are
 // 341 kB at the same dimensions with no visible difference. The original PNGs
 // remain in src/assets/images/ as the source for regenerating them.
-import { onMounted } from 'vue';
+import { onBeforeUnmount, onMounted, ref } from 'vue';
+
+// scope DOM queries to this carousel and dispose its background work when
+// the dashboard route unmounts.
+const carousel = ref(null);
+let autoSlideInterval;
+let indicatorTimeout;
+let transitionTrack;
+let transitionHandler;
 
 onMounted(() => {
-    const track = document.querySelector(".carousel-track");
-    const items = document.querySelectorAll(".carousel-item");
-    const indicators = document.querySelectorAll(".carousel-item-indicator");
-    const topLabel = document.querySelector(".top-label");
+    const track = carousel.value?.querySelector(".carousel-track");
+    const items = carousel.value?.querySelectorAll(".carousel-item") ?? [];
+    const indicators = carousel.value?.querySelectorAll(".carousel-item-indicator") ?? [];
+    const topLabel = carousel.value?.querySelector(".top-label");
+    if (!track || !items.length || !topLabel) return;
     
     const itemCount = items.length - 2;
     const itemWidth = items[0].clientWidth;
@@ -44,7 +53,7 @@ onMounted(() => {
       updateIndicators();
     }
     
-    track.addEventListener("transitionend", () => {
+    transitionHandler = () => {
       if (index === 0) {
         index = itemCount;
         track.style.transition = "none";
@@ -56,7 +65,9 @@ onMounted(() => {
       }
   
       isTransitioning = false;
-    });
+    };
+    transitionTrack = track;
+    track.addEventListener("transitionend", transitionHandler);
     
     function updateIndicators() {
       const current = (index - 1 + itemCount) % itemCount;
@@ -67,7 +78,8 @@ onMounted(() => {
         fill.style.left = "-100%";
       });
   
-      setTimeout(() => {
+      window.clearTimeout(indicatorTimeout);
+      indicatorTimeout = window.setTimeout(() => {
         indicators.forEach((line, i) => {
           const fill = line.querySelector(".progress-fill");
           fill.style.transition = i === current ? `left ${slideDuration}ms linear` : "none";
@@ -77,7 +89,7 @@ onMounted(() => {
     }
     
     function startAutoSlide() {
-      setInterval(() => {
+      autoSlideInterval = window.setInterval(() => {
         goToSlide(index + 1);
       }, slideDuration);
     }
@@ -86,9 +98,17 @@ onMounted(() => {
     startAutoSlide();
 })
 
+onBeforeUnmount(() => {
+    window.clearInterval(autoSlideInterval);
+    window.clearTimeout(indicatorTimeout);
+    if (transitionTrack && transitionHandler) {
+      transitionTrack.removeEventListener("transitionend", transitionHandler);
+    }
+});
+
 </script>
 <template>
-    <div class="cta">
+    <div ref="carousel" class="cta">
         <div class = "hero-carousel">
             <div class="top-label">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-compass"><circle cx="12" cy="12" r="10"></circle><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon></svg>
@@ -106,14 +126,15 @@ onMounted(() => {
                     <div class="cta-text-container">
                         <h1>Track Your Progress</h1>
                         <p>View your strengths, spot weaknesses, and watch your improvement over time.</p>
-                        <button class="cta-redirect">Open Stats Dashboard 
+                        <!-- This is navigation, so expose a real link and make the CTA functional. -->
+                        <RouterLink class="cta-redirect" to="/stats">Open Stats Dashboard
                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" 
                                  viewBox="0 0 24 24" fill="none" stroke="currentColor" 
                                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round" 
                                  class="feather feather-chevron-right">
                                 <polyline points="9 18 15 12 9 6"></polyline>
                             </svg>
-                        </button>
+                        </RouterLink>
                     </div>
                     <img src="@/assets/images/stats.webp" class="cta-img" data-type="stats">
                 </div>
@@ -121,7 +142,8 @@ onMounted(() => {
                     <div class="cta-text-container">
                         <h1>Ready to Test Yourself?</h1>
                         <p>Dive into our full archive of past paper questions.</p>
-                        <button class="cta-redirect">Open Paper Browser <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-chevron-right"><polyline points="9 18 15 12 9 6"></polyline></svg></button>
+                        <!-- This is navigation, so expose a real link and make the CTA functional. -->
+                        <RouterLink class="cta-redirect" to="/browser">Open Paper Browser <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-chevron-right"><polyline points="9 18 15 12 9 6"></polyline></svg></RouterLink>
                     </div>
                     <img src="@/assets/images/paper.webp" class="cta-img" data-type="paper">
                 </div>
@@ -129,14 +151,15 @@ onMounted(() => {
                     <div class="cta-text-container">
                         <h1>Track Your Progress</h1>
                         <p>View your strengths, spot weaknesses, and watch your improvement over time.</p>
-                        <button class="cta-redirect">Open Stats Dashboard 
+                        <!-- The seamless carousel clone must retain the same working destination. -->
+                        <RouterLink class="cta-redirect" to="/stats">Open Stats Dashboard
                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" 
                                  viewBox="0 0 24 24" fill="none" stroke="currentColor" 
                                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round" 
                                  class="feather feather-chevron-right">
                                 <polyline points="9 18 15 12 9 6"></polyline>
                             </svg>
-                        </button>
+                        </RouterLink>
                     </div>
                     <img src="@/assets/images/stats.webp" class="cta-img" data-type="stats">
                 </div>
@@ -144,7 +167,8 @@ onMounted(() => {
                     <div class="cta-text-container">
                         <h1>Ready to Test Yourself?</h1>
                         <p>Dive into our full archive of past paper questions.</p>
-                        <button class="cta-redirect">Open Paper Browser <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-chevron-right"><polyline points="9 18 15 12 9 6"></polyline></svg></button>
+                        <!-- The seamless carousel clone must retain the same working destination. -->
+                        <RouterLink class="cta-redirect" to="/browser">Open Paper Browser <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-chevron-right"><polyline points="9 18 15 12 9 6"></polyline></svg></RouterLink>
                     </div>
                     <img src="@/assets/images/paper.webp" class="cta-img" data-type="paper">
                 </div>
@@ -240,6 +264,9 @@ onMounted(() => {
 }
 
 .cta-redirect {
+  // RouterLink renders an anchor; retain the button-like CTA presentation.
+  color: $text;
+  text-decoration: none;
   display: flex;
   align-items: center;
   width: fit-content;

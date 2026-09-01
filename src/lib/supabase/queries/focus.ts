@@ -9,6 +9,7 @@ import type {
   QuestionFlagsView,
 } from '@/lib/types/database';
 import { applyAttemptFilter, unwrap, type StatsFilter } from './core';
+import { isGuess, isOverconfident, isUnderconfident } from '@/lib/stats/model';
 
 /**
  * Per-question flags, filtered to the user.
@@ -145,14 +146,18 @@ function median(values: number[]): number | null {
   return sorted.length % 2 === 0 ? (sorted[mid - 1]! + sorted[mid]!) / 2 : sorted[mid]!;
 }
 
+// the three rules moved out of v_question_flags and into model.ts
+// (migration 00000000000007). This function used to read boolean columns the
+// database had already decided; it now applies the same rules the rest of the
+// page's claims come from, so a retune is one edit rather than a migration.
 export function summariseFlags(flags: QuestionFlagsView[]): FocusTotals {
-  const guesses = flags.filter(f => f.is_guess);
+  const guesses = flags.filter(isGuess);
   const guessedCorrect = guesses.filter(f => f.is_correct === true).length;
 
   return {
     questions: flags.length,
-    overconfident: flags.filter(f => f.is_overconfident === true).length,
-    underconfident: flags.filter(f => f.is_underconfident === true).length,
+    overconfident: flags.filter(isOverconfident).length,
+    underconfident: flags.filter(isUnderconfident).length,
     guesses: guesses.length,
     guessAccuracy: guesses.length > 0 ? guessedCorrect / guesses.length : null,
     // median, not mean - hesitation has a long right tail (one question

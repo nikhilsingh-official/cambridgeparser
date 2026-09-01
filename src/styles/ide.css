@@ -794,6 +794,31 @@ button.tag-chip:hover {
   border-bottom: 1px solid var(--border);
 }
 
+/* the per-question status badge in the problem explorer. */
+.problem-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.problem-status {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.05rem 0.35rem;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  /* Never let a long badge push the paper code out of the row. */
+  flex: none;
+}
+.problem-status.solved {
+  color: var(--success);
+  border-color: var(--success);
+  background: var(--success-darkened);
+}
+
 .problem-link .tag-chips {
   margin-top: 0.22rem;
 }

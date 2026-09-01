@@ -62,6 +62,10 @@ begin
   if v_n = 0 then raise exception 'v_topic_mastery returned 0 rows for the owner'; end if;
   raise notice 'owner sees % rows in v_topic_mastery', v_n;
 
+  select count(*) into v_n from public.v_topic_practice;
+  if v_n = 0 then raise exception 'v_topic_practice returned 0 rows for the owner'; end if;
+  raise notice 'owner sees % rows in v_topic_practice', v_n;
+
   -- ------------------------------------------------------------- intruder
   reset role;
   set local role authenticated;
@@ -105,6 +109,12 @@ begin
   -- user can read, so the isolation rests entirely on the exam_attempts join.
   select count(*) into v_n from public.v_topic_mastery;
   if v_n <> 0 then raise exception 'LEAK via view: intruder sees % rows in v_topic_mastery', v_n; end if;
+
+  -- v_topic_practice is the finest-grained user-keyed view in the schema: one
+  -- row per question answered. If security_invoker were ever dropped from it,
+  -- this would hand over another student's entire answer history.
+  select count(*) into v_n from public.v_topic_practice;
+  if v_n <> 0 then raise exception 'LEAK via view: intruder sees % rows in v_topic_practice', v_n; end if;
 
   raise notice 'intruder sees 0 rows in every owned table and every view';
 
@@ -172,11 +182,8 @@ begin
   if not v_failed then raise exception 'LEAK: a client rewrote the answer key'; end if;
   raise notice 'answer key is not client-rewritable';
 
-  -- The answer key is cached by the client on first sit (cacheAnswerKey.ts),
-  -- so INSERT must still work - but only to ADD a key, never to replace one.
-  -- The upsert this replaced emitted `on conflict do update`, which needs
-  -- UPDATE, which is what let any client rewrite a key that serves every user
-  -- of that paper.
+  -- fetch-pdf now owns key installation. Even a brand-new paper is not a
+  -- browser write: first-writer control was enough to poison persisted stats.
   v_failed := false;
   begin
     insert into public.paper_answer_keys (paper_id, question_count)
@@ -184,8 +191,8 @@ begin
   exception when insufficient_privilege then
     v_failed := true;
   end;
-  if v_failed then raise exception 'client can no longer cache a NEW answer key'; end if;
-  raise notice 'client can still cache a new answer key';
+  if not v_failed then raise exception 'LEAK: client installed a new answer key'; end if;
+  raise notice 'client cannot install a new answer key';
 
   v_failed := false;
   begin

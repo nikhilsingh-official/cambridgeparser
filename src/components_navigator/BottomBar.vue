@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { onBeforeUnmount, ref } from 'vue';
 import { Wrench, LayoutGrid, FlagTriangleRight } from 'lucide-vue-next';
 import { getShowStates, getHighlightMode } from './composable';
 
@@ -10,31 +10,52 @@ const { showOverview, showTools } = getShowStates()
 // with the C/E keys.
 const { highlightMode, isCorrectMode, toggleMode } = getHighlightMode()
 
+// the bar now renders the active paper and the real persistence/review
+// state instead of hard-coded demo values.
+const props = defineProps<{
+  schema: string;
+  readOnly: boolean;
+  saved: boolean;
+}>();
+
 // this bar had no way to finish a paper, which is why MCQNav.endExam() was
 // unreachable and no attempt was ever written. A confirm step guards it -
 // ending is irreversible and it sits next to two harmless toggles.
 const confirming = ref(false);
+// clear the confirmation timeout if the solver unmounts while armed.
+let confirmTimer: ReturnType<typeof window.setTimeout> | undefined;
 const emit = defineEmits<{ (e: 'endExam'): void }>();
 
 function onEndClick() {
+  if (props.readOnly) return;
   if (!confirming.value) {
     confirming.value = true;
-    window.setTimeout(() => { confirming.value = false; }, 4000);
+    confirmTimer = window.setTimeout(() => { confirming.value = false; }, 4000);
     return;
   }
   emit('endExam');
 }
+
+onBeforeUnmount(() => {
+  if (confirmTimer !== undefined) window.clearTimeout(confirmTimer);
+});
 </script>
 <template>
     <div class="bottom-bar">
       <div class="exam-code-container">
-        <p>0625_w22_21</p>
+        <p>{{ schema }}</p>
       </div>
       <div class="drawers-caller">
-        <div class="tools-wrapper" @click="showTools = !showTools">
+        <!-- these drawer toggles were mouse-only divs. -->
+        <button
+          type="button"
+          class="tools-wrapper"
+          :aria-expanded="showTools"
+          @click="showTools = !showTools"
+        >
           <Wrench></Wrench>
           <p>Tools</p>
-        </div>
+        </button>
         <!-- mode indicator. Clickable as well as readable, so the mode can
              be changed without opening Tools or knowing the shortcut. -->
         <button
@@ -49,19 +70,31 @@ function onEndClick() {
           <span class="mode-key">{{ isCorrectMode ? 'C' : 'E' }}</span>
         </button>
 
-        <div class="overview-wrapper" @click="showOverview = !showOverview">
+        <button
+          type="button"
+          class="overview-wrapper"
+          :aria-expanded="showOverview"
+          @click="showOverview = !showOverview"
+        >
           <LayoutGrid></LayoutGrid>
           <p>Overview</p>
-        </div>
+        </button>
       </div>
       <!-- End Exam control. Two-step: first click arms, second confirms. -->
-      <div class="end-exam-wrapper" :class="{ armed: confirming }" @click="onEndClick">
+      <button
+        type="button"
+        v-if="!readOnly"
+        class="end-exam-wrapper"
+        :class="{ armed: confirming }"
+        :aria-label="confirming ? 'Confirm end exam' : 'End exam'"
+        @click="onEndClick"
+      >
         <FlagTriangleRight />
         <p>{{ confirming ? 'Confirm end?' : 'End Exam' }}</p>
-      </div>
+      </button>
       <div class="save-container">
         <div class="dot-save-indicator"></div>
-        <p>Saved</p>
+        <p>{{ saved ? 'Saved' : 'Saves on finish' }}</p>
       </div>
     </div>
 </template>
@@ -116,6 +149,8 @@ function onEndClick() {
   align-items: center;
   column-gap: 6px;
   cursor: pointer;
+  background: transparent;
+  color: $text;
   padding: 4px 12px;
   border-radius: 50px;
   border: 1px solid transparent;
@@ -164,6 +199,9 @@ function onEndClick() {
       font-family: 'Inter';
       font-size: 13.5px;
       cursor: pointer;
+      border: 0;
+      padding: 0;
+      background: transparent;
     }
   }
   .save-container {

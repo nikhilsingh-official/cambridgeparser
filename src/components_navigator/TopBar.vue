@@ -2,14 +2,19 @@
 import TopBarTimer from './TopBarTimer.vue';
 import ZenMode from './ZenMode.vue';
 
+// MCQNav owns the exam lifecycle; the timer only renders that state.
+defineProps<{ running: boolean }>();
+// MCQNav owns Zen Mode so it can change the surrounding solver layout.
+const zenMode = defineModel<boolean>('zenMode', { default: false });
+
 </script>
 <template>
     <div class="top-bar-wrapper">
         <div class="zen-mode-wrapper">
-            <ZenMode></ZenMode>
+            <ZenMode v-model="zenMode"></ZenMode>
         </div>
         <div class="timer-wrapper">
-            <TopBarTimer></TopBarTimer>
+            <TopBarTimer :running="running"></TopBarTimer>
         </div>
         <div class="end-btn-wrapper">
         </div>

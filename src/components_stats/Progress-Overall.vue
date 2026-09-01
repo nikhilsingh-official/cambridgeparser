@@ -20,6 +20,7 @@ import MicroStat from './MicroStat.vue';
 import { baseAxis, baseTooltip, type ChartTheme } from '@/lib/charts/echarts';
 import { pct, count, shortDate, subjectLabel } from '@/lib/stats/format';
 import type { AttemptSummaryView, SubjectStatsView } from '@/lib/types/database';
+import { accuracyTrend } from '@/lib/stats/model';
 
 const props = defineProps<{
   attempts: AttemptSummaryView[];
@@ -172,15 +173,14 @@ const weakestSubject = computed(() => {
 
 // the section's reading, from the same numbers the charts draw.
 
-/** Accuracy of the newest five papers minus the oldest five, in points. */
-const trend = computed(() => {
-  const withAccuracy = chronological.value.filter(a => a.accuracy != null);
-  if (withAccuracy.length < 6) return null;
-  const take = Math.min(5, Math.floor(withAccuracy.length / 2));
-  const mean = (xs: AttemptSummaryView[]) =>
-    xs.reduce((n, a) => n + (a.accuracy ?? 0), 0) / xs.length;
-  return mean(withAccuracy.slice(-take)) - mean(withAccuracy.slice(0, take));
-});
+/**
+ * Accuracy of the newest papers minus the oldest, in ratio.
+ *
+ * the arithmetic moved to model.ts. It was written out here AND in
+ * StatsPage.vue, which fed the recommendation banner - so the chart and the
+ * sentence above it were two independent implementations of the same claim.
+ */
+const trend = computed(() => accuracyTrend(chronological.value));
 </script>
 
 <template>

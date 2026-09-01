@@ -77,6 +77,11 @@ function marksLabel(point) {
         </div>
 
         <template v-else-if="result">
+          <!-- grading and progress persistence are separate outcomes. A
+               correct score must not silently imply it reached history. -->
+          <div v-if="grading?.history_saved === false" class="error-box">
+            {{ grading.history_error || 'This grade could not be added to progress history.' }}
+          </div>
           <div class="score-row">
             <span class="score">{{ result.total_awarded }} / {{ result.max_marks }}</span>
             <span class="score-label">marks awarded</span>

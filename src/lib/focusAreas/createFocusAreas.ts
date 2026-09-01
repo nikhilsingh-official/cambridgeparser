@@ -29,21 +29,26 @@ export function createFocusAreas(segmentedQuestions: SegmentedQuestions) {
       }
 
       const text: textbox[] = segment.segmentText;
-      const firstText: textbox | undefined = text[0];
-      const lastText: textbox | undefined = text[segment.segmentText.length - 1];
 
-      if(!segment || !text || !firstText || !lastText) continue;
-      const y: number = firstText.y - 5;
+      if(!segment || !text || !text.length) continue;
+      // was `text[0].y` and `text[length - 1].y2`, which read the first and
+      // last elements of the array as the question's top and bottom edges. The
+      // array is in PDF content-stream order, not top-to-bottom order, so those
+      // are whichever items the typesetter happened to draw first and last - on
+      // a question with a diagram the last drawn label sits partway up the
+      // question, and the box stopped short of the answer options by a median
+      // of 88pt (worst 422pt) across the 52 papers measured. contentY /
+      // contentY2 are the real extremes, computed in segmentQuestions.ts.
+      const y: number = segment.contentY - 5;
 
       const nextSegment: QuestionSegment | undefined = pageSegments[segmentIndex + 1];
-      const nextFirstText: textbox | undefined = nextSegment?.segmentText[0];
 
       let y2: number;
-      if (nextSegment?.segmentText?.length && nextFirstText) {
-        const buffer = Math.min(12.5, (nextFirstText.y - lastText.y2) / 2);
-        y2 = nextFirstText.y - buffer;
+      if (nextSegment) {
+        const buffer = Math.min(12.5, (nextSegment.contentY - segment.contentY2) / 2);
+        y2 = nextSegment.contentY - buffer;
       } else {
-        y2 = lastText.y2 + 12.5;
+        y2 = segment.contentY2 + 12.5;
       }
 
       pageFocusAreas.push(reactive({

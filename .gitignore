@@ -17,6 +17,8 @@ node_modules/
 .vscode/
 .agents/
 .codex/
+# Playwright MCP snapshots are ephemeral local test evidence.
+.playwright-mcp/
 
 # Logs and temporary files
 *.log
@@ -70,6 +72,10 @@ dist/
 
 # local Supabase CLI scratch state, including emulator service-role keys.
 supabase/.temp/
+
+# downloaded grade-threshold PDFs. Regenerate with scripts/gt/build.py;
+# the parsed output (data/grade_thresholds.json) is what gets committed.
+scripts/gt/cache/
 
 # checksum-pinned Cambridge PDFs are fetched locally for the solver audit.
 tests/fixtures/solver-corpus/cache/

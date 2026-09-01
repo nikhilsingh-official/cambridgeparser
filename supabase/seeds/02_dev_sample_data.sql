@@ -118,8 +118,12 @@ begin
   -- One answer key per paper. Deterministic so a reset reproduces the same
   -- database: a seed whose numbers move under you is a debugging trap.
   foreach paper in array papers loop
-    insert into paper_answer_keys (paper_id, source_url, question_count, parsed_at)
-    values (paper, 'seed://dev-sample-data', qcount, now())
+    insert into paper_answer_keys
+      (paper_id, source_url, question_count, parsed_at, source_sha256,
+       verified_at, parser_version)
+    values
+      (paper, 'seed://dev-sample-data', qcount, now(),
+       repeat('0', 64), now(), 1)
     on conflict (paper_id) do nothing;
 
     for q in 1..qcount loop

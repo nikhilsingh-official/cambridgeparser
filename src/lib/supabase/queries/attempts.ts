@@ -141,6 +141,15 @@ export interface PaperAttemptState {
   lastAttemptedAt: IsoTimestamp;
   /** 0..1 over the whole answer key, or null when it was never marked. */
   accuracy: number | null;
+  /**
+   * the raw marks behind that accuracy, carried so the browser can grade
+   * a component rather than compare percentages. Accuracy alone cannot be
+   * pooled across papers of different lengths, and a grade needs the mark
+   * count to know whether there is enough evidence to state one.
+   */
+  marksAwarded: number | null;
+  marksTotal: number | null;
+  questionsRecorded: number | null;
   /** How many times this exact paper has been opened. */
   attemptCount: number;
 }
@@ -150,12 +159,14 @@ export async function fetchPaperStates(
   userId: string,
 ): Promise<Map<PaperSchema, PaperAttemptState>> {
   const rows = await unwrap<
-    Pick<AttemptSummaryView, 'paper_id' | 'status' | 'started_at' | 'accuracy'>
+    Pick<AttemptSummaryView,
+      'paper_id' | 'status' | 'started_at' | 'accuracy'
+      | 'marks_awarded' | 'marks_total' | 'questions_recorded'>
   >(
     'fetchPaperStates',
     supabase
       .from(SUMMARY)
-      .select('paper_id, status, started_at, accuracy')
+      .select('paper_id, status, started_at, accuracy, marks_awarded, marks_total, questions_recorded')
       .eq('user_id', userId)
       // Newest first, so the first row seen for a paper is the one kept.
       .order('started_at', { ascending: false }),
@@ -172,6 +183,9 @@ export async function fetchPaperStates(
       if (existing.status !== COMPLETED && r.status === COMPLETED) {
         existing.status = r.status;
         existing.accuracy = r.accuracy;
+        existing.marksAwarded = r.marks_awarded;
+        existing.marksTotal = r.marks_total;
+        existing.questionsRecorded = r.questions_recorded;
       }
       continue;
     }
@@ -180,6 +194,9 @@ export async function fetchPaperStates(
       status: r.status,
       lastAttemptedAt: r.started_at,
       accuracy: r.accuracy,
+      marksAwarded: r.marks_awarded,
+      marksTotal: r.marks_total,
+      questionsRecorded: r.questions_recorded,
       attemptCount: 1,
     });
   }

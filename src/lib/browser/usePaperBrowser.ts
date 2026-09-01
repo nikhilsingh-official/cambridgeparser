@@ -25,6 +25,11 @@ import {
 } from '@/components_browser/browserFilter';
 import { EXAM_SERIES_LABEL } from '@/lib/types/enums';
 import { AttemptStatus } from '@/lib/types/enums';
+import { paperNumberFromSchema } from '@/constants/subjectCodes';
+// the grade rule lives in model.ts with every other threshold, so the
+// browser and the stats page cannot drift into disagreeing about who is
+// struggling. See model.ts SS F, needsPractice().
+import { MODEL, needsPractice, readiness } from '@/lib/stats/model';
 
 /** A paper plus everything the card needs to render it. */
 export interface PaperCard extends PaperEntry {
@@ -71,29 +76,45 @@ function progressOf(state: PaperAttemptState | undefined): PaperProgress {
 }
 
 /**
- * Which subjects to nudge the student towards.
+ * Which papers to nudge the student towards.
  *
- * rule-based, and the rule is stated on the card. A subject qualifies when
- * they have completed at least two papers in it and averaged under 60% - low
- * enough to be worth more practice, and two papers is the least that makes an
- * average mean anything. Papers already sat are never recommended: the point
- * is to send them somewhere new.
+ * rule-based, and the rule is stated on the card. A paper qualifies when
+ * they have completed at least two of that component and their pooled marks
+ * still grade below the target - two being the least that makes an average
+ * mean anything. Papers already sat are never recommended: the point is to
+ * send them somewhere new.
+ *
+ * THE GRAIN IS THE COMPONENT, NOT THE SUBJECT. This used to pool every
+ * Physics paper together and call the subject weak under a flat 60%. Both
+ * halves were wrong: Core and Extended have different scales, so the pooled
+ * number belonged to neither, and 60% on Extended is a grade A - the browser
+ * was telling its best candidates to practise more. The threshold is now
+ * model.ts's, and it is a grade.
  */
-function weakSubjects(states: Map<string, PaperAttemptState>): Map<string, number> {
-  const bySubject = new Map<string, { sum: number; n: number }>();
+function weakPapers(states: Map<string, PaperAttemptState>): Map<string, string> {
+  const byPaper = new Map<string, { awarded: number; total: number; q: number; n: number }>();
   for (const s of states.values()) {
     if (s.status !== AttemptStatus.Completed || s.accuracy === null) continue;
-    const code = s.paperId.split('_')[0];
-    const agg = bySubject.get(code) ?? { sum: 0, n: 0 };
-    agg.sum += s.accuracy;
+    const code = s.paperId.split('_')[0] ?? '';
+    const paper = paperNumberFromSchema(s.paperId);
+    if (!code || paper === null) continue;
+    const key = `${code}/${paper}`;
+    const agg = byPaper.get(key) ?? { awarded: 0, total: 0, q: 0, n: 0 };
+    agg.awarded += s.marksAwarded ?? 0;
+    agg.total += s.marksTotal ?? 0;
+    agg.q += s.questionsRecorded ?? 0;
     agg.n += 1;
-    bySubject.set(code, agg);
+    byPaper.set(key, agg);
   }
 
-  const weak = new Map<string, number>();
-  for (const [code, { sum, n }] of bySubject) {
-    const mean = sum / n;
-    if (n >= 2 && mean < 0.6) weak.set(code, mean);
+  const weak = new Map<string, string>();
+  for (const [key, agg] of byPaper) {
+    if (agg.n < MODEL.flags.minPapersForSubject) continue;
+    const [code, paper] = key.split('/');
+    // No paper schema: this pools several sessions, so the component average
+    // is the only scale it can be read against. See useStats.ts.
+    const r = readiness(agg.awarded, agg.total, agg.q, code!, Number(paper));
+    if (r.reliable && needsPractice(r.grade)) weak.set(key, r.grade);
   }
   return weak;
 }
@@ -146,7 +167,7 @@ export function usePaperBrowser() {
   );
 
   const cards = computed<PaperCard[]>(() => {
-    const weak = weakSubjects(states.value);
+    const weak = weakPapers(states.value);
     const now = Date.now();
 
     return entries.value.map((entry) => {
@@ -161,10 +182,14 @@ export function usePaperBrowser() {
         tags.push('Unfinished');
       }
 
-      const weakMean = weak.get(entry.code);
+      // the grade, not the percentage. A percentage is not comparable
+      // across components - the same 60% is an A on Extended and a D on Core -
+      // so the number that made this sentence readable was the one that made
+      // it wrong.
+      const weakGrade = weak.get(`${entry.code}/${entry.paperNumber}`);
       const recommendation =
-        progress === PaperProgress.Unattempted && weakMean !== undefined
-          ? `You average ${Math.round(weakMean * 100)}% in ${entry.subject}`
+        progress === PaperProgress.Unattempted && weakGrade !== undefined
+          ? `You average a ${weakGrade} on ${entry.subject} Paper ${entry.paperNumber}`
           : null;
 
       return {

@@ -5,7 +5,9 @@ export function startFocusAreaTimer(lastTick: number, documentFocusAreas: Docume
 
   lastTick = performance.now();
 
-  window.setInterval(() => {
+  // return a disposer. The old interval survived every solver navigation
+  // and retained the entire parsed paper tree for the rest of the session.
+  const intervalId = window.setInterval(() => {
     const active = getActiveFocusArea(documentFocusAreas);
     const now = performance.now();
 
@@ -17,4 +19,6 @@ export function startFocusAreaTimer(lastTick: number, documentFocusAreas: Docume
 
     lastTick = now;
   }, 1000);
+
+  return () => window.clearInterval(intervalId);
 }

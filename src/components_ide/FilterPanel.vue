@@ -93,15 +93,18 @@ function clearAll() {
       <div class="facet-mode">
         <span class="facet-mode-label">Match</span>
         <div class="view-toggle" role="group" aria-label="Tag match mode">
+          <!-- expose the selected segmented-control value to assistive technology. -->
           <button
             type="button"
             :class="{ active: mode === MATCH_ANY }"
+            :aria-pressed="mode === MATCH_ANY"
             title="Show questions carrying any of the selected tags"
             @click="emit('update:mode', MATCH_ANY)"
           >Any</button>
           <button
             type="button"
             :class="{ active: mode === MATCH_ALL }"
+            :aria-pressed="mode === MATCH_ALL"
             title="Show only questions carrying every selected tag"
             @click="emit('update:mode', MATCH_ALL)"
           >All</button>

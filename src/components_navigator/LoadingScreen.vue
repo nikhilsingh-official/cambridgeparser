@@ -12,6 +12,8 @@ defineProps<{
   schema?: string
   // set when fetch-pdf could not find the paper. See the note in MCQNav.
   loadError?: string | null
+  // non-blocking trust failure; the PDF still opens as unsaved practice.
+  practiceWarning?: string | null
 }>()
 
 // this component previously swallowed the start of the exam entirely - it
@@ -140,7 +142,10 @@ onBeforeUnmount(() => {
      lets the overlay fade and lift away, revealing the paper underneath. -->
 <Transition name="screen-fade">
 <div v-if="!examVisible" class="loading-screen">
-    <div class="back-btn" @click="emit('back')"><ChevronLeft class="icon" /> Back to Browser</div>
+    <!-- use a real button so the exit is reachable by keyboard. -->
+    <button type="button" class="back-btn" @click="emit('back')">
+      <ChevronLeft class="icon" /> Back to Browser
+    </button>
     <div class="centered-content">
       <div :style="{ display: !countdownStarted && !loadError ? 'flex' : 'none' }" ref="lottieContainer" class="lottie"></div>
       <!-- the rotating "Preparing the PDF..." message is a lie once the
@@ -148,6 +153,11 @@ onBeforeUnmount(() => {
       <h3 v-if="loadError" class="load-error">{{ loadError }}</h3>
       <h3 v-else :style="{ display: !countdownStarted ? 'flex' : 'none' }">{{ loading_messages[currentLoadingIndex] }}</h3>        
       <h5 :style="{ display: !countdownStarted ? 'flex' : 'none' }">Paper · {{ schema ?? '—' }}</h5>
+      <!-- shown before the user commits to the paper, not discovered only
+           after they finish and expect the result to appear in history. -->
+      <p v-if="practiceWarning && !countdownStarted" class="practice-warning">
+        Practice only — {{ practiceWarning }}
+      </p>
       <div class="button-container">
         <button v-if="loadError" @click="emit('back')">Back to Browser</button>
         <button v-else :style="{ display: state && !countdownStarted ? 'flex' : 'none' }" @click="startCountdown">Start Exam</button>
@@ -201,6 +211,14 @@ onBeforeUnmount(() => {
             text-align: center;
             opacity: 0.85;
         }
+        /* warning uses the shared semantic token rather than a local hex. */
+        .practice-warning {
+            max-width: 42ch;
+            text-align: center;
+            color: $warning;
+            font-family: 'Inter';
+            font-size: 13px;
+        }
         h5 {
             font-family: 'Kode Mono';
             opacity: 0.5;
@@ -252,6 +270,8 @@ onBeforeUnmount(() => {
     }
 }
 .back-btn {
+    /* button reset preserves the existing pill styling. */
+    background: transparent;
     position: absolute;
     top: 20px;
     left: 20px;

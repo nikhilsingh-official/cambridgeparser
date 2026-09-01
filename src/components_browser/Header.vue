@@ -65,7 +65,9 @@ const isDefault = computed(() => {
 })
 
 function reset() {
-  filter.value = defaultFilter()
+  // The parent owns a const reactive object, so reset its fields in place;
+  // replacing the defineModel value emits an assignment the parent cannot make.
+  Object.assign(filter.value, defaultFilter())
 }
 </script>
 <template>
@@ -202,6 +204,8 @@ function reset() {
     }
 }
 .multiselect {
+  /* Vue 3's functional :deep() syntax replaces deprecated ::v-deep
+     combinators for the third-party multiselect internals below. */
   font-family: 'Lexend';
   border: none;
   background: $secondary-background;
@@ -212,16 +216,16 @@ function reset() {
     background-color: $tertiary-background;
   }
 
-  ::v-deep .multiselect-tag {
+  :deep(.multiselect-tag) {
     background-color: $primary-color;
   }
 
-  ::v-deep .multiselect-tags-search {
+  :deep(.multiselect-tags-search) {
     background-color: transparent;
     color: $text;
   }
 
-  ::v-deep .multiselect-dropdown {
+  :deep(.multiselect-dropdown) {
     background-color: $tertiary-background;
     color: $text;
     border: none;
@@ -241,7 +245,7 @@ function reset() {
   }
 }
 
-::v-deep .multiselect.is-active {
+:deep(.multiselect.is-active) {
   border: none !important;
   box-shadow: none !important;
 }

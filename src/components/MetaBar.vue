@@ -1,7 +1,15 @@
 <template>
     <div class="meta-container">
         <h1 class="page-header">Dashboard</h1>
-        <button class="profile-button"></button>
+        <!-- there is no profile route or menu yet. Disable the control
+             instead of presenting a button that silently does nothing. -->
+        <button
+          class="profile-button"
+          type="button"
+          aria-label="Profile settings are not available yet"
+          title="Profile settings are not available yet"
+          disabled
+        ></button>
     </div>
 </template>
 <style lang="scss" scoped>
@@ -25,6 +33,7 @@
     background-position: center center;
     border: none;
     background-color: transparent;
-    cursor: pointer;
+    cursor: not-allowed;
+    opacity: 0.55;
 }
 </style>

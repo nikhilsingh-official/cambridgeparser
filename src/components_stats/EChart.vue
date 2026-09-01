@@ -15,7 +15,7 @@
 //   4. do not render into a zero-height box. ECharts silently draws nothing
 //      and leaves no warning, which is indistinguishable from "no data".
 // ==========================================================================
-import { onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import { echarts, readChartTheme, type ChartTheme } from '@/lib/charts/echarts';
 import { currentTheme } from '@/lib/theme';
 
@@ -32,10 +32,39 @@ const host = ref<HTMLDivElement | null>(null);
 const chart = shallowRef<echarts.ECharts | null>(null);
 let observer: ResizeObserver | null = null;
 
+/**
+ * The option, built inside a computed so that every reactive value the builder
+ * READS becomes a dependency of the repaint.
+ *
+ * this was `watch(() => [props.option, props.hasData, currentTheme.value])`
+ * on the stated assumption that "a data change produces a new identity". It
+ * does not. Every section declares its builder as an arrow function in setup(),
+ * so `props.option` holds one reference for the component's whole lifetime and
+ * a data change tracked nothing at all.
+ *
+ * The first paint still worked, which is exactly what hid it: `hasData` flips
+ * false -> true when the rows land, and that IS tracked. Changing a filter
+ * afterwards - data on both sides, so `hasData` never moves - left all seven
+ * charts showing the previous selection with the new one in the tiles beside
+ * them. Calling the builder inside a computed fixes it at the root: whatever
+ * props or refs it touches are tracked automatically, with no list to maintain.
+ */
+const built = computed(() => {
+  // Read both before any early return so both are tracked on every pass.
+  const el = host.value;
+  const enabled = props.hasData !== false;
+  // Colours come from CSS custom properties, which are not reactive on their
+  // own - touching the theme ref is what makes a theme switch repaint.
+  void currentTheme.value;
+  if (!el || !enabled) return null;
+  return props.option(readChartTheme(el));
+});
+
 function draw() {
-  if (!host.value || props.hasData === false) return;
+  const option = built.value;
+  if (!host.value || option === null) return;
   if (!chart.value) chart.value = echarts.init(host.value, undefined, { renderer: 'canvas' });
-  chart.value.setOption(props.option(readChartTheme(host.value)), true);
+  chart.value.setOption(option, true);
   // the instance is reachable from the DOM node in development so a chart
   // that renders nothing can be inspected without adding a probe each time.
   // A blank canvas and a broken option look identical from the outside.
@@ -52,9 +81,9 @@ onMounted(() => {
   if (host.value) observer.observe(host.value);
 });
 
-// `option` is a function so a data change produces a new identity; watching it
-// alongside the theme covers both repaint triggers.
-watch(() => [props.option, props.hasData, currentTheme.value], () => draw(), { flush: 'post' });
+// `flush: 'post'` so the canvas element exists before the first draw when
+// `hasData` has just flipped and the template swapped the empty state out.
+watch(built, () => draw(), { flush: 'post' });
 
 onBeforeUnmount(() => {
   observer?.disconnect();

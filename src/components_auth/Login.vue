@@ -18,7 +18,7 @@ import { Mail, Lock, Eye, EyeOff, LoaderCircle, ArrowRight, AlertCircle, CheckCi
 import { useAuthStore, authErrorMessage, type OAuthProvider } from '@/stores/useAuth';
 import ThemeSwitcher from '@/components/ThemeSwitcher.vue';
 
-const { login, signUp, sendPasswordReset } = useAuthStore();
+const { login, signUp } = useAuthStore();
 const router = useRouter();
 const route = useRoute();
 
@@ -98,23 +98,6 @@ async function submitOAuth(provider: OAuthProvider) {
   } catch (err) {
     errorMessage.value = authErrorMessage(err);
     oauthLoading.value = null;
-  }
-}
-
-async function forgotPassword() {
-  if (!email.value.trim()) {
-    errorMessage.value = 'Enter your email first, then choose "Forgot password".';
-    return;
-  }
-  loading.value = true;
-  errorMessage.value = null;
-  try {
-    await sendPasswordReset(email.value.trim());
-    notice.value = 'If that email has an account, a reset link is on its way.';
-  } catch (err) {
-    errorMessage.value = authErrorMessage(err);
-  } finally {
-    loading.value = false;
   }
 }
 
@@ -213,16 +196,6 @@ const providers: { id: OAuthProvider; label: string; path: string }[] = [
             </button>
           </div>
         </label>
-
-        <button
-          v-if="mode === 'signin'"
-          type="button"
-          class="link-btn forgot"
-          :disabled="busy"
-          @click="forgotPassword"
-        >
-          Forgot password?
-        </button>
 
         <button type="submit" class="primary" :disabled="!canSubmit">
           <LoaderCircle v-if="loading" class="btn-icon spin" />
@@ -417,8 +390,6 @@ const providers: { id: OAuthProvider; label: string; path: string }[] = [
     &:hover .field-icon { opacity: 0.8; }
   }
 }
-
-.forgot { align-self: flex-end; margin-top: -4px; }
 
 /* ---- buttons (LoadingScreen's pill, same hover) ---------------------- */
 .primary {

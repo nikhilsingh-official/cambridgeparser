@@ -76,9 +76,6 @@ export function selectOption(highlightMode: Ref<"correct" | "eliminated">, event
   if(!currentSegHighlights) return
   if(!currentOptionHighlights) return
 
-  console.log("Highlight Group Array: ")
-  console.log(groupHighlights)
-
   const optionState = currentOptionHighlights[0]?.state;
   if(!optionState) return;
 

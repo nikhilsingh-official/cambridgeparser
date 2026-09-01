@@ -13,7 +13,10 @@
 import { computed, ref, onMounted } from 'vue';
 import { ChevronRight, RotateCcw, Check, X, Minus, Zap } from 'lucide-vue-next';
 import { formatDuration, QuestionOutcome, type ExamSummary } from '@/lib/types/examSummary';
-import { subjectNameFromSchema } from '@/constants/subjectCodes';
+import {
+  subjectNameFromSchema, subjectCodeFromSchema, paperNumberFromSchema,
+} from '@/constants/subjectCodes';
+import { readiness, gradeTone, isPaperCeiling, isTierCapped, MODEL } from '@/lib/stats/model';
 
 const props = defineProps<{
   summary: ExamSummary | null;
@@ -21,11 +24,14 @@ const props = defineProps<{
   saving?: boolean;
   /** Non-null when persistence failed; the score is still shown. */
   saveError?: string | null;
+  /** Only transactional failures are retryable; practice-only sessions are not. */
+  canRetry?: boolean;
 }>();
 
 const emit = defineEmits<{
   (e: 'dashboard'): void;
   (e: 'review'): void;
+  (e: 'retry'): void;
 }>();
 
 const subject = computed(() =>
@@ -49,14 +55,52 @@ onMounted(() => {
   requestAnimationFrame(step);
 });
 
-// colour band for the ring. Deliberately NOT presented as a Cambridge
-// grade - grade boundaries are per-paper and are not modelled anywhere yet.
-const band = computed(() => {
-  const p = props.summary?.percentage ?? 0;
-  if (p >= 80) return 'strong';
-  if (p >= 60) return 'fair';
-  return 'weak';
+/**
+ * the grade this score would have earned on this component.
+ *
+ * The comment that used to sit here said grade boundaries "are not modelled
+ * anywhere yet" and the ring was banded on invented 80/60 cut-offs. Both are
+ * now wrong: src/constants/gradeThresholds.ts holds Cambridge's own published
+ * thresholds for this exact paper - the session and variant are in the schema -
+ * and model.ts turns them into a grade with an interval around it.
+ *
+ * On a multiple-choice component grade A averages 66%, so the old rule painted
+ * a real A as merely "fair" - the kind of error that quietly tells a student
+ * they are doing worse than they are.
+ */
+const grade = computed(() => {
+  const s = props.summary;
+  if (!s) return null;
+  return readiness(
+    s.marksAwarded,
+    s.marksTotal,
+    s.results.length,
+    subjectCodeFromSchema(s.paperId),
+    paperNumberFromSchema(s.paperId),
+    // the schema itself, so the grade comes from THIS paper's published
+    // boundary rather than the component mean. It is one specific past paper -
+    // we know which session set the boundary, so averaging it away would be
+    // discarding the answer.
+    s.paperId,
+  );
 });
+
+// The ring now takes its colour from the grade rather than from a percentage,
+// so what it signals matches what the letter beside it says.
+const band = computed(() =>
+  grade.value?.reliable ? gradeTone(grade.value.grade) : 'fair');
+
+// a Core-tier paper caps at C. Scoring 83% on one and being shown a C
+// reads as a bug unless the screen says why, so it does - and points at the
+// paper where the same marks would be worth more.
+//
+// Both halves are required. Hitting an A on the Extended paper is also "the
+// ceiling", and telling someone who has just got an A that they have run into
+// a limit would be absurd, so the tier test gates the message.
+const atCeiling = computed(() =>
+  !!grade.value?.reliable
+  && isTierCapped(grade.value.thresholds)
+  && isPaperCeiling(grade.value.grade, grade.value.thresholds));
 
 const ringStyle = computed(() => ({
   // conic-gradient sweep for the score ring
@@ -80,10 +124,55 @@ function outcomeIcon(outcome: QuestionOutcome) {
       </header>
 
       <!-- score ring - the one thing the candidate actually wants -->
-      <div class="score-ring" :class="band" :style="ringStyle">
-        <div class="score-inner">
-          <p class="pct">{{ shownPercentage }}<span>%</span></p>
-          <p class="marks">{{ summary.marksAwarded }} / {{ summary.marksTotal }} marks</p>
+      <div class="score-row">
+        <div class="score-ring" :class="band" :style="ringStyle">
+          <div class="score-inner">
+            <p class="pct">{{ shownPercentage }}<span>%</span></p>
+            <p class="marks">{{ summary.marksAwarded }} / {{ summary.marksTotal }} marks</p>
+          </div>
+        </div>
+
+        <!-- the grade, with everything needed to read it honestly - which
+             component it is for, how wide the estimate is, and that the
+             boundary itself moves between sessions. A bare letter would be a
+             more confident claim than the data supports. -->
+        <div v-if="grade?.reliable" class="grade-card" :class="band">
+          <p class="grade-label">would have been</p>
+          <p class="grade-letter">{{ grade.grade }}</p>
+          <p class="grade-range">
+            {{ grade.best === grade.worst ? 'firm at this mark' : `${grade.best}–${grade.worst} range` }}
+          </p>
+          <p v-if="atCeiling" class="grade-ceiling">
+            {{ grade.grade }} is the highest this paper awards — the higher grades
+            are only on the Extended paper.
+          </p>
+          <!-- which boundary this was read against. The two claims are
+               not the same strength - one is what the examiner published for
+               this paper, the other is what an average paper would have
+               needed - so the note says which, rather than one line covering
+               both. -->
+          <p class="grade-note">
+            <template v-if="grade.basis === 'session'">
+              this paper only, against its own {{ grade.thresholds!.session }} boundaries
+            </template>
+            <template v-else>
+              this paper only; no boundaries published for this session, so
+              {{ grade.thresholds!.years[0] }}–{{ grade.thresholds!.years[1] }} averaged over
+              {{ grade.thresholds!.grades[grade.grade as 'A']?.n ?? 0 }} sessions
+            </template>
+          </p>
+        </div>
+        <div v-else class="grade-card unknown">
+          <p class="grade-label">grade estimate</p>
+          <p class="grade-letter">&mdash;</p>
+          <p class="grade-range">
+            {{ grade && !grade.thresholds ? 'no published boundaries' : 'too few questions' }}
+          </p>
+          <p class="grade-note">
+            {{ grade && !grade.thresholds
+              ? 'Cambridge boundaries for this component were not found.'
+              : `A grade needs at least ${MODEL.grade.minQuestions} questions behind it.` }}
+          </p>
         </div>
       </div>
 
@@ -138,6 +227,7 @@ function outcomeIcon(outcome: QuestionOutcome) {
         <span v-if="saving" class="saving">Saving attempt…</span>
         <span v-else-if="saveError" class="save-failed" :title="saveError">
           Results shown locally — attempt not saved
+          <button v-if="canRetry" type="button" @click="emit('retry')">Retry save</button>
         </span>
         <span v-else class="saved">Attempt saved</span>
       </div>
@@ -197,7 +287,77 @@ function outcomeIcon(outcome: QuestionOutcome) {
   }
 }
 
-/* ---- score ring ---------------------------------------------------- */
+/* ---- score ring + grade -------------------------------------------- */
+/* the ring and the grade sit side by side rather than stacked - they are
+   the same fact stated two ways, and separating them vertically would invite
+   reading the grade as a second, independent result. */
+.score-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  flex-wrap: wrap;
+}
+
+.grade-card {
+  --tone: #{$secondary-color};
+  text-align: left;
+  padding: 16px 20px;
+  border-radius: 16px;
+  background: $tertiary-background;
+  /* A left rule rather than a tinted fill: the ring beside it already carries
+     the colour, and two saturated blocks would compete. */
+  border-left: 3px solid var(--tone);
+  max-width: 260px;
+
+  &.strong { --tone: #{$success}; }
+  &.fair   { --tone: #{$warning}; }
+  &.weak   { --tone: #{$danger}; }
+  &.unknown { --tone: #{$muted}; }
+
+  .grade-label {
+    font-family: 'Lexend';
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    opacity: 0.5;
+    margin: 0;
+  }
+  .grade-letter {
+    font-family: 'Kode Mono';
+    font-size: 52px;
+    line-height: 1;
+    margin: 2px 0 0;
+    color: var(--tone);
+  }
+  .grade-range {
+    font-family: 'Lexend';
+    font-size: 12px;
+    opacity: 0.65;
+    margin: 6px 0 0;
+  }
+  .grade-note {
+    font-family: 'Lexend';
+    font-size: 10.5px;
+    line-height: 1.4;
+    opacity: 0.4;
+    margin: 6px 0 0;
+  }
+  /* Brighter than the provenance note below it: this one changes what the
+     student should do next, rather than explaining where a number came from. */
+  .grade-ceiling {
+    font-family: 'Lexend';
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--tone);
+    opacity: 0.85;
+    margin: 8px 0 0;
+  }
+  /* An unavailable grade is dimmed AND an em dash - never a letter that
+     happens to look small. */
+  &.unknown .grade-letter { opacity: 0.3; }
+}
+
 .score-ring {
   --ring: #{$secondary-color};
   width: 200px;

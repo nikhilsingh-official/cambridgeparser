@@ -9,6 +9,12 @@
 Maps every recorded field to a visual, picks a charting library, and fills the
 slots already laid out in `components_stats/`.
 
+> **Ordering and priority live in [`stats_priority.md`](./stats_priority.md).**
+> This document says what each chart is; that one says which are worth a
+> student's attention, in what order, and why — and it is what the current page
+> order follows. **Every statistical assumption lives in one file,
+> `src/lib/stats/model.ts`**; no component or view computes a metric itself.
+
 ---
 
 ## 0. Decisions taken
@@ -118,7 +124,7 @@ It is **which chart types this dataset needs, and which are first-class**.
 |---|---|---|---|
 | Calendar heatmap (daily activity) | **`calendar` coordinate system, built in** | `chartjs-chart-matrix` plugin + manual date grid | hand-built, ~80 lines |
 | Sankey (answer changes) | **built in** | none | `d3-sankey` + all rendering |
-| Radar (topic mastery) | built in | built in | hand-built |
+| Radar (topic mastery) — *not built, see §7.8* | built in | built in | hand-built |
 | Boxplot (time distributions) | **built in** | `chartjs-chart-boxplot` plugin | hand-built |
 | Polar bar (hour of day) | **built in** | partial (`polarArea`, less control) | hand-built |
 | Scatter, 40k+ points | **canvas, `large: true`** | canvas, fine | SVG chokes; needs canvas by hand |
@@ -368,7 +374,7 @@ that looks broken on day one is worse than one with fewer charts.
 | Calibration curve | ~200 answered questions | **10 deciles is far too many** — `v_calibration_curve` uses `width_bucket(…, 10)`, so at 40 questions most buckets hold ≤4 and the curve is pure noise. Drop to 4–5 buckets until n is large, and always render bucket counts so the reader can see the thinness |
 | Calendar heatmap | any | fine when empty — an empty year still reads correctly |
 | Boxplots | 5 attempts per subject | fall back to a dot strip |
-| Topic mastery | the paper is tagged in `question_topics` | hide the section entirely; do not show an empty radar |
+| Topic mastery | the paper is tagged in `question_topics`, **and 8 questions per topic before a topic is named** | hide the section entirely; below 8 questions a topic still draws, hollow, and is never named by the banner |
 | Sankey | ~20 answer changes | hide |
 
 Give every chart an explicit empty state naming what to do — *"Sit two more
@@ -390,7 +396,18 @@ papers to see a trend"* — not a blank card.
 6. **Focus section.** Calibration curve + scatter. Do these *after* enough real
    attempts exist to tune the thresholds in §6 against actual data.
 7. **§5 event charts.** Sankey, pacing, elimination precision.
-8. **Topic mastery.** Data is in (`question_topics`); nothing renders it yet.
+8. ~~**Topic mastery.**~~ — **done**. `Topics-Overall.vue`, between Progress and
+   Engagement, hidden when nothing is tagged.
+
+   **The radar in §2 was not built.** It was picked before the taxonomy
+   existed, on the assumption that a subject has a handful of topics; the real
+   count is 12–21, where a radar becomes a hairball with labels long enough to
+   overrun the corners. And because the page's subject filter is a multiselect
+   while topic sets are *disjoint* across subjects, a radar spanning two
+   subjects draws one shape over axes that share no meaning. Built instead as a
+   bar sorted weakest-first — which answers "what should I revise" directly and
+   reads the same at one subject or six — paired with an accuracy-against-n
+   scatter that makes the thin-evidence problem visible rather than hidden.
 
 ---
 

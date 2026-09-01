@@ -21,7 +21,9 @@ const letters = computed(() =>
   <div class="side-window-question-wrapper" :class="{ answered: question.selected !== null }">
     <span class="question-number">{{ question.questionNumber }}</span>
     <div class="indicators-wrapper">
-      <button
+      <!-- Overview mirrors the PDF state; it cannot mutate highlights.
+           Render indicators as indicators instead of inert buttons. -->
+      <span
         v-for="(letter, i) in letters"
         :key="letter"
         class="option-btn"
@@ -30,7 +32,7 @@ const letters = computed(() =>
           eliminated: question.eliminated.includes(i),
         }"
         :aria-label="`Question ${question.questionNumber} option ${letter}`"
-      >{{ letter }}</button>
+      >{{ letter }}</span>
     </div>
     <div class="indicators-wrapper">
       <div class="indicator-wrapper">
@@ -80,7 +82,6 @@ const letters = computed(() =>
     display: flex;
     align-items: center;
     justify-content: center;
-    cursor: pointer;
 }
 
 .option-btn.correct {
@@ -95,7 +96,6 @@ const letters = computed(() =>
 
 .indicator-wrapper {
     height: 100%;
-    cursor: pointer;
     .icon {
         svg {
             stroke: $text;

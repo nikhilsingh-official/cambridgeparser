@@ -11,6 +11,11 @@ const header = ref<HTMLElement | null>(null);
 
 const { showTools } = getShowStates()
 
+// completed attempts may open this panel, but its actions are read-only.
+const props = defineProps<{ readOnly?: boolean }>();
+// route the functional paper stop control to MCQNav's lifecycle owner.
+const emit = defineEmits<{ (e: 'endExam'): void }>();
+
 const isDragging = ref(false);
 const pointerId = ref<number | null>(null);
 
@@ -138,9 +143,6 @@ onBeforeUnmount(() => {
   <div
     ref="container"
     class="tools-container"
-    :aria-grabbed="isDragging ? 'true' : 'false'"
-    role="button"
-    tabindex="0"
     v-show="showTools"
   >
     <div class="header-wrapper" ref="header">
@@ -153,11 +155,11 @@ onBeforeUnmount(() => {
     </div>
     <div class="buttons-wrapper">
       <h2>Question Actions</h2>
-      <ActiveQuestionButtons></ActiveQuestionButtons>
+      <ActiveQuestionButtons :disabled="props.readOnly"></ActiveQuestionButtons>
     </div>
     <div class="paper-wrapper">
       <h2>Paper Controls</h2>
-      <PaperControls></PaperControls>
+      <PaperControls :disabled="props.readOnly" @end-exam="emit('endExam')"></PaperControls>
     </div>
   </div>
 </template>

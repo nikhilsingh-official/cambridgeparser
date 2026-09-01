@@ -6,6 +6,11 @@
 
 # SmartSolver — Outstanding Work
 
+> **Historical document.** This predates the final unified-app review and
+> contains status that is no longer current. Use
+> [`README.md`](../../README.md) and
+> [`docs/preproduction_issues.md`](../preproduction_issues.md) for release work.
+
 Status after the data-layer pass. **Done** items are in §1 for context; §2 onward
 is the actual backlog, ordered by what blocks the most.
 
@@ -273,8 +278,8 @@ Infrastructure exists for all of these; none has a consumer.
 | **Answer-change quality** | **not built** | the highest-value unbuilt metric. Now possible: `attempt_events` records every transition type (`setCorrect`, `elimToCorrect`, `correctToElim`, …) with the option index, so right→wrong vs wrong→right is derivable. `optionSwitchCount` only ever counted switches, never whether they helped. |
 | Elimination precision | not built | `eliminated_mask` × `correct_option` — how often a ruled-out option really was wrong, and how often the *correct* answer was eliminated |
 | Pacing / fatigue | not built | `attempt_events` gives true answering order, which `question_number` cannot |
-| Topic mastery | **done** — `v_topic_mastery` reads the `question_topics` link table, seeded by `npm run topics:build` | UI: nothing renders it yet (`fetchTopicMastery()` has no caller) |
-| Exam readiness / predicted grade | not built | grade-threshold table per subject; thin layer over accuracy + topic mastery |
+| Topic mastery | **done** — `v_topic_mastery` reads the `question_topics` link table, seeded by `npm run topics:build` | UI: the Topics section of the stats page (`Topics-Overall.vue`), hidden when nothing is tagged |
+| Exam readiness / predicted grade | **done** — `readiness()` in `model.ts` §F, rendered in Next steps | Real thresholds from 406 published documents (`scripts/gt/build.py`). Averaged across sessions, so it is an average-difficulty target, not a prediction for one session |
 
 **On the three thresholds:** the guess and confidence cut-offs are placeholders
 chosen for plausibility, not fitted to data. Once a few hundred questions exist,
