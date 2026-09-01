@@ -4,13 +4,19 @@
 // ==========================================================================
 
 import type {
-  CalibrationPointView,
   Db,
   QuestionFlagsView,
 } from '@/lib/types/database';
 import { applyAttemptFilter, unwrap, type StatsFilter } from './core';
 import { fetchCountedPages } from './pagination';
 import { isGuess, isOverconfident, isUnderconfident } from '@/lib/stats/model';
+import {
+  summariseAnswerChangeRows,
+  type AnswerChangeSummary,
+  type AnswerChangeVerdict,
+} from '@/lib/stats/filterScope';
+
+export type { AnswerChangeSummary } from '@/lib/stats/filterScope';
 
 /**
  * Per-question flags, filtered to the user.
@@ -49,70 +55,6 @@ export async function fetchQuestionFlags(
     10_000,
     (from, to) => query.range(from, to),
   );
-}
-
-/**
- * The calibration curve.
- *
- * `buckets` re-bins the 10 deciles v_calibration_curve produces. At a few
- * hundred questions most deciles hold fewer than five rows and the curve is
- * noise dressed as insight - docs/stats_page_design.md §6. Re-binning client-side
- * keeps the view stable while letting the UI choose a resolution its sample
- * size can support.
- */
-export interface CalibrationPoint {
-  meanConfidence: number;
-  observedAccuracy: number;
-  questions: number;
-  /** observedAccuracy - meanConfidence. Negative = overconfident. */
-  gap: number;
-}
-
-export async function fetchCalibrationCurve(
-  supabase: Db,
-  userId: string,
-  buckets = 5,
-): Promise<CalibrationPoint[]> {
-  const rows = await unwrap<CalibrationPointView>(
-    'fetchCalibrationCurve',
-    supabase
-      .from('v_calibration_curve')
-      .select('*')
-      .eq('user_id', userId)
-      .order('confidence_bucket', { ascending: true }),
-  );
-
-  if (rows.length === 0) return [];
-
-  // weighted re-bin. Merging deciles means recombining WEIGHTED means -
-  // averaging the decile averages would count a bucket of 2 questions as
-  // heavily as one of 200.
-  const merged = new Map<number, { conf: number; acc: number; n: number }>();
-  for (const r of rows) {
-    // width_bucket returns 1..10; map onto 0..buckets-1.
-    const target = Math.min(
-      buckets - 1,
-      Math.floor(((r.confidence_bucket - 1) / 10) * buckets),
-    );
-    const cell = merged.get(target) ?? { conf: 0, acc: 0, n: 0 };
-    cell.conf += r.mean_confidence * r.questions;
-    cell.acc  += r.observed_accuracy * r.questions;
-    cell.n    += r.questions;
-    merged.set(target, cell);
-  }
-
-  return [...merged.entries()]
-    .sort((a, b) => a[0] - b[0])
-    .map(([, c]) => {
-      const meanConfidence = c.conf / c.n;
-      const observedAccuracy = c.acc / c.n;
-      return {
-        meanConfidence,
-        observedAccuracy,
-        questions: c.n,
-        gap: observedAccuracy - meanConfidence,
-      };
-    });
 }
 
 /** The six tiles under the charts in the focus section. */
@@ -228,35 +170,33 @@ export async function fetchScatterPoints(
 // since it existed, and nothing read it.
 // ==========================================================================
 
-export interface AnswerChangeSummary {
-  changes: number;
-  wrongToRight: number;
-  rightToWrong: number;
-  wrongToWrong: number;
-  /** wrongToRight - rightToWrong. Marks that changing your mind won or cost. */
-  netMarks: number;
-}
-
 export async function fetchAnswerChanges(
   supabase: Db,
   userId: string,
+  filter: Pick<StatsFilter, 'subjectCodes' | 'from' | 'to'> = {},
 ): Promise<AnswerChangeSummary | null> {
-  const rows = await unwrap<{
-    changes: number; wrong_to_right: number; right_to_wrong: number;
-    wrong_to_wrong: number; net_marks: number;
+  // the summary view is all-time and cannot be filtered. Read the compact
+  // verdict rows instead, apply the same subject/date scope as the rest of the
+  // solver page, then aggregate the handful of counters in the browser.
+  const query = applyAttemptFilter(
+    supabase
+      .from('v_answer_changes')
+      .select('exam_attempt_id, question_number, elapsed_ms, verdict', { count: 'exact' }),
+    userId,
+    filter,
+  )
+    .order('exam_attempt_id', { ascending: true })
+    .order('question_number', { ascending: true })
+    .order('elapsed_ms', { ascending: true });
+  const rows = await fetchCountedPages<{
+    exam_attempt_id: string;
+    question_number: number;
+    elapsed_ms: number;
+    verdict: AnswerChangeVerdict;
   }>(
     'fetchAnswerChanges',
-    supabase.from('v_answer_change_summary').select('*').eq('user_id', userId),
+    10_000,
+    (from, to) => query.range(from, to),
   );
-  const row = rows[0];
-  // Null rather than a row of zeros: a user who has never changed an answer has
-  // no data here, which is a different statement from "changed 0 answers".
-  if (!row || row.changes === 0) return null;
-  return {
-    changes: row.changes,
-    wrongToRight: row.wrong_to_right,
-    rightToWrong: row.right_to_wrong,
-    wrongToWrong: row.wrong_to_wrong,
-    netMarks: row.net_marks,
-  };
+  return summariseAnswerChangeRows(rows);
 }

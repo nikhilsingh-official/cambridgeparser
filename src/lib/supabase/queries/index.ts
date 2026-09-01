@@ -19,12 +19,11 @@ export { fetchDailyActivity, fetchHourOfDay, computeStreaks } from './activity';
 
 export {
   fetchQuestionFlags,
-  fetchCalibrationCurve,
   fetchScatterPoints,
   summariseFlags,
   fetchAnswerChanges,
 } from './focus';
-export type { CalibrationPoint, FocusTotals, ScatterPoint, AnswerChangeSummary } from './focus';
+export type { FocusTotals, ScatterPoint, AnswerChangeSummary } from './focus';
 
 export { fetchSubjectStats, fetchTopicMastery } from './subjects';
 export { fetchTopicPractice } from './practice';

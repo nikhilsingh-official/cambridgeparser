@@ -21,7 +21,8 @@ import { Target, ScatterChart, Shuffle } from 'lucide-vue-next';
 import EChart from './EChart.vue';
 import { baseAxis, baseTooltip, type ChartTheme } from '@/lib/charts/echarts';
 import { pct, duration, count } from '@/lib/stats/format';
-import type { CalibrationPoint, FocusTotals, AnswerChangeSummary } from '@/lib/supabase/queries';
+import type { FocusTotals, AnswerChangeSummary } from '@/lib/supabase/queries';
+import type { CalibrationPoint } from '@/lib/stats/filterScope';
 import type { QuestionFlagsView } from '@/lib/types/database';
 
 const props = defineProps<{

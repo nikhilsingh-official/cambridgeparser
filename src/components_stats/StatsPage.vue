@@ -18,7 +18,6 @@ import {
   engagementRecommendation, focusRecommendation,
 } from '@/lib/stats/recommendations';
 import { accuracyTrend as modelAccuracyTrend } from '@/lib/stats/model';
-import type { ExamSeries } from '@/lib/types/enums';
 
 // the filters were ['Wade Cooper', 'Arlene Mccoy', ...] and bound to
 // nothing. They now write straight into the query filter, so changing one
@@ -29,21 +28,6 @@ const {
   filter, state, loading, error, sectionErrors, hasData, totals, streaks, focus, topics,
   rankedTopics, queue, missed, readinessByPaper, ide,
 } = useStats();
-
-// Options come from what the user has actually sat - an exam year with no
-// attempts behind it is a dead end, and offering it makes the filter feel
-// broken.
-const yearOptions = computed(() => state.options?.examYears ?? []);
-
-// the series filter listed the raw stored codes - "s" and "w" - which is
-// what the database holds and not what anyone calls them.
-const SERIES_LABEL: Record<string, string> = {
-  s: 'Summer (May/June)', w: 'Winter (Oct/Nov)', m: 'March',
-};
-const seriesOptions = computed(() =>
-  (state.options?.series ?? []).map(code => ({
-    value: code, label: SERIES_LABEL[code] ?? code,
-  })));
 
 // disambiguated for the same reason as everywhere else - the list showed
 // "Computer Science" twice, and picking one of them was a coin flip.
@@ -62,14 +46,6 @@ const subjectOptions = computed(() => {
 const selectedSubjects = computed({
   get: () => filter.subjectCodes ?? [],
   set: v => { filter.subjectCodes = v.length ? v : undefined; },
-});
-const selectedYears = computed({
-  get: () => filter.examYears ?? [],
-  set: v => { filter.examYears = v.length ? v : undefined; },
-});
-const selectedSeries = computed({
-  get: () => filter.series ?? [],
-  set: v => { filter.series = v.length ? (v as ExamSeries[]) : undefined; },
 });
 
 // the section chevrons now control their content instead of advertising
@@ -168,7 +144,7 @@ const subtitle = computed(() => {
   if (sectionErrors.progress) return 'Could not load your progress summary.';
   if (!hasData.value) return 'No completed papers yet. Sit one and this page fills in.';
   const acc = pct(totals.value.accuracy) ?? '—';
-  return `${totals.value.papers} papers · ${totals.value.questions} questions · ${acc} overall accuracy.`;
+  return `${totals.value.papers} papers · ${totals.value.questions} questions · ${acc} accuracy in this scope.`;
 });
 
 // The header pie: how the marks split across subjects. Categorical, fixed
@@ -221,27 +197,17 @@ const subjectSplitOption = (theme: ChartTheme) => ({
                 </div>
                 <p class="subtext">{{ subtitle }}</p>
                 <p v-if="error" class="stats-error" role="alert">{{ error }}</p>
+                <!-- CP-004 deliberately exposes only the dimension every
+                     solver panel can honour. The IDE has no paper subject and
+                     is labelled all-time in its own section. -->
+                <p class="filter-scope">Subject filters apply to every solver section below.</p>
                 <div class="flex-container">
                     <Multiselect
                       v-model="selectedSubjects"
                       :options="subjectOptions"
                       mode="multiple"
                       :searchable="true"
-                      placeholder="Subjects..."
-                    />
-                    <Multiselect
-                      v-model="selectedYears"
-                      :options="yearOptions"
-                      mode="multiple"
-                      :searchable="true"
-                      placeholder="Years..."
-                    />
-                    <Multiselect
-                      v-model="selectedSeries"
-                      :options="seriesOptions"
-                      mode="multiple"
-                      :searchable="true"
-                      placeholder="Series..."
+                      placeholder="Filter solver by subject..."
                     />
                 </div>
             </div>
@@ -330,6 +296,7 @@ const subjectSplitOption = (theme: ChartTheme) => ({
         <div v-if="ide.submissions || sectionErrors.ide" class="section-container ide-container">
             <div class="section-header">
                 <h1 class="section-inner-header"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-code-icon lucide-code"><path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/></svg> pseudocode</h1>
+                <span class="scope-badge">All-time · subject filter does not apply</span>
                 <button
                   type="button"
                   class="expand-btn"
@@ -390,6 +357,22 @@ const subjectSplitOption = (theme: ChartTheme) => ({
 </template>
 <style lang="scss" scoped>
     .stats-error { margin: 0.25rem 0 0; color: var(--danger); font-family: var(--font-body); font-size: 0.8rem; }
+    // the filter contract is visible before interaction so no panel can be
+    // mistaken for a differently scoped claim.
+    .filter-scope {
+      margin: 0.35rem 0 0;
+      color: var(--muted);
+      font-family: var(--font-body);
+      font-size: 0.78rem;
+    }
+    .scope-badge {
+      margin-left: auto;
+      color: var(--muted);
+      font-family: var(--font-body);
+      font-size: 0.72rem;
+      letter-spacing: 0.02em;
+    }
+    .scope-badge + .expand-btn { margin-left: 1rem; }
     // section failures stay beside the panel they affect; successful
     // sections remain visible instead of being replaced by a page-wide error.
     .section-error {

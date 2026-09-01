@@ -45,26 +45,25 @@ band are ordered by severity and release priority.
 | 1 · XL | CP-005 | Confirmed limitation | High if mobile is promised | Phone-width dashboard and solver layouts are not usable |
 | 2 · XL/data | CP-018 | Model risk | Medium | Analytics thresholds are hand-picked rather than calibrated |
 | 3 · L–XL | CP-006 | Product gap | High if resume is promised | In-progress papers cannot be saved, resumed, or restarted |
-| 4 · L | CP-004 | Confirmed stats defect | High | Page-level filters control only some stats panels |
-| 5 · L | CP-008 | Confirmed lifecycle defect | Medium | Tab-close abandonment can leave stale in-progress attempts |
-| 6 · L | CP-015 | Integration risk | Medium–High | Every solver load depends on one paper mirror |
-| 7 · L | CP-017 | Compatibility risk | Medium | Vendored PDF.js v3 is mixed with npm pdfjs-dist v5 |
-| 8 · L | GAP-001 | Product gap | Medium | Overview rows cannot navigate to their PDF questions |
-| 9 · L | GAP-002 | Product gap | Medium | Paper Generator is not implemented |
-| 10 · M–L | CP-016 | Performance risk | Medium | PDFs are transported as inflated JSON number arrays |
-| 11 · M–L | CP-020 | Standards defect | Medium | Offline Python tooling remains outside the supported application boundary |
-| 12 · M–L | GAP-003 | Product gap | Low–Medium | Calendar has no route or data model |
-| 13 · M | CP-007 | Confirmed auth defect | High | Recovery links have no set-new-password workflow; UI entry is hidden |
-| 14 · M | CP-011 | Production risk | High | Hosted Supabase schema, policies, seed, and functions are unverified |
-| 15 · M | CP-012 | Production risk | High | Real deployed Edge grading is unverified |
-| 16 · M | CP-013 | Production risk | High | Hosted OAuth/provider configuration is unverified |
-| 17 · M | CP-019 | Build/performance risk | Low–Medium | Lottie uses eval and ECharts produces a large route dependency |
-| 18 · M | GAP-004 | Product gap | Medium | Profile and Settings workflows are not implemented |
-| 19 · M | GAP-005 | Product gap | Low | Active-question copy is not implemented |
-| 20 · M | GAP-006 | Product gap | Medium | Some Learn topics have no linked practice |
-| 21 · S–M | CP-009 | Confirmed integration defect | Low | The default PDF.js locale bundle is missing |
-| 22 · S–M | GAP-007 | Product gap | Low | Shortcut help has no in-product overlay |
-| 23 · S operational | CP-014 | Production risk | High until exercised | Preview deployment and deep-link behavior are unverified |
+| 4 · L | CP-008 | Confirmed lifecycle defect | Medium | Tab-close abandonment can leave stale in-progress attempts |
+| 5 · L | CP-015 | Integration risk | Medium–High | Every solver load depends on one paper mirror |
+| 6 · L | CP-017 | Compatibility risk | Medium | Vendored PDF.js v3 is mixed with npm pdfjs-dist v5 |
+| 7 · L | GAP-001 | Product gap | Medium | Overview rows cannot navigate to their PDF questions |
+| 8 · L | GAP-002 | Product gap | Medium | Paper Generator is not implemented |
+| 9 · M–L | CP-016 | Performance risk | Medium | PDFs are transported as inflated JSON number arrays |
+| 10 · M–L | CP-020 | Standards defect | Medium | Offline Python tooling remains outside the supported application boundary |
+| 11 · M–L | GAP-003 | Product gap | Low–Medium | Calendar has no route or data model |
+| 12 · M | CP-007 | Confirmed auth defect | High | Recovery links have no set-new-password workflow; UI entry is hidden |
+| 13 · M | CP-011 | Production risk | High | Hosted Supabase schema, policies, seed, and functions are unverified |
+| 14 · M | CP-012 | Production risk | High | Real deployed Edge grading is unverified |
+| 15 · M | CP-013 | Production risk | High | Hosted OAuth/provider configuration is unverified |
+| 16 · M | CP-019 | Build/performance risk | Low–Medium | Lottie uses eval and ECharts produces a large route dependency |
+| 17 · M | GAP-004 | Product gap | Medium | Profile and Settings workflows are not implemented |
+| 18 · M | GAP-005 | Product gap | Low | Active-question copy is not implemented |
+| 19 · M | GAP-006 | Product gap | Medium | Some Learn topics have no linked practice |
+| 20 · S–M | CP-009 | Confirmed integration defect | Low | The default PDF.js locale bundle is missing |
+| 21 · S–M | GAP-007 | Product gap | Low | Shortcut help has no in-product overlay |
+| 22 · S operational | CP-014 | Production risk | High until exercised | Preview deployment and deep-link behavior are unverified |
 
 CP-001 and CP-003 are resolved by migration 00000000000008: answer-key writes
 are service-only, every legacy key is discarded, retained attempts are pending
@@ -84,7 +83,8 @@ or rubric-inconsistent AI scores are rejected before persistence, and transient
 Google 408/500/502/503/504 or network failures can fall back to OpenRouter after one
 retry. Statistics reads now fail by progress/topics/focus/engagement/IDE group,
 with a visible section-level error, rather than one rejected query clearing the
-whole page. This isolation does **not** resolve CP-004's mixed filter scopes.
+whole page. CP-004 is now resolved by narrowing the page contract to the one
+dimension every solver section can represent: subject.
 
 ## High-severity, high-complexity decisions
 
@@ -93,9 +93,8 @@ small wiring pass.
 
 | Rank | ID | Issue | Severity | Complexity | Why it is hard |
 |---:|---|---|---|---|---|
-| 1 | CP-004 | Stats filters change only some panels | High | L | Several views have already aggregated away year/series/variant. |
-| 2 | CP-005 | The dashboard and solver are not usable at phone widths | High if mobile is launch scope; otherwise Medium | XL | The solver/PDF layout needs product-level responsive behavior. |
-| 3 | CP-006 | Save/resume/restart is absent for in-progress papers | High for long-paper workflows | L–XL | Resume needs durable incremental state and reconciliation. |
+| 1 | CP-005 | The dashboard and solver are not usable at phone widths | High if mobile is launch scope; otherwise Medium | XL | The solver/PDF layout needs product-level responsive behavior. |
+| 2 | CP-006 | Save/resume/restart is absent for in-progress papers | High for long-paper workflows | L–XL | Resume needs durable incremental state and reconciliation. |
 
 ## Resolved integrity defects
 
@@ -122,35 +121,25 @@ small wiring pass.
   attempted mutation/deletion of completed history.
 - **Fixed:** Yes locally; hosted rollout remains CP-011/CP-014.
 
+### CP-004 — Statistics panels had mixed filter scopes
+
+- **Contract chosen:** the page exposes a subject filter for solver analytics;
+  year, series, and variant controls were removed because existing topic views
+  have already aggregated those dimensions away. IDE analytics are independent
+  of paper subjects and are visibly labelled all-time.
+- **Fix:** attempts are fetched once for the selected subjects and now drive
+  progress, subject totals, daily activity, local-hour activity, and streaks.
+  Focus flags, calibration, and raw answer changes use the same subject scope;
+  topic mastery/practice is narrowed by subject before recommendations render.
+- **Verification:** aggregation tests cover weighted subject totals, daily/hour
+  activity, calibration, and answer-change summaries. The `/stats` browser test
+  confirms the single filter and the scoped PostgREST requests.
+- **Fixed:** Yes locally; preview verification remains part of CP-014.
+
 The same pass moved IDE grading to Supabase and made its recorder service-only;
 an authenticated caller can no longer invoke an RPC with an invented score.
 
 ## Confirmed unresolved defects
-
-### CP-004 — The global stats filter has mixed scope
-
-- **Priority:** P1
-- **Severity / complexity:** High / L
-- **Evidence:** [`useStats.ts`](../src/lib/stats/useStats.ts) applies the complete
-  filter to attempt summaries and question flags, but deliberately reads daily,
-  hour, subject, calibration, answer-change, and IDE aggregates unfiltered.
-  Topic rows can honor subject only; their views have already pooled year,
-  series, and variant.
-- **Actual behavior:** selecting subject/year/series updates some totals and
-  charts while other panels keep all-time/all-paper data without a persistent
-  scope label. A single page-level filter therefore makes internally
-  inconsistent claims.
-- **Expected behavior:** every visible panel honors the selected scope, or is
-  clearly separated and labelled as global before the user interacts.
-- **Likely fix:** choose one contract. Either add filter dimensions to the
-  underlying views/queries, or split global panels into a visibly unfiltered
-  section and remove the implication that the page filter controls them.
-- **Steps to reproduce:** open `/stats` with multiple subjects/years, select one
-  year or series, and compare the filtered paper totals with the activity,
-  subject, calibration, answer-change, topic, and IDE panels.
-- **Likely root cause:** aggregate views discarded filter dimensions before the
-  page-level filtering contract was introduced.
-- **Fixed:** No. The separate rapid-filter response race was fixed in this pass.
 
 ### CP-007 — Password-reset links cannot complete a reset
 
@@ -285,10 +274,9 @@ the launch copy promises program output.
 
 1. Deploy a preview and close CP-011 through CP-014 with real hosted tests.
 2. Implement CP-007 password recovery; its broken UI entry is already hidden.
-3. Resolve CP-004 by either changing the data grain or separating global stats.
-4. Decide whether mobile and resume are launch promises; if not, keep their
+3. Decide whether mobile and resume are launch promises; if not, keep their
    current limitations explicit.
-5. Address P2/P3 cleanup and product gaps after the integrity gates pass.
+4. Address P2/P3 cleanup and product gaps after the integrity gates pass.
 
 Until the hosted Supabase, provider, OAuth and preview gates are exercised, the
 recommendation remains **not ready for a public production push**.

@@ -16,13 +16,9 @@ import { storeToRefs } from 'pinia';
 import { supabase, useAuthStore } from '@/stores/useAuth';
 import {
   fetchAttemptSummaries,
-  fetchDailyActivity,
-  fetchHourOfDay,
-  fetchSubjectStats,
   fetchTopicMastery,
   fetchTopicPractice,
   fetchQuestionFlags,
-  fetchCalibrationCurve,
   fetchAnswerChanges,
   fetchFilterOptions,
   fetchIdeStats,
@@ -31,7 +27,6 @@ import {
   summariseFlags,
   type StatsFilter,
   type FilterOptions,
-  type CalibrationPoint,
   type FocusTotals,
   type AnswerChangeSummary,
 } from '@/lib/supabase/queries';
@@ -50,6 +45,13 @@ import {
   type IdeSubmission,
 } from './model';
 import { loadStatsSections } from './loadStatsSections';
+import {
+  aggregateDailyActivity,
+  aggregateHourOfDay,
+  aggregateSubjectStats,
+  calibrationFromFlags,
+  type CalibrationPoint,
+} from './filterScope';
 
 export interface StatsState {
   attempts: AttemptSummaryView[];
@@ -106,7 +108,7 @@ export function useStats() {
   const error = computed(() => Object.values(sectionErrors).some(Boolean)
     ? 'Some statistics sections could not load. Unaffected sections are still available.'
     : null);
-  // filter changes can overlap twelve parallel reads. Only the newest load
+  // filter changes can overlap the section reads. Only the newest load
   // may publish; otherwise a slower, older selection can overwrite the current
   // filter's data and make the controls disagree with every chart.
   let loadGeneration = 0;
@@ -125,24 +127,29 @@ export function useStats() {
     loading.value = true;
     Object.assign(sectionErrors, EMPTY_SECTION_ERRORS);
     try {
+      // one filtered attempt query is shared by every section whose claims
+      // can be derived from attempt grain. This is the CP-004 contract: the
+      // subject filter selects one solver dataset, not a different subset per
+      // chart.
+      const attemptsPromise = fetchAttemptSummaries(supabase, userId, {
+        subjectCodes: filter.subjectCodes,
+      });
       // groups run concurrently, but each has its own rejection boundary.
       // A focus-view migration failure, for example, no longer discards valid
       // progress, topic, engagement and IDE responses.
       const results = await loadStatsSections<StatsSection, Partial<StatsState>>({
         progress: async () => {
-          const [attempts, subjects, options] = await Promise.all([
-            fetchAttemptSummaries(supabase, userId, filter),
-            // These rollups do not carry the full paper filter; see CP-004.
-            fetchSubjectStats(supabase, userId),
+          const [attempts, options] = await Promise.all([
+            attemptsPromise,
             // Options remain unfiltered so a selection is never a one-way door.
             fetchFilterOptions(supabase, userId),
           ]);
-          return { attempts, subjects, options };
+          return { attempts, subjects: aggregateSubjectStats(attempts), options };
         },
         topics: async () => {
-          // both reads need the whole topic history. Subject narrowing is
-          // applied by the computed values below; year/series filtering would
-          // corrupt the sequence after those dimensions were aggregated away.
+          // both reads need whole topic histories. The sole page filter is
+          // subject, narrowed by the computed values below without changing a
+          // topic's ordered practice sequence.
           const [topics, practice] = await Promise.all([
             fetchTopicMastery(supabase, userId),
             fetchTopicPractice(supabase, userId),
@@ -150,19 +157,18 @@ export function useStats() {
           return { topics, practice };
         },
         focus: async () => {
-          const [flags, calibration, answerChanges] = await Promise.all([
-            fetchQuestionFlags(supabase, userId, filter),
-            fetchCalibrationCurve(supabase, userId),
-            fetchAnswerChanges(supabase, userId),
+          const [flags, answerChanges] = await Promise.all([
+            fetchQuestionFlags(supabase, userId, { subjectCodes: filter.subjectCodes }),
+            fetchAnswerChanges(supabase, userId, { subjectCodes: filter.subjectCodes }),
           ]);
-          return { flags, calibration, answerChanges };
+          return { flags, calibration: calibrationFromFlags(flags), answerChanges };
         },
         engagement: async () => {
-          const [daily, hours] = await Promise.all([
-            fetchDailyActivity(supabase, userId, filter.from, filter.to),
-            fetchHourOfDay(supabase, userId),
-          ]);
-          return { daily, hours };
+          const attempts = await attemptsPromise;
+          return {
+            daily: aggregateDailyActivity(attempts),
+            hours: aggregateHourOfDay(attempts),
+          };
         },
         // IDE rows have no Cambridge paper dimensions, so they remain an
         // explicitly independent, unfiltered section.

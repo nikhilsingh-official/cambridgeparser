@@ -52,8 +52,8 @@ export async function unwrap<T>(
  * The filter bar on the stats page. Every field is optional; an empty filter
  * means "everything for this user".
  *
- * arrays rather than single values because the page's three multiselects
- * are multi-choice. An empty array means "no constraint", NOT "match nothing" -
+ * arrays rather than single values because filter controls can be
+ * multi-choice. An empty array means "no constraint", NOT "match nothing" -
  * applyAttemptFilter() skips empty arrays rather than emitting `in.()`, which
  * PostgREST rejects as a syntax error.
  */

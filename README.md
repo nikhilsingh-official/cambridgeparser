@@ -59,7 +59,7 @@ transactional, idempotent RPC boundary. Completed histories are read-only.
 | `/dashboard` | Authenticated | Summary and entry points into solver and IDE work |
 | `/browser` | Authenticated | Find an MCQ paper and open its solver |
 | `/solver/:schema` | Authenticated, full screen | Sit, finish, and review one paper such as `0610_s26_11` |
-| `/stats` | Authenticated | Filtered solver and IDE progress analytics |
+| `/stats` | Authenticated | Subject-filtered solver analytics plus separately labelled all-time IDE analytics |
 | `/problems` | Authenticated | Search and filter the pseudocode corpus |
 | `/ide` and `/ide/:id` | Authenticated | Parse and submit free-form or fill-blank answers |
 | `/learn` | Authenticated | Pseudocode learning topics and links to related practice |
@@ -201,7 +201,7 @@ npx vue-tsc -b
 npm run build
 ```
 
-The current Node suite contains 129 assertions/tests across `tests/**/*.test.ts`
+The current Node suite contains 133 assertions/tests across `tests/**/*.test.ts`
 and `tests/**/*.test.mjs`. The build repeats the type check before Vite bundles
 the application.
 
@@ -317,9 +317,15 @@ not prove the Vercel rewrite or unified app is live.
 - Paper Generator, Calendar, Settings, profile, copy-question, restart, and
   mid-paper save are explicitly disabled because their workflows are not
   implemented. The solver Overview is a passive state summary, not navigation.
+- Solver statistics can be filtered by subject. Year, series, and variant are
+  deliberately not page-level statistics filters because topic aggregates do
+  not retain those dimensions. Pseudocode statistics are all-time and labelled
+  separately from the subject-scoped solver sections.
 - Password recovery is not exposed because the recovery link has no
-  new-password form yet. Do not advertise it until CP-007 in
-  `docs/preproduction_issues.md` is resolved.
+  new-password form yet. The Supabase-supported implementation options and
+  production prerequisites are documented in
+  [`docs/supabase_password_recovery.md`](docs/supabase_password_recovery.md);
+  do not advertise recovery until CP-007 is resolved.
 - PDF.js currently emits repeated localization warnings while valid papers
   render. They are noisy but did not prevent the tested PDFs from loading.
 - The committed question corpus is not regenerated in this repository, so

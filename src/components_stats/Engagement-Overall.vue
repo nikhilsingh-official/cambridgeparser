@@ -229,7 +229,7 @@ const peakHour = computed(() => {
         <MicroStat label="Longest streak" :value="streaks.longest ? `${streaks.longest}d` : '0d'" hint="personal best" />
     </div>
     <div class="quickview-container quickview-container-3">
-        <MicroStat label="Total time" :value="duration(totals.timeMs)" hint="all papers" />
+        <MicroStat label="Total time" :value="duration(totals.timeMs)" hint="this scope" />
     </div>
     <div class="quickview-container quickview-container-4">
         <MicroStat label="Peak hour" :value="peakHour" :hint="totals.avgPaperMs ? `${duration(totals.avgPaperMs)} avg paper` : 'when you revise'" />
