@@ -14,19 +14,9 @@
 import type { TableRow } from '@/lib/processing/processingTypes';
 
 /**
- * Raw body returned by the edge function.
- *
- * `qp` is the question-paper PDF as a byte array. It is JSON, so the bytes
- * arrive as a plain number[] - which inflates a ~1 MB PDF to ~4 MB of text.
- * That inefficiency is pre-existing and tracked in docs/future_work.md; the type
- * documents it rather than hiding it.
- *
- * The Record form is tolerated because JSON transports of typed arrays
- * sometimes arrive as `{"0": 37, "1": 80, ...}` rather than an array, and the
- * existing client already branches on that.
+ * Metadata encoded beside the binary PDF in the multipart Edge response.
  */
-export interface FetchPdfResponse {
-  qp: number[] | Record<string, number>;
+export interface FetchPdfMetadata {
   /** Parsed mark-scheme rows, or null when the table could not be read. */
   answers: TableRow[] | null;
   /** Whether the server installed the fresh key into authoritative storage. */

@@ -28,6 +28,7 @@ test('label-only options receive usable click targets', async () => {
   const vite = await createServer({
     appType: 'custom',
     logLevel: 'error',
+    optimizeDeps: { noDiscovery: true },
     server: { middlewareMode: true, hmr: { port: 24679 } },
   });
 

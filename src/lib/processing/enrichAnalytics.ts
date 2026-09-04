@@ -73,17 +73,15 @@ export function enrichAnalytics(baseAnalytics: QuestionsAnalytics, eventLogs: Ev
     const BUTTON_TYPES: ButtonType[] = ["Copy", "Flag", "Star", "Save"];
 
 
-    const buttonSelectionEvents = qLogs.filter(
-      (e) =>
-        BUTTON_TYPES.includes(e.elementType as ButtonType) &&
-        e.actionType === "Selection"
-      );
-
-    const buttonCounts = buttonSelectionEvents.reduce((acc, ev) => {
-      const key = ev.elementType as ButtonType;
-      acc[key] = (acc[key] ?? 0) + 1;
-      return acc;
-    }, {} as Record<ButtonType, number>);
+    // these controls are toggles, so analytics must reflect their final
+    // state. Counting Selection events made an on/off cycle look selected and
+    // rewarded repeated cycles. Copy remains a one-shot interaction elsewhere.
+    const finalButtonState = qLogs.reduce((state, event) => {
+      if (!BUTTON_TYPES.includes(event.elementType as ButtonType)) return state;
+      const key = event.elementType as ButtonType;
+      state[key] = event.actionType === "Selection";
+      return state;
+    }, {} as Record<ButtonType, boolean>);
 
     function diminishing(value: number) {
       const first = 0.5;
@@ -97,7 +95,15 @@ export function enrichAnalytics(baseAnalytics: QuestionsAnalytics, eventLogs: Ev
       return norm;
     }
 
-    const flagCount = buttonCounts.Flag ?? 0;
+    // explicit positive intent must start at zero and rise when the user
+    // acts. `diminishing()` runs in the opposite direction and is reserved for
+    // confidence penalties such as marking a question for review.
+    function increasing(value: number) {
+      if (value <= 0) return 0;
+      return Math.min(0.9, 0.5 + 0.25 * (value - 1));
+    }
+
+    const flagCount = finalButtonState.Flag ? 1 : 0;
     const markReviewScore = diminishing(flagCount);
 
     //Calculate the number of times the user eliminates an option
@@ -192,8 +198,9 @@ export function enrichAnalytics(baseAnalytics: QuestionsAnalytics, eventLogs: Ev
     );
 
     //Difficulty signal (boolean) from marked as difficult
-    const difficultCount = buttonCounts.Star ?? 0;
-    const markDifficultScore = diminishing(difficultCount);
+    const difficultCount = finalButtonState.Star ? 1 : 0;
+    // Star is evidence for difficulty, so its signal rises from zero.
+    const markDifficultScore = increasing(difficultCount);
 
     //Difficulty signal derived from number of times the user switches options
     const switchScore = clamp(optionSwitchCount / Math.max(1, 5));
@@ -216,8 +223,13 @@ export function enrichAnalytics(baseAnalytics: QuestionsAnalytics, eventLogs: Ev
     const difficultyScore = clamp(difficulty);
 
     //Interest signal derived from saving question
-    const saveCount = buttonCounts.Save ?? 0;
-    const markSaveScore = diminishing(saveCount);
+    const saveCount = finalButtonState.Save ? 1 : 0;
+    // Save is evidence for interest, so its signal rises from zero.
+    const markSaveScore = increasing(saveCount);
+
+    // review intent contributes positively to interest even though the
+    // same Flag event contributes inversely to confidence.
+    const markReviewInterestScore = increasing(flagCount);
 
     //Interest signal derived from number of highlight events
     const highlightSignal = clamp(highlightEvents.length / Math.max(1, 6));
@@ -230,7 +242,7 @@ export function enrichAnalytics(baseAnalytics: QuestionsAnalytics, eventLogs: Ev
       interestWeights[0] * markSaveScore +
       interestWeights[1] * highlightSignal +
       interestWeights[2] * clamp(revisitCount / Math.max(1, 3)) +
-      interestWeights[3] * markReviewScore +
+      interestWeights[3] * markReviewInterestScore +
       interestWeights[4] * difficultyScore +
       interestWeights[5] * timeSignal;
     const interestScore = clamp(interestRaw);

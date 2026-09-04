@@ -20,7 +20,8 @@ deployed, routed, or authenticated as separate sites.
 - A curated browser of solvable IGCSE, O Level, and AS/A Level MCQ papers with
   subject, year, series, variant, and progress filters.
 - A timed PDF paper runner with answer selection, option elimination, flags,
-  an overview, finish confirmation, result review, and persisted attempts.
+  clickable question navigation, active-question copy, finish confirmation,
+  result review, and persisted attempts.
 - Dashboard and statistics views backed by real attempt, topic, focus-area,
   recommendation, and IDE-submission data.
 - A searchable Cambridge 9618 pseudocode question corpus with tag filtering,
@@ -39,7 +40,7 @@ deployed, routed, or authenticated as separate sites.
 | Web client | Vue 3, TypeScript, Vite, Pinia, Vue Router, CodeMirror, ECharts, and PDF.js under `src/` |
 | Authentication | One Supabase client and session in `src/stores/useAuth.ts`; route protection in `src/router/router.ts` |
 | Application data | Supabase Postgres, Row Level Security, RPCs, ordered migrations, and development seeds under `supabase/` |
-| MCQ paper retrieval | Authenticated `fetch-pdf` Supabase Edge Function; fetches the PDFs, parses and atomically installs a verified answer key, then returns the paper |
+| MCQ paper retrieval | Authenticated `fetch-pdf` Supabase Edge Function; fetches the PDFs, parses and atomically installs a verified answer key, then returns binary PDF data and metadata in one multipart response |
 | IDE grading | Authenticated Supabase `grade` Edge Function; Google AI Studio is primary and OpenRouter is the fallback |
 | IDE corpus/parser | Committed records and images in `public/resources`, plus a committed WASM parser built from `pseudocode-parser/` |
 | Hosting | Vercel serves the Vite `dist/` client and rewrites history-mode deep links; Supabase hosts both server functions |
@@ -201,7 +202,7 @@ npx vue-tsc -b
 npm run build
 ```
 
-The current Node suite contains 133 assertions/tests across `tests/**/*.test.ts`
+The current Node suite contains 139 assertions/tests across `tests/**/*.test.ts`
 and `tests/**/*.test.mjs`. The build repeats the type check before Vite bundles
 the application.
 
@@ -303,6 +304,9 @@ not prove the Vercel rewrite or unified app is live.
 - The paper browser is deliberately limited to components the MCQ answer and
   mark-scheme pipeline can parse. It is not a catalogue of every Cambridge
   subject or written paper.
+- The installed `pdfjs-dist` dependency currently has a high-severity npm
+  advisory. Resolve CP-022 in the pre-production issue register before treating
+  external PDF parsing as production-safe.
 - Paper years and unavailable sittings are curated in
   `src/constants/paperCatalogue.ts`. Update them only after verifying both the
   question paper and mark scheme at the configured mirror.
@@ -314,9 +318,9 @@ not prove the Vercel rewrite or unified app is live.
 - The dashboard and solver remain desktop-oriented. The dashboard currently
   overflows and overlaps at phone widths, so mobile should not be advertised
   as fully supported until that layout is corrected.
-- Paper Generator, Calendar, Settings, profile, copy-question, restart, and
-  mid-paper save are explicitly disabled because their workflows are not
-  implemented. The solver Overview is a passive state summary, not navigation.
+- Settings, profile, restart, and mid-paper save are explicitly disabled because
+  their workflows are not implemented. Paper Generator and Calendar are not
+  advertised in the navigation.
 - Solver statistics can be filtered by subject. Year, series, and variant are
   deliberately not page-level statistics filters because topic aggregates do
   not retain those dimensions. Pseudocode statistics are all-time and labelled
@@ -326,8 +330,6 @@ not prove the Vercel rewrite or unified app is live.
   production prerequisites are documented in
   [`docs/supabase_password_recovery.md`](docs/supabase_password_recovery.md);
   do not advertise recovery until CP-007 is resolved.
-- PDF.js currently emits repeated localization warnings while valid papers
-  render. They are noisy but did not prevent the tested PDFs from loading.
 - The committed question corpus is not regenerated in this repository, so
   corpus corrections require an external extraction workflow and a reviewed
   data update.
@@ -335,9 +337,11 @@ not prove the Vercel rewrite or unified app is live.
   conflict with `AGENTS.md`. Resolve CP-020 before committing those files.
 
 The ranked current issue register, including production gates and evidence, is
-[`docs/preproduction_issues.md`](docs/preproduction_issues.md). Older roadmap
-documents contain historical pre-merge status and should not be used as the
-release checklist.
+[`docs/preproduction_issues.md`](docs/preproduction_issues.md). The measured
+transport, analytics-model, and frontend bundle options for CP-016, CP-018, and
+CP-019 are in [`docs/performance_options.md`](docs/performance_options.md). Older
+roadmap documents contain historical pre-merge status and should not be used as
+the release checklist.
 
 ## Coding constraints
 

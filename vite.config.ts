@@ -18,7 +18,9 @@ export default defineConfig({
         manualChunks: {
           pdfjs: ['pdfjs-dist'],
           supabase: ['@supabase/supabase-js'],
-          lottie: ['lottie-web'],
+          // keep the manual chunk aligned with LoadingScreen's
+          // expression-free canvas player so the full eval build stays out.
+          lottie: ['lottie-web/build/player/lottie_light_canvas'],
           // ECharts is ~690 kB raw. Left in the route chunk it made
           // StatsPage the largest bundle in the app and re-downloaded on every
           // deploy that touched the page; split out it caches independently.

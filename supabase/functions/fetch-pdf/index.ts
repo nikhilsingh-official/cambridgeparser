@@ -4,6 +4,8 @@ import * as pdfjs from "npm:pdfjs-serverless";
 import { getAnswersFromPDF } from "./answerKey.ts";
 // the Edge Function, not the browser, now owns the shared key write.
 import { normalizeTrustedAnswerKey, sha256Hex } from "./trustedAnswerKey.ts";
+// keep PDF bytes binary while returning metadata in the same invocation.
+import { createFetchPdfResponse } from "./paperResponse.ts";
 
 const ANSWER_KEY_PARSER_VERSION = 1;
 
@@ -148,8 +150,6 @@ Deno.serve(async (req: any) => {
     }
 
     const headers = new Headers();
-    headers.set("Content-Type", "application/json");
-    headers.set("Content-Disposition", `inline; filename="${schema}.pdf"`);
     headers.set("Cache-Control", "public, max-age=3600, s-maxage=86400");
 
     headers.set("X-Source-URL", qpResult.url);
@@ -166,16 +166,12 @@ Deno.serve(async (req: any) => {
       schema, msResult.url, markSchemeSha256, trustedAnswers,
     );
 
-    const body = {
-      qp:  Array.from(new Uint8Array(qpArrayBuffer)),
+    // multipart avoids expanding each PDF byte into a JSON number while
+    // preserving the one-call PDF + marking metadata contract.
+    return createFetchPdfResponse(schema, qpArrayBuffer, {
       answers,
       answerKey,
-    }
-
-    return new Response(JSON.stringify(body), {
-      status: 200,
-      headers
-    });
+    }, headers);
 
   } catch (err) {
     console.error("Unhandled error:", err);

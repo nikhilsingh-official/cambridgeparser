@@ -6,6 +6,8 @@ import { getShowStates } from './composable';
 import { answeredCount, questionList } from '@/lib/state/examState';
 
 const { showOverview } = getShowStates();
+// pass the selected question to MCQNav, which owns the iframe and focus tree.
+const emit = defineEmits<{ (event: 'navigate-question', questionNumber: number): void }>();
 </script>
 
 <template>
@@ -36,10 +38,12 @@ const { showOverview } = getShowStates();
       </div>
       <!-- was `v-for="i in 40"` - a fixed 40 rows regardless of the paper,
            each rendering invented answers. Now driven by the parsed paper. -->
+      <!-- each row bubbles its requested PDF question to MCQNav. -->
       <SideWindowQuestion
         v-for="q in questionList"
         :key="q.questionNumber"
         :question="q"
+        @navigate="emit('navigate-question', $event)"
       />
 
       <!-- the panel used to look identical before and after the paper had

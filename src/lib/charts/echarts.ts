@@ -18,19 +18,17 @@ import {
   GridComponent,
   TooltipComponent,
   LegendComponent,
-  DatasetComponent,
   MarkLineComponent,
   VisualMapComponent,
-  TitleComponent,
 } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
-import { LabelLayout, UniversalTransition } from 'echarts/features';
+import { LabelLayout } from 'echarts/features';
 
 echarts.use([
   LineChart, BarChart, ScatterChart, PieChart, HeatmapChart,
-  GridComponent, TooltipComponent, LegendComponent, DatasetComponent,
-  MarkLineComponent, VisualMapComponent, TitleComponent,
-  LabelLayout, UniversalTransition,
+  GridComponent, TooltipComponent, LegendComponent,
+  MarkLineComponent, VisualMapComponent,
+  LabelLayout,
   CanvasRenderer,
 ]);
 

@@ -48,18 +48,6 @@ async function handleLogout() {
                       Paper Browser
                     </router-link>                   
                 </li>
-                <!-- no generator route or implementation exists yet. -->
-                <li
-                  class="sidebar-item sidebar-item--disabled"
-                  aria-disabled="true"
-                  aria-label="Paper Generator (coming soon)"
-                  title="Paper Generator is coming soon"
-                >
-                    <div class="sidebar-icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sparkles-icon lucide-sparkles"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></svg>
-                    </div>
-                    <span class="sidebar-text">Paper Generator</span>
-                </li>
                 <!-- the "Paper Solver" item was removed. It was a
                      router-link hardcoded to /solver/0455_w22_12, so every
                      student who clicked it sat the same Economics paper
@@ -106,18 +94,6 @@ async function handleLogout() {
                     <router-link to="/stats" class="sidebar-text" active-class="active-link" exact>
                       Stats
                     </router-link>                   
-                </li>
-                <!-- no calendar route or implementation exists yet. -->
-                <li
-                  class="sidebar-item sidebar-item--disabled"
-                  aria-disabled="true"
-                  aria-label="Calendar (coming soon)"
-                  title="Calendar is coming soon"
-                >
-                    <div class="sidebar-icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-calendar"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-                    </div>
-                    <span class="sidebar-text">Calendar</span>
                 </li>
             </div>
             <div class="sidebar-group">

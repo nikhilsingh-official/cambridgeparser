@@ -14,4 +14,7 @@ export {
   getOptions
 } from "./getOptions";
 
+// active-question lookup and readable clipboard text.
+export { segmentedQuestionText } from './segmentedQuestionText';
+
 export * from "./pdfTypes";

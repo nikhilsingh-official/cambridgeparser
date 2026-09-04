@@ -7,6 +7,8 @@ import { FocusAreaAction } from "@/lib/types/enums";
 import type { EventLogs } from "../utils/utilsTypes";
 import type { DocumentFocusAreas, FocusArea } from "./focusAreasTypes";
 import { throttle } from "../utils/throttle";
+// PDF clicks and Overview navigation now share one activation invariant.
+import { activateQuestionFocus } from "./activateQuestionFocus";
 
 export function eventListenersInit(
   documentFocusAreas: DocumentFocusAreas,
@@ -49,10 +51,8 @@ export function eventListenersInit(
     const current = pageFocusAreas.find((f) => y >= f.y && y <= f.y2) ?? null;
     if (!current) return;
 
-    const previousActive = documentFocusAreas.flat().find((f) => f.active);
-    if (previousActive && previousActive !== current) previousActive.active = false;
-
-    current.active = true;
+    // keep exactly one question active through the shared helper.
+    activateQuestionFocus(documentFocusAreas, current.questionNumber);
     logFocusArea(eventLogs, FocusAreaAction.UserClick, current.questionNumber);
   });
 

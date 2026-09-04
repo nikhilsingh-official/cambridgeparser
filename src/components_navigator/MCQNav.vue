@@ -11,7 +11,7 @@ import BottomBar from './BottomBar.vue';
 import { createKeydownHandlers } from '@/lib/utils/keydownListeners';
 import type { TableRow } from '@/lib/processing/processingTypes';
 import { useAuthStore, supabase } from '@/stores/useAuth';
-import { type DocumentFocusAreas, createFocusAreas, eventListenersInit, startFocusAreaTimer } from '@/lib/focusAreas';
+import { type DocumentFocusAreas, activateQuestionFocus, createFocusAreas, eventListenersInit, startFocusAreaTimer } from '@/lib/focusAreas';
 import { createHighlights, type DocumentHighlights } from '@/lib/highlights';
 import { extractText, identifyQuestionNumbers, segmentQuestions, getOptions } from '@/lib/pdf';
 // extracted so its idempotence can be unit-tested without a DOM.
@@ -25,21 +25,22 @@ import { getQuestionsAnalytics } from '@/lib/processing/getQuestionAnalytics';
 // direct table writers are replaced by one transactional completion RPC.
 import { startExamAttempt, abandonExamAttempt, finalizeExamAttempt } from '@/lib/supabase/pushToExamTable';
 // exam-relative event timing, and the shared session the flag buttons read.
-import { setEventEpoch } from '@/lib/utils/addEventLog';
+import { logFocusArea, setEventEpoch } from '@/lib/utils/addEventLog';
 // the attempt_status values, so 'completed'/'abandoned' are not bare strings.
-import { registerExamSession, registerExamHighlights, getHighlightMode } from './composable';
+import { registerExamSession, registerExamHighlights, registerExamQuestions, getHighlightMode } from './composable';
 import router from '@/router/router';
 // types for the vendored pdf.js viewer and the fetch-pdf contract.
 import { asPdfViewerWindow, type PdfPageView } from '@/lib/types/pdfViewer';
 // drives the paper's dark mode and the mirrored token values.
 import { currentTheme, isLightTheme } from '@/lib/theme';
-import type { FetchPdfResponse, LoadedPaper } from '@/lib/types/fetchPdf';
+import type { LoadedPaper } from '@/lib/types/fetchPdf';
 // local summary computation for the end screen.
 import { buildExamSummary, type ExamSummary } from '@/lib/types/examSummary';
 import { renderHighlights } from '@/lib/render/renderHighlights';
 import { renderFocusAreas } from '@/lib/render/renderFocusAreas';
-// fail closed when the edge function returns a partial or malformed key.
-import { validateAnswerKey } from '@/lib/pdf/validateAnswerKey';
+// validates the multipart Edge response before any bytes reach PDF.js.
+import { decodeFetchPdfResponse } from '@/lib/pdf/decodeFetchPdfResponse';
+import { FocusAreaAction } from '@/lib/types/enums';
 
 const { showOverview } = getShowStates();
   
@@ -106,9 +107,8 @@ const reviewOnly = ref(false);
 // distinguishes a fully persisted attempt from the in-progress row.
 const attemptSaved = ref(false);
 
-// the fetch-pdf edge function's response had no type at all - `answers`
-// was `any`, so the mark-scheme rows flowed untyped into getQuestionsAnalytics
-// and persistence. FetchPdfResponse/LoadedPaper name that contract.
+// the fetch-pdf boundary validates multipart metadata and bytes before the
+// mark-scheme rows flow into analytics or persistence.
 async function getPDF(): Promise<LoadedPaper> {
 
   const { data, error } = await supabase.functions.invoke("fetch-pdf", {
@@ -122,17 +122,10 @@ async function getPDF(): Promise<LoadedPaper> {
     throw error;
   }
 
-  // `functions.invoke` returns `any`, so the response is named here at the
-  // boundary. Everything downstream of this line is typed.
-  const body = data as FetchPdfResponse;
-  const answers = validateAnswerKey(body.answers);
-  if (!answers) throw new Error('The mark scheme did not contain a complete answer key');
-
-  const pdfBytes = new Uint8Array(
-    Array.isArray(body.qp)
-      ? body.qp
-      : Object.values(body.qp)
-  );
+  // FunctionsClient converts multipart responses to FormData. Validate
+  // both parts before creating the object URL or handing bytes to PDF.js.
+  const body = await decodeFetchPdfResponse(data);
+  const { answers, pdfBytes } = body;
 
   const pdfBlob = new Blob([pdfBytes], {
     type: "application/pdf"
@@ -144,8 +137,8 @@ async function getPDF(): Promise<LoadedPaper> {
     answers,
     pdfBytes,
     pdfUrl,
-    answerKeyPersisted: body.answerKey?.persisted === true,
-    answerKeyError: body.answerKey?.error,
+    answerKeyPersisted: body.answerKey.persisted,
+    answerKeyError: body.answerKey.error,
   };
 }
 
@@ -324,6 +317,34 @@ async function abandonExam() {
 // fires on tab close / reload, where onBeforeUnmount does not run.
 function handleBeforeUnload() {
   void abandonExam();
+}
+
+// Overview navigation updates the same active focus-area state as a PDF
+// click, records the interaction, and scrolls the vendored viewer to the
+// question's exact parsed vertical position.
+function navigateToQuestion(questionNumber: number) {
+  const target = activateQuestionFocus(focusAreas, questionNumber);
+  if (!target) return;
+
+  logFocusArea(eventLogs, FocusAreaAction.UserClick, questionNumber);
+
+  const doc = iframeRef.value?.contentDocument;
+  const page = doc?.querySelector<HTMLElement>(
+    `.page[data-page-number="${target.pageIndex + 1}"]`,
+  );
+  const viewerContainer = doc?.querySelector<HTMLElement>('#viewerContainer');
+
+  if (page && viewerContainer) {
+    const questionTop = page.offsetTop + target.focusArea.y * totalScale.value;
+    viewerContainer.scrollTo({
+      top: Math.max(0, questionTop - viewerContainer.clientHeight * 0.15),
+      behavior: 'smooth',
+    });
+  } else {
+    target.focusArea.el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  showOverview.value = false;
 }
 
 // the pdf.js viewer is a separate document, so it inherits none of the
@@ -705,6 +726,8 @@ const onLoad = async (pdfBytes: Uint8Array) => {
     const text = await extractText(pdf);
     const question_numbers = identifyQuestionNumbers(text);
     const segmentedQuestions = segmentQuestions(text, question_numbers);
+    // expose the parser's existing segment to the active-question Copy action.
+    registerExamQuestions(segmentedQuestions);
     const optionsText = await getOptions(pdf, text, segmentedQuestions);
 
     highlights = createHighlights(optionsText);
@@ -841,6 +864,9 @@ onMounted(async () => {
   // store outlives the component, so without it question 4's flags would carry
   // into the next paper.
   resetExamState();
+  // prevent parser output from a previous solver route being copied while
+  // the next paper is still loading.
+  registerExamQuestions([]);
 
   if (!session) {
     router.push("/login");
@@ -911,7 +937,8 @@ onMounted(async () => {
         class="overview-drawer"
         :class="{ 'overview-drawer--open': showOverview }"
       >
-        <SideWindow/>
+        <!-- Overview rows activate and scroll to their parsed PDF question. -->
+        <SideWindow @navigate-question="navigateToQuestion"/>
       </aside>
     </section>
 

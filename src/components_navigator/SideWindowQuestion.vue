@@ -9,6 +9,8 @@ import { OPTION_LETTERS } from '@/lib/types/enums';
 import type { QuestionState } from '@/lib/state/examState';
 
 const props = defineProps<{ question: QuestionState }>();
+// the parent owns PDF navigation; this row only names the requested item.
+const emit = defineEmits<{ (event: 'navigate', questionNumber: number): void }>();
 
 // option count comes from the parsed paper rather than assuming four -
 // paper_answers.option_count exists precisely because it is not always 4.
@@ -18,7 +20,14 @@ const letters = computed(() =>
 </script>
 
 <template>
-  <div class="side-window-question-wrapper" :class="{ answered: question.selected !== null }">
+  <!-- a real button makes Overview navigation keyboard-accessible. -->
+  <button
+    type="button"
+    class="side-window-question-wrapper"
+    :class="{ answered: question.selected !== null }"
+    :aria-label="`Go to question ${question.questionNumber}`"
+    @click="emit('navigate', question.questionNumber)"
+  >
     <span class="question-number">{{ question.questionNumber }}</span>
     <div class="indicators-wrapper">
       <!-- Overview mirrors the PDF state; it cannot mutate highlights.
@@ -45,7 +54,7 @@ const letters = computed(() =>
         <div class="icon save-icon" :class="{ 'active': question.saved }"><Save /></div>
       </div>
     </div>
-  </div>
+  </button>
 </template>
 <style lang="scss" scoped>
 .side-window-question-wrapper {
@@ -54,7 +63,25 @@ const letters = computed(() =>
   align-items: center;
   width: 100%;
   padding: 0.8vw 1vw;
+  /* reset native button chrome while retaining keyboard semantics. */
+  border-top: 0;
+  border-right: 0;
+  border-left: 0;
   border-bottom: $tertiary-background 1px solid;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+
+  /* expose mouse and keyboard navigation state with the theme accent. */
+  &:hover,
+  &:focus-visible {
+    background: color-mix(in srgb, $accent 8%, transparent);
+  }
+
+  &:focus-visible {
+    outline: 2px solid $accent;
+    outline-offset: -2px;
+  }
 }
 
 .question-number {

@@ -1,8 +1,10 @@
-import { computed, ref, type Ref } from "vue";
+import { computed, ref, shallowRef, type Ref } from "vue";
 // imports added for the exam-session accessors below.
 import type { EventLogs, HighlightMode } from "@/lib/utils/utilsTypes";
 import { getActiveFocusArea, type DocumentFocusAreas } from "@/lib/focusAreas";
 import type { DocumentHighlights } from "@/lib/highlights";
+// Copy reads the already-parsed question instead of reparsing the PDF.
+import { segmentedQuestionText, type SegmentedQuestions } from '@/lib/pdf';
 
 const showOverview = ref(false);
 const showTools = ref(false);
@@ -48,10 +50,15 @@ export function getHighlightMode() {
 // focusAreas is created with reactive(), so reading the active area at click
 // time always reflects the question the student is actually looking at.
 let examEventLogs: EventLogs = [];
-let examFocusAreas: DocumentFocusAreas = [];
+// the array is registered after the toolbar has mounted. A shallow ref
+// invalidates active-question consumers at that handoff while leaving the
+// existing reactive FocusArea objects (and their DOM handles) untouched.
+const examFocusAreas = shallowRef<DocumentFocusAreas>([]);
 // the overview needs the highlight tree to know what has been selected or
 // eliminated per question, so it is registered alongside the other two.
 const examHighlights: Ref<DocumentHighlights> = ref([]);
+// parser output retained for active-question actions such as Copy.
+let examSegmentedQuestions: SegmentedQuestions = [];
 
 /** Called once by MCQNav after the focus areas exist. */
 export function registerExamSession(
@@ -60,7 +67,7 @@ export function registerExamSession(
     highlights?: DocumentHighlights,
 ) {
     examEventLogs = eventLogs;
-    examFocusAreas = focusAreas;
+    examFocusAreas.value = focusAreas;
     if (highlights) examHighlights.value = highlights;
 }
 
@@ -69,13 +76,23 @@ export function registerExamHighlights(highlights: DocumentHighlights) {
     examHighlights.value = highlights;
 }
 
+/** called after question segmentation completes for this paper. */
+export function registerExamQuestions(questions: SegmentedQuestions) {
+  examSegmentedQuestions = questions;
+}
+
 export function getExamHighlights() {
     return examHighlights;
 }
 
 export function getExamSession() {
-    return {
-        eventLogs: () => examEventLogs,
-        activeQuestionNumber: () => getActiveFocusArea(examFocusAreas)?.questionNumber ?? 0,
-    };
+  return {
+    eventLogs: () => examEventLogs,
+    activeQuestionNumber: () => getActiveFocusArea(examFocusAreas.value)?.questionNumber ?? 0,
+    // null means there is no active parsed question to copy yet.
+    activeQuestionText: () => segmentedQuestionText(
+      examSegmentedQuestions,
+      getActiveFocusArea(examFocusAreas.value)?.questionNumber ?? 0,
+    ),
+  };
 }

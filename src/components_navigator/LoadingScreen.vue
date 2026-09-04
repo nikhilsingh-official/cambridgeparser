@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from "vue";
-import lottie from "lottie-web";
+// this animation has no expressions, so use the canvas-only light player.
+// It omits Lottie's eval-based expression engine while preserving rendering.
+import lottie from "lottie-web/build/player/lottie_light_canvas";
 import type { AnimationItem } from "lottie-web";
 import animationData from "@/assets/soluer-loader.json";
 import { ChevronLeft } from "lucide-vue-next";

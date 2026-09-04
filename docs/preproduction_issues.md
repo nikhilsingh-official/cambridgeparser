@@ -8,7 +8,7 @@
 
 # Pre-production unresolved issues
 
-Reviewed against the local repository and local Supabase stack through 2026-09-01.
+Reviewed against the local repository and local Supabase stack through 2026-09-04.
 The public `cambridgeparser.com` deployment was deliberately excluded because it
 still serves the old IDE. “Confirmed” means the current implementation contains
 the defect or limitation. “Release risk” means the code path could not be
@@ -46,24 +46,16 @@ band are ordered by severity and release priority.
 | 2 · XL/data | CP-018 | Model risk | Medium | Analytics thresholds are hand-picked rather than calibrated |
 | 3 · L–XL | CP-006 | Product gap | High if resume is promised | In-progress papers cannot be saved, resumed, or restarted |
 | 4 · L | CP-008 | Confirmed lifecycle defect | Medium | Tab-close abandonment can leave stale in-progress attempts |
-| 5 · L | CP-015 | Integration risk | Medium–High | Every solver load depends on one paper mirror |
-| 6 · L | CP-017 | Compatibility risk | Medium | Vendored PDF.js v3 is mixed with npm pdfjs-dist v5 |
-| 7 · L | GAP-001 | Product gap | Medium | Overview rows cannot navigate to their PDF questions |
-| 8 · L | GAP-002 | Product gap | Medium | Paper Generator is not implemented |
-| 9 · M–L | CP-016 | Performance risk | Medium | PDFs are transported as inflated JSON number arrays |
-| 10 · M–L | CP-020 | Standards defect | Medium | Offline Python tooling remains outside the supported application boundary |
-| 11 · M–L | GAP-003 | Product gap | Low–Medium | Calendar has no route or data model |
-| 12 · M | CP-007 | Confirmed auth defect | High | Recovery links have no set-new-password workflow; UI entry is hidden |
-| 13 · M | CP-011 | Production risk | High | Hosted Supabase schema, policies, seed, and functions are unverified |
-| 14 · M | CP-012 | Production risk | High | Real deployed Edge grading is unverified |
-| 15 · M | CP-013 | Production risk | High | Hosted OAuth/provider configuration is unverified |
-| 16 · M | CP-019 | Build/performance risk | Low–Medium | Lottie uses eval and ECharts produces a large route dependency |
-| 17 · M | GAP-004 | Product gap | Medium | Profile and Settings workflows are not implemented |
-| 18 · M | GAP-005 | Product gap | Low | Active-question copy is not implemented |
-| 19 · M | GAP-006 | Product gap | Medium | Some Learn topics have no linked practice |
-| 20 · S–M | CP-009 | Confirmed integration defect | Low | The default PDF.js locale bundle is missing |
-| 21 · S–M | GAP-007 | Product gap | Low | Shortcut help has no in-product overlay |
-| 22 · S operational | CP-014 | Production risk | High until exercised | Preview deployment and deep-link behavior are unverified |
+| 5 · M–L | CP-020 | Standards defect | Medium | Offline Python tooling remains outside the supported application boundary |
+| 6 · M | CP-022 | Confirmed dependency vulnerability | High | Installed PDF.js is inside an arbitrary-JavaScript advisory range |
+| 7 · M | CP-007 | Confirmed auth defect | High | Recovery links have no set-new-password workflow; UI entry is hidden |
+| 8 · M | CP-011 | Production risk | High | Hosted Supabase schema, policies, seed, and functions are unverified |
+| 9 · M | CP-012 | Production risk | High | Real deployed Edge grading is unverified |
+| 10 · M | CP-013 | Production risk | High | Hosted OAuth/provider configuration is unverified |
+| 11 · M | GAP-004 | Product gap | Medium | Profile and Settings workflows are not implemented |
+| 12 · M | GAP-006 | Product gap | Medium | Some Learn topics have no linked practice |
+| 13 · S–M | GAP-007 | Product gap | Low | Shortcut help has no in-product overlay |
+| 14 · S operational | CP-014 | Production risk | High until exercised | Preview deployment and deep-link behavior are unverified |
 
 CP-001 and CP-003 are resolved by migration 00000000000008: answer-key writes
 are service-only, every legacy key is discarded, retained attempts are pending
@@ -75,6 +67,11 @@ pass. Ambiguous non-linear choices deliberately select through verified A–D
 markers with enlarged label hitboxes instead of claiming unsafe formula/table
 fragment association. CP-010 (contradictory historical roadmap status) was
 also mitigated. Both are excluded from the unresolved ranking.
+
+At the owner's direction on 2026-09-04, CP-009 (missing PDF.js locale), CP-015
+(single paper mirror), and CP-017 (mixed PDF.js versions) are accepted and no
+longer tracked as release issues. This is a scope decision, not a claim that the
+underlying technical conditions changed.
 
 The 2026-09-01 low-complexity pass also removed three failure amplifiers that
 are not unresolved entries: topic-practice history is no longer silently cut at
@@ -139,7 +136,53 @@ small wiring pass.
 The same pass moved IDE grading to Supabase and made its recorder service-only;
 an authenticated caller can no longer invoke an RPC with an invented score.
 
+### CP-021 — Explicit user-intent signals were inverted in persisted analytics
+
+- **Fix:** separate increasing intent signals from the decreasing review-based
+  confidence penalty. Star now increases difficulty; Save and review Flag now
+  increase interest. Analytics use each toggle's final state, so turning it off
+  clears the signal and repeated on/off cycles cannot inflate it. Button logging
+  is synchronized to the active question and cannot create question zero.
+- **Verification:** regression tests cover monotonicity, deselection, and an
+  on/off/on cycle. A real solver run also confirmed that changing the active
+  question enables the corresponding actions rather than retaining the previous
+  question's state.
+- **Historical caveat:** existing version-1 composites were not backfilled and
+  remain unsuitable for cross-version comparison. These values are not exposed
+  by the current Stats UI.
+- **Fixed:** Yes for newly completed attempts.
+
+The 2026-09-04 cleanup also resolved CP-016: `fetch-pdf` now carries binary PDF
+data and JSON metadata in one multipart response. The largest golden PDF passed
+byte-for-byte unit/client checks and a live local Edge invocation with all 40
+answers. CP-019's Lottie `eval` path and duplicate wrapper dependency were
+removed; ECharts registrations were pruned. The remaining 635 KiB route-only
+ECharts chunk warning is a measurement-led optimization rather than a confirmed
+release defect. Overview rows now navigate to the corresponding PDF question,
+and active-question Copy uses the existing parsed segment. Paper Generator and
+Calendar were removed from navigation instead of retained as disabled promises.
+
 ## Confirmed unresolved defects
+
+### CP-022 — Installed PDF.js version has a high-severity advisory
+
+- **Priority:** P0 before processing PDFs from an external source in production.
+- **Severity / complexity:** High / M.
+- **Evidence:** `npm audit` reports
+  [`GHSA-hq66-cqwq-w95j`](https://github.com/advisories/GHSA-hq66-cqwq-w95j)
+  against the installed direct dependency `pdfjs-dist@5.7.284`. The reported
+  vulnerable range is `>=5.6.83 <6.2.108` and the advisory describes arbitrary
+  JavaScript execution when opening a malicious PDF.
+- **Steps to reproduce:** run `npm audit` in the repository root.
+- **Actual behavior:** the production dependency audit exits non-zero with one
+  high-severity vulnerability.
+- **Expected behavior:** the PDF parsing stack has no known high-severity
+  advisory applicable to its installed version.
+- **Likely fix:** upgrade the direct dependency to a patched PDF.js release,
+  reconcile any v6 API/runtime changes, then rerun the entire 19-family golden
+  corpus, the multipart Edge path, the solver browser workflow, and the build.
+- **Fixed:** No. It was discovered by the final audit and is deliberately not
+  hidden by raising audit thresholds or applying an unverified major upgrade.
 
 ### CP-007 — Password-reset links cannot complete a reset
 
@@ -184,27 +227,6 @@ an authenticated caller can no longer invoke an RPC with an invented score.
   lifecycle phase that does not guarantee network completion.
 - **Fixed:** No.
 
-### CP-009 — Missing default PDF.js locale produces repeated warnings
-
-- **Priority:** P2
-- **Severity / complexity:** Low / S–M
-- **Evidence:** local solver runs emitted repeated missing-localization warnings
-  for page, loading, thumbnail, and editor labels. `public/web/locale` contains
-  only `az`, `es-ES`, `gd`, and `trs`; no `en-US/viewer.properties` is committed
-  even though [`locale.properties`](../public/web/locale/locale.properties)
-  references the full locale set.
-- **Actual behavior:** tested papers render, but one run produced hundreds of
-  warnings and some PDF.js accessibility labels may fall back incorrectly.
-- **Expected behavior:** the vendored viewer includes the matching default
-  locale resources with no missing-key warnings.
-- **Likely fix:** restore the locale file from the exact vendored PDF.js release,
-  not a hand-written partial list.
-- **Steps to reproduce:** load a solver paper and inspect the browser console for
-  missing Fluent localization IDs.
-- **Likely root cause:** only four locale directories were copied with the
-  vendored viewer, while its locale manifest still references the full set.
-- **Fixed:** No.
-
 ### CP-020 — Python exists outside the permitted application boundary
 
 - **Priority:** P2
@@ -238,11 +260,7 @@ the local environment cannot prove them.
 | 2 | CP-012 | Google/OpenRouter grading has not been exercised through the deployed Supabase Edge Function with real provider credentials | High for IDE submissions | M operational | Valid, invalid, quota, timeout, provider-fallback, and trusted persistence tests against preview deployment |
 | 3 | CP-013 | Google, Azure, Twitter, email confirmation, and redirect allow-lists depend on hosted Supabase/provider configuration | High for the advertised auth methods | M operational | Test each enabled method from production and preview origins; hide providers that are not configured |
 | 4 | CP-014 | The deployed site and history rewrites have not been smoke-tested because the current domain is the old product | High | S operational | Preview tests for refresh/deep links, both Edge Functions, `/web/viewer.html`, assets, and all auth callbacks |
-| 5 | CP-015 | The solver depends on a third-party paper mirror for every uncached QP/MS fetch | Medium–High | L | Availability monitoring, bounded size/time tests, cache behavior, user-facing outage state, and a fallback/storage policy |
-| 6 | CP-016 | The edge function serializes a PDF as a JSON number array | Medium | M–L | Measure largest catalogue response against Supabase/browser memory and response limits; replace with binary/object storage if needed |
-| 7 | CP-017 | Vendored PDF.js viewer v3 is driven with npm `pdfjs-dist` v5 utilities/types | Medium | L | Pin one compatible release or isolate versions completely; run the golden paper suite after upgrade |
-| 8 | CP-018 | Analytics/recommendation thresholds are hand-picked rather than calibrated on user outcomes | Medium | XL/data | Collect labelled traces, validate calibration/false-positive rates, version any changed model, and backfill from raw events |
-| 9 | CP-019 | The production build warns about `eval` inside `lottie-web`, and the ECharts chunk is about 658 kB minified | Low–Medium | M | Replace or isolate the decorative Lottie dependency, measure route startup on realistic devices, and further split/load charts only when needed |
+| 5 | CP-018 | Analytics/recommendation thresholds are hand-picked rather than calibrated on user outcomes | Medium | XL/data | Separate product policy from estimators, collect labelled traces, validate false-positive/ranking quality, version changes, and backfill derived metrics |
 
 One production-only deployment bug found during this review is **not** in the
 open list: the global Vercel `X-Frame-Options: DENY` header would have blocked
@@ -258,11 +276,7 @@ They are not release regressions unless the launch scope promises them.
 |---:|---|---|---|
 | XL | Responsive phone solver/dashboard | High | CP-005; requires layout and interaction design, including the PDF viewer and side panels |
 | L–XL | Mid-paper save/resume and restart | High | CP-006; restart alone is smaller, but honest resume is a persistence feature |
-| L | Clickable Overview navigation | Medium | Rows show real state but do not yet scroll/focus the PDF question |
-| L | Paper Generator | Medium | Disabled sidebar item; needs generation rules, validation, and a route/workflow |
-| M–L | Calendar | Low–Medium | Disabled sidebar item; requires a scheduling data model if it is more than a local view |
 | M | Profile and Settings | Medium | Disabled controls; profile data exists but no current settings workflow writes it |
-| M | Copy active question | Low | Disabled because the parsed question text is not exposed through the active-question state |
 | M | Practice for every Learn topic | Medium | Unsupported syllabus-extension records explicitly show “practice coming soon” |
 | S–M | Shortcut-help overlay | Low | Shortcuts exist, but there is no in-product reference panel |
 

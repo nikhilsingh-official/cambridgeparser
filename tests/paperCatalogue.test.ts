@@ -11,6 +11,7 @@ test('paper catalogue does not expose 2016 or earlier cards', async () => {
   const vite = await createServer({
     appType: 'custom',
     logLevel: 'error',
+    optimizeDeps: { noDiscovery: true },
     server: { middlewareMode: true, hmr: { port: 24680 } },
   });
 
@@ -32,6 +33,7 @@ test('paper catalogue applies verified sitting and variant exclusions', async ()
   const vite = await createServer({
     appType: 'custom',
     logLevel: 'error',
+    optimizeDeps: { noDiscovery: true },
     server: { middlewareMode: true, hmr: { port: 24681 } },
   });
 
