@@ -8,7 +8,7 @@
 
 # Pre-production unresolved issues
 
-Reviewed against the local repository and local Supabase stack through 2026-09-04.
+Reviewed against the local repository and local Supabase stack through 2026-09-07.
 The public `cambridgeparser.com` deployment was deliberately excluded because it
 still serves the old IDE. “Confirmed” means the current implementation contains
 the defect or limitation. “Release risk” means the code path could not be
@@ -42,20 +42,18 @@ band are ordered by severity and release priority.
 
 | Complexity rank | ID | Type | Severity | Summary |
 |---:|---|---|---|---|
-| 1 · XL | CP-005 | Confirmed limitation | High if mobile is promised | Phone-width dashboard and solver layouts are not usable |
-| 2 · XL/data | CP-018 | Model risk | Medium | Analytics thresholds are hand-picked rather than calibrated |
-| 3 · L–XL | CP-006 | Product gap | High if resume is promised | In-progress papers cannot be saved, resumed, or restarted |
-| 4 · L | CP-008 | Confirmed lifecycle defect | Medium | Tab-close abandonment can leave stale in-progress attempts |
-| 5 · M–L | CP-020 | Standards defect | Medium | Offline Python tooling remains outside the supported application boundary |
-| 6 · M | CP-022 | Confirmed dependency vulnerability | High | Installed PDF.js is inside an arbitrary-JavaScript advisory range |
-| 7 · M | CP-007 | Confirmed auth defect | High | Recovery links have no set-new-password workflow; UI entry is hidden |
-| 8 · M | CP-011 | Production risk | High | Hosted Supabase schema, policies, seed, and functions are unverified |
-| 9 · M | CP-012 | Production risk | High | Real deployed Edge grading is unverified |
-| 10 · M | CP-013 | Production risk | High | Hosted OAuth/provider configuration is unverified |
-| 11 · M | GAP-004 | Product gap | Medium | Profile and Settings workflows are not implemented |
-| 12 · M | GAP-006 | Product gap | Medium | Some Learn topics have no linked practice |
-| 13 · S–M | GAP-007 | Product gap | Low | Shortcut help has no in-product overlay |
-| 14 · S operational | CP-014 | Production risk | High until exercised | Preview deployment and deep-link behavior are unverified |
+| 1 · XL/data | CP-018 | Model risk | Medium | Analytics thresholds are hand-picked rather than calibrated |
+| 2 · L–XL | CP-006 | Product gap | High if resume is promised | In-progress papers cannot be saved, resumed, or restarted |
+| 3 · L | CP-008 | Confirmed lifecycle defect | Medium | Tab-close abandonment can leave stale in-progress attempts |
+| 4 · M–L | CP-020 | Standards defect | Medium | Offline Python tooling remains outside the supported application boundary |
+| 5 · M | CP-022 | Confirmed dependency vulnerability | High | Both PDF.js copies are inside arbitrary-JavaScript advisory ranges |
+| 6 · M | CP-011 | Production risk | High | Hosted Supabase schema, policies, seed, and functions are unverified |
+| 7 · M | CP-012 | Production risk | High | Real deployed Edge grading is unverified |
+| 8 · M | CP-013 | Production risk | High | Hosted OAuth/provider configuration is unverified |
+| 9 · M | GAP-004 | Product gap | Medium | Profile and Settings workflows are not implemented |
+| 10 · M | GAP-006 | Product gap | Medium | Some Learn topics have no linked practice |
+| 11 · S–M | GAP-007 | Product gap | Low | Shortcut help has no in-product overlay |
+| 12 · S operational | CP-014 | Production risk | High until exercised | Preview deployment and deep-link behavior are unverified |
 
 CP-001 and CP-003 are resolved by migration 00000000000008: answer-key writes
 are service-only, every legacy key is discarded, retained attempts are pending
@@ -90,8 +88,7 @@ small wiring pass.
 
 | Rank | ID | Issue | Severity | Complexity | Why it is hard |
 |---:|---|---|---|---|---|
-| 1 | CP-005 | The dashboard and solver are not usable at phone widths | High if mobile is launch scope; otherwise Medium | XL | The solver/PDF layout needs product-level responsive behavior. |
-| 2 | CP-006 | Save/resume/restart is absent for in-progress papers | High for long-paper workflows | L–XL | Resume needs durable incremental state and reconciliation. |
+| 1 | CP-006 | Save/resume/restart is absent for in-progress papers | High for long-paper workflows | L–XL | Resume needs durable incremental state and reconciliation. |
 
 ## Resolved integrity defects
 
@@ -136,6 +133,39 @@ small wiring pass.
 The same pass moved IDE grading to Supabase and made its recorder service-only;
 an authenticated caller can no longer invoke an RPC with an invented score.
 
+### CP-005 — Unsupported phone layouts remained interactive
+
+- **Product boundary chosen:** authenticated application pages require a
+  viewport at least 768 CSS pixels wide. Public landing, sign-in, sign-up, and
+  password-recovery screens remain available on narrow screens.
+- **Fix:** narrow authenticated routes do not mount the sidebar or route
+  component. They render a dedicated desktop-required screen with a working
+  sign-out action, so an unusable solver cannot start invisibly underneath it.
+- **Verification:** policy tests cover 767/768-pixel boundaries and public
+  exceptions. A real authenticated browser session at 390 × 844 showed only
+  the blocker; sign-out returned to the usable mobile login screen.
+- **Fixed:** Yes for the stated desktop-only launch scope. Responsive solver
+  and dashboard layouts remain future product work, not advertised behavior.
+
+### CP-007 — Password recovery had no completion path
+
+- **Fix:** sign-in now exposes a neutral account-recovery request form and
+  sends links to a dedicated `/reset-password` route. The auth store captures
+  the Supabase `PASSWORD_RECOVERY` event, rejects forged recovery URL intent,
+  and permits `updateUser({ password })` only with both recovery intent and a
+  live session. The form checks an eight-character minimum and confirmation,
+  maps stable Auth error codes, removes callback material from browser history,
+  signs out after success, and handles invalid/expired links without exposing
+  account existence.
+- **Verification:** pure tests cover callback errors and prove that forged URL
+  recovery intent/credentials cannot grant reset authority, plus password rules.
+  A real local GoTrue/Mailpit recovery email was
+  requested and followed; mismatch was rejected, the password was changed,
+  the recovery session was discarded, and a fresh login with the new password
+  succeeded. Direct navigation without recovery authorization failed closed.
+- **Fixed:** Yes locally. Hosted redirect allow-list, SMTP, and deployment
+  verification remain operational work under CP-013 and CP-014.
+
 ### CP-021 — Explicit user-intent signals were inverted in persisted analytics
 
 - **Fix:** separate increasing intent signals from the decreasing review-based
@@ -172,40 +202,24 @@ Calendar were removed from navigation instead of retained as disabled promises.
   [`GHSA-hq66-cqwq-w95j`](https://github.com/advisories/GHSA-hq66-cqwq-w95j)
   against the installed direct dependency `pdfjs-dist@5.7.284`. The reported
   vulnerable range is `>=5.6.83 <6.2.108` and the advisory describes arbitrary
-  JavaScript execution when opening a malicious PDF.
+  JavaScript execution when opening a malicious PDF. Separately, the viewer
+  actually served from `public/web/viewer.html` vendors PDF.js 3.2.146 in
+  `public/build/pdf.js`; it is affected by
+  [`GHSA-wgrm-67xf-hhpq`](https://github.com/advisories/GHSA-wgrm-67xf-hhpq)
+  because `isEvalSupported` defaults to true. That older viewer also enables
+  PDF scripting by default and the deployment has no Content Security Policy.
 - **Steps to reproduce:** run `npm audit` in the repository root.
 - **Actual behavior:** the production dependency audit exits non-zero with one
   high-severity vulnerability.
 - **Expected behavior:** the PDF parsing stack has no known high-severity
   advisory applicable to its installed version.
-- **Likely fix:** upgrade the direct dependency to a patched PDF.js release,
-  reconcile any v6 API/runtime changes, then rerun the entire 19-family golden
-  corpus, the multipart Edge path, the solver browser workflow, and the build.
+- **Likely fix:** treat the imported library and vendored viewer as one upgrade:
+  move both to one patched version, disable `isEvalSupported` and PDF scripting
+  unless a verified workflow needs them, add a restrictive viewer CSP, then
+  rerun the entire 19-family golden corpus, multipart Edge path, solver browser
+  workflow, and build.
 - **Fixed:** No. It was discovered by the final audit and is deliberately not
   hidden by raising audit thresholds or applying an unverified major upgrade.
-
-### CP-007 — Password-reset links cannot complete a reset
-
-- **Priority:** P0
-- **Severity / complexity:** High / M
-- **Evidence:** [`sendPasswordReset()`](../src/stores/useAuth.ts) redirects the
-  recovery link to `/login`, but [`Login.vue`](../src/components_auth/Login.vue)
-  has no recovery mode and never calls `supabase.auth.updateUser()` with a new
-  password. The guest-only route redirects an authenticated recovery session to
-  `/dashboard`.
-- **Steps to reproduce:** generate a recovery email through the existing
-  `sendPasswordReset()` store method (or a Supabase recovery test), open the
-  delivered link, and attempt to set a new password.
-- **Actual behavior:** there is no new-password form; the user is redirected into
-  the app and the forgotten password remains unchanged.
-- **Expected behavior:** a recovery session lands on a dedicated, validated
-  password form, updates the password, handles expired links, and then signs in
-  or returns to login.
-- **Likely root cause:** the mail-dispatch half was implemented without a
-  recovery-session route/state and `updateUser()` form.
-- **Mitigation applied:** **Forgot password** is now hidden until the recovery
-  route is complete.
-- **Fixed:** No; the dead entry point is removed, but account recovery is absent.
 
 ### CP-008 — Tab-close abandonment is best-effort only
 
@@ -258,7 +272,7 @@ the local environment cannot prove them.
 |---:|---|---|---|---|---|
 | 1 | CP-011 | Hosted Supabase migrations, grants, RLS, seed data, and `fetch-pdf` deployment have not been exercised as the production project | High | M operational | Fresh hosted deployment, SQL checks, two-user isolation test, and one persisted solver attempt |
 | 2 | CP-012 | Google/OpenRouter grading has not been exercised through the deployed Supabase Edge Function with real provider credentials | High for IDE submissions | M operational | Valid, invalid, quota, timeout, provider-fallback, and trusted persistence tests against preview deployment |
-| 3 | CP-013 | Google, Azure, Twitter, email confirmation, and redirect allow-lists depend on hosted Supabase/provider configuration | High for the advertised auth methods | M operational | Test each enabled method from production and preview origins; hide providers that are not configured |
+| 3 | CP-013 | Google, Azure, Twitter, email confirmation/recovery, SMTP, and redirect allow-lists depend on hosted Supabase/provider configuration | High for the advertised auth methods | M operational | Add the exact recovery redirect, configure SMTP, test email flows and each enabled OAuth method from production/preview origins, and hide providers that are not configured |
 | 4 | CP-014 | The deployed site and history rewrites have not been smoke-tested because the current domain is the old product | High | S operational | Preview tests for refresh/deep links, both Edge Functions, `/web/viewer.html`, assets, and all auth callbacks |
 | 5 | CP-018 | Analytics/recommendation thresholds are hand-picked rather than calibrated on user outcomes | Medium | XL/data | Separate product policy from estimators, collect labelled traces, validate false-positive/ranking quality, version changes, and backfill derived metrics |
 
@@ -274,7 +288,6 @@ They are not release regressions unless the launch scope promises them.
 
 | Complexity rank | Gap | Severity if promised | Notes |
 |---:|---|---|---|
-| XL | Responsive phone solver/dashboard | High | CP-005; requires layout and interaction design, including the PDF viewer and side panels |
 | L–XL | Mid-paper save/resume and restart | High | CP-006; restart alone is smaller, but honest resume is a persistence feature |
 | M | Profile and Settings | Medium | Disabled controls; profile data exists but no current settings workflow writes it |
 | M | Practice for every Learn topic | Medium | Unsupported syllabus-extension records explicitly show “practice coming soon” |
@@ -284,12 +297,18 @@ The WASM pseudocode parser validates supported syntax but does not execute
 general programs. That is an intentional product boundary, not a defect, unless
 the launch copy promises program output.
 
+The authenticated application is likewise an explicit desktop-only product at
+launch: widths below 768 CSS pixels receive a blocker instead of an interactive
+dashboard, solver, stats, or IDE layout. Building genuinely responsive versions
+of those screens remains future product work, but is no longer an ambiguous or
+silently broken launch path.
+
 ## Recommended resolution order
 
-1. Deploy a preview and close CP-011 through CP-014 with real hosted tests.
-2. Implement CP-007 password recovery; its broken UI entry is already hidden.
-3. Decide whether mobile and resume are launch promises; if not, keep their
-   current limitations explicit.
+1. Resolve CP-022 before accepting externally sourced PDFs in production.
+2. Deploy a preview and close CP-011 through CP-014 with real hosted tests,
+   including the new exact recovery redirect and SMTP-backed reset flow.
+3. Keep save/resume outside launch promises unless CP-006 is implemented.
 4. Address P2/P3 cleanup and product gaps after the integrity gates pass.
 
 Until the hosted Supabase, provider, OAuth and preview gates are exercised, the

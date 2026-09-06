@@ -6,6 +6,10 @@ reference/source material. Recommendations are labelled separately from facts.
 
 # Supabase password recovery options (CP-007)
 
+**Implementation status (2026-09-07):** Option A is implemented and verified
+against the local Supabase Auth server and Mailpit. The remaining work is hosted
+configuration and preview/production verification, not application wiring.
+
 ## Decision summary
 
 **Recommendation:** keep the application's current browser-only **implicit auth
@@ -189,7 +193,7 @@ flow; it is not prescribed verbatim by Supabase.
    or noisy callback parameters with `history.replaceState`, and provide a
    button back to the request form. Do not silently route to the dashboard.
 
-## Configuration required before implementation can be called complete
+## Configuration required before hosted rollout can be called complete
 
 These are repository observations and recommendations:
 
@@ -198,9 +202,8 @@ These are repository observations and recommendations:
   `https://cambridgeparser.com/reset-password`.
 - Preview redirect patterns only if password recovery is intentionally tested
   on previews; keep the production entry exact.
-- Local Site URL should match Vite (`http://127.0.0.1:5173`), with an exact local
-  recovery redirect. The current `supabase/config.toml` still uses port `3000`,
-  so its Auth URL configuration does not match `npm run dev` on port `5173`.
+- Local Site URL matches Vite (`http://127.0.0.1:5173`), and local redirect
+  patterns cover both `127.0.0.1` and `localhost` on port 5173.
 - Verify the Reset Password email template honors `{{ .RedirectTo }}`. Supabase
   notes that customized templates may need this instead of `{{ .SiteURL }}`.
   [Redirect URLs — Email templates](https://supabase.com/docs/guides/auth/redirect-urls#email-templates-when-using-redirectto)
@@ -238,9 +241,13 @@ These are repository observations and recommendations:
 
 ## Implementation boundary
 
-No CP-007 application implementation is included in this research. The
-recommended change is approximately medium complexity: one dedicated route and
-form, a small recovery state addition to the existing auth store, re-enabling
-the login entry point, local/hosted Auth URL configuration, and end-to-end email
-tests. No database migration or Edge Function is required for the documented
-Supabase flow.
+The application implementation now includes the dedicated route and form,
+central recovery-event state, neutral request UI, stable Auth-code handling,
+callback cleanup, local Auth URL configuration, and focused state-rule tests.
+A real local recovery email was followed through password update, sign-out, and
+fresh login. No database migration or Edge Function is required for this flow.
+
+The repository cannot configure the hosted Supabase dashboard or SMTP account.
+Before launch, add the exact production redirect, verify the Reset Password
+template uses the intended redirect, configure SMTP, and repeat fresh, expired,
+reused, nonexistent-account, and cross-device cases against the deployed app.

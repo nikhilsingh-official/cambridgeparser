@@ -18,7 +18,7 @@ import { Mail, Lock, Eye, EyeOff, LoaderCircle, ArrowRight, AlertCircle, CheckCi
 import { useAuthStore, authErrorMessage, type OAuthProvider } from '@/stores/useAuth';
 import ThemeSwitcher from '@/components/ThemeSwitcher.vue';
 
-const { login, signUp } = useAuthStore();
+const { login, signUp, sendPasswordReset, clearPasswordRecovery } = useAuthStore();
 const router = useRouter();
 const route = useRoute();
 
@@ -33,8 +33,10 @@ const redirectPath = computed(() => {
   return path.startsWith('/') && !path.startsWith('//') ? path : '/';
 });
 
-type Mode = 'signin' | 'signup';
-const mode = ref<Mode>('signin');
+type Mode = 'signin' | 'signup' | 'recovery-request';
+// invalid/reset links return here with mode=recovery so another email can
+// be requested without making the user hunt for the entry point.
+const mode = ref<Mode>(route.query.mode === 'recovery' ? 'recovery-request' : 'signin');
 
 const email = ref('');
 const password = ref('');
@@ -44,18 +46,26 @@ const loading = ref(false);
 /** tracked separately so only the clicked provider shows a spinner. */
 const oauthLoading = ref<OAuthProvider | null>(null);
 const errorMessage = ref<string | null>(null);
-const notice = ref<string | null>(null);
+const notice = ref<string | null>(
+  route.query.notice === 'password-updated'
+    ? 'Password updated. Sign in with your new password.'
+    : null,
+);
 
 const busy = computed(() => loading.value || oauthLoading.value !== null);
 
 const canSubmit = computed(() =>
-  email.value.trim().length > 0 && password.value.length > 0 && !busy.value,
+  email.value.trim().length > 0
+    && (mode.value === 'recovery-request' || password.value.length > 0)
+    && !busy.value,
 );
 
 function switchMode(next: Mode) {
   mode.value = next;
+  password.value = '';
   errorMessage.value = null;
   notice.value = null;
+  if (next === 'recovery-request') clearPasswordRecovery();
 }
 
 async function submitEmail() {
@@ -65,6 +75,12 @@ async function submitEmail() {
   notice.value = null;
 
   try {
+    if (mode.value === 'recovery-request') {
+      // Supabase intentionally does not reveal whether this address exists.
+      await sendPasswordReset(email.value.trim());
+      notice.value = 'If an account exists, check your email for a reset link.';
+      return;
+    }
     if (mode.value === 'signup') {
       const { needsConfirmation } = await signUp(email.value.trim(), password.value);
       if (needsConfirmation) {
@@ -138,11 +154,15 @@ const providers: { id: OAuthProvider; label: string; path: string }[] = [
           </svg>
           <h1>Soluer</h1>
         </div>
-        <h2>{{ mode === 'signin' ? 'Welcome back' : 'Create your account' }}</h2>
+        <h2>{{ mode === 'signin'
+          ? 'Welcome back'
+          : mode === 'signup' ? 'Create your account' : 'Reset your password' }}</h2>
         <p class="brand-sub">
           {{ mode === 'signin'
             ? 'Sign in to sit papers and track your progress.'
-            : 'Start solving past papers with automatic marking.' }}
+            : mode === 'signup'
+              ? 'Start solving past papers with automatic marking.'
+              : 'Enter your email and we will send a secure reset link.' }}
         </p>
       </header>
 
@@ -173,7 +193,7 @@ const providers: { id: OAuthProvider; label: string; path: string }[] = [
           </div>
         </label>
 
-        <label class="field">
+        <label v-if="mode !== 'recovery-request'" class="field">
           <span class="field-label">Password</span>
           <div class="field-input">
             <Lock class="field-icon" />
@@ -200,15 +220,17 @@ const providers: { id: OAuthProvider; label: string; path: string }[] = [
         <button type="submit" class="primary" :disabled="!canSubmit">
           <LoaderCircle v-if="loading" class="btn-icon spin" />
           <template v-else>
-            {{ mode === 'signin' ? 'Sign in' : 'Create account' }}
+            {{ mode === 'signin'
+              ? 'Sign in'
+              : mode === 'signup' ? 'Create account' : 'Send reset link' }}
             <ArrowRight class="btn-icon" />
           </template>
         </button>
       </form>
 
-      <div class="divider"><span>or continue with</span></div>
+      <div v-if="mode !== 'recovery-request'" class="divider"><span>or continue with</span></div>
 
-      <div class="oauth-row">
+      <div v-if="mode !== 'recovery-request'" class="oauth-row">
         <button
           v-for="p in providers"
           :key="p.id"
@@ -237,6 +259,16 @@ const providers: { id: OAuthProvider; label: string; path: string }[] = [
           New here?
           <button type="button" class="link-btn" @click="switchMode('signup')">
             Create an account
+          </button>
+          <span class="switch-separator" aria-hidden="true">·</span>
+          <button type="button" class="link-btn" @click="switchMode('recovery-request')">
+            Forgot password?
+          </button>
+        </template>
+        <template v-else-if="mode === 'recovery-request'">
+          Remembered it?
+          <button type="button" class="link-btn" @click="switchMode('signin')">
+            Sign in
           </button>
         </template>
         <template v-else>
@@ -492,4 +524,7 @@ const providers: { id: OAuthProvider; label: string; path: string }[] = [
   opacity: 0.65;
   margin: 1.2rem 0 0;
 }
+
+// visually separates the two sign-in alternatives without another row.
+.switch-separator { margin: 0 0.35rem; }
 </style>

@@ -15,7 +15,7 @@ deployed, routed, or authenticated as separate sites.
 
 ## Features
 
-- Email/password sign-up, sign-in, session restoration, and
+- Email/password sign-up, sign-in, password recovery, session restoration, and
   Google, Microsoft/Azure, or Twitter OAuth entry points.
 - A curated browser of solvable IGCSE, O Level, and AS/A Level MCQ papers with
   subject, year, series, variant, and progress filters.
@@ -57,6 +57,7 @@ transactional, idempotent RPC boundary. Completed histories are read-only.
 |---|---|---|
 | `/` | Public; signed-in users go to `/dashboard` | Product landing page |
 | `/login` | Signed-out users | Email/OAuth sign-in and account creation |
+| `/reset-password` | Public callback with a Supabase recovery session | Validate and set a replacement password |
 | `/dashboard` | Authenticated | Summary and entry points into solver and IDE work |
 | `/browser` | Authenticated | Find an MCQ paper and open its solver |
 | `/solver/:schema` | Authenticated, full screen | Sit, finish, and review one paper such as `0610_s26_11` |
@@ -71,6 +72,11 @@ the persisted outcome in the dashboard/browser/stats views. A normal IDE flow
 is: choose a problem, write or fill an answer, run the local parser where
 applicable, invoke the `grade` Edge Function, inspect the mark scheme and feedback, and
 see the recorded attempt in progress views.
+
+Password recovery starts from **Forgot password?** on `/login`. The request
+response deliberately does not reveal whether an account exists. A valid email
+link opens `/reset-password`, updates the password through Supabase Auth, signs
+out the temporary recovery session, and returns the user to normal sign-in.
 
 ## Repository structure
 
@@ -192,6 +198,11 @@ OAuth buttons are always rendered, but each provider must also be enabled and
 configured in the target Supabase project. The local config does not enable
 Google, Azure, or Twitter by default.
 
+For hosted password recovery, add the exact
+`https://cambridgeparser.com/reset-password` URL to Supabase Auth's redirect
+allow-list and configure production SMTP. Local Auth is aligned with Vite on
+port 5173; recovery messages are visible in the Supabase Mailpit UI.
+
 ## Tests and validation
 
 Run the Node domain/service suite, type check, and production build:
@@ -202,7 +213,7 @@ npx vue-tsc -b
 npm run build
 ```
 
-The current Node suite contains 139 assertions/tests across `tests/**/*.test.ts`
+The current Node suite contains 145 assertions/tests across `tests/**/*.test.ts`
 and `tests/**/*.test.mjs`. The build repeats the type check before Vite bundles
 the application.
 
@@ -255,7 +266,7 @@ cargo test --manifest-path pseudocode-parser/Cargo.toml
 
 Automated tests complement rather than replace browser testing. At minimum,
 release verification should cover anonymous route guards, account/session
-behavior, one complete persisted paper, result review, filtered stats, IDE
+behavior, a real email password reset, one complete persisted paper, result review, filtered stats, IDE
 parser errors, fill-blank input, grading success/error responses, deep links,
 refresh/back navigation, console/network errors, and narrow-screen layouts.
 
@@ -315,9 +326,10 @@ not prove the Vercel rewrite or unified app is live.
   provider key.
 - The WASM parser validates supported pseudocode syntax; it does not currently
   execute programs or produce general program output.
-- The dashboard and solver remain desktop-oriented. The dashboard currently
-  overflows and overlaps at phone widths, so mobile should not be advertised
-  as fully supported until that layout is corrected.
+- Authenticated application layouts are deliberately blocked below 768 CSS
+  pixels rather than exposing unusable phone-width dashboard, solver, stats,
+  or IDE screens. The public landing and account/recovery screens remain usable
+  there; responsive application layouts are not currently a supported feature.
 - Settings, profile, restart, and mid-paper save are explicitly disabled because
   their workflows are not implemented. Paper Generator and Calendar are not
   advertised in the navigation.
@@ -325,11 +337,10 @@ not prove the Vercel rewrite or unified app is live.
   deliberately not page-level statistics filters because topic aggregates do
   not retain those dimensions. Pseudocode statistics are all-time and labelled
   separately from the subject-scoped solver sections.
-- Password recovery is not exposed because the recovery link has no
-  new-password form yet. The Supabase-supported implementation options and
-  production prerequisites are documented in
-  [`docs/supabase_password_recovery.md`](docs/supabase_password_recovery.md);
-  do not advertise recovery until CP-007 is resolved.
+- Password recovery is implemented and locally verified. Production still
+  depends on an exact hosted redirect allow-list entry, working SMTP, and a
+  deployed end-to-end test; see
+  [`docs/supabase_password_recovery.md`](docs/supabase_password_recovery.md).
 - The committed question corpus is not regenerated in this repository, so
   corpus corrections require an external extraction workflow and a reviewed
   data update.

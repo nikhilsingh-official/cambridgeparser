@@ -16,6 +16,9 @@ const MCQNav = () => import('@/components_navigator/MCQNav.vue')
 const IdeView = () => import('@/views/IdeView.vue')
 const ProblemsView = () => import('@/views/ProblemsView.vue')
 const LearnView = () => import('@/views/LearnView.vue')
+// recovery must accept the temporary authenticated recovery session, so it
+// is public chrome but deliberately neither guestOnly nor requiresAuth.
+const ResetPassword = () => import('@/components_auth/ResetPassword.vue')
 // the public landing page. Kept eager alongside Login for the same reason -
 // it is the first paint for an anonymous visitor.
 import LandingView from '@/views/LandingView.vue'
@@ -36,6 +39,8 @@ declare module 'vue-router' {
     guestOnly?: boolean
     /** Reachable without a session AND without the app shell (no sidebar). */
     publicChrome?: boolean
+    /** This route has an intentionally usable layout below the app breakpoint. */
+    supportsNarrowViewport?: boolean
     /** Signed-in, but the page owns the whole viewport (the exam runner). */
     fullscreen?: boolean
   }
@@ -45,8 +50,10 @@ const routes: RouteRecordRaw[] = [
   // the public shopfront. No session, no sidebar - it is the page a visitor
   // lands on before they have an account, and it came from the Cambridge IDE
   // side of the merge.
-  { path: '/', name: 'Landing', component: LandingView, meta: { publicChrome: true } },
-  { path: '/login', name: 'Login', component: Login, meta: { guestOnly: true, publicChrome: true } },
+  // public/account screens are the only intentionally narrow layouts.
+  { path: '/', name: 'Landing', component: LandingView, meta: { publicChrome: true, supportsNarrowViewport: true } },
+  { path: '/login', name: 'Login', component: Login, meta: { guestOnly: true, publicChrome: true, supportsNarrowViewport: true } },
+  { path: '/reset-password', name: 'ResetPassword', component: ResetPassword, meta: { publicChrome: true, supportsNarrowViewport: true } },
 
   // ------------------------------------------------------------ paper solver
   // every application route is explicitly protected. Previously all of
