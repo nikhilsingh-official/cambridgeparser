@@ -7,14 +7,15 @@
 // history and should be rotated).
 //
 // Every colour, font, radius and shadow below comes from a THEME TOKEN, so
-// this one screen renders correctly under soluer-dark (teal, rounded),
+// this one screen renders correctly under the internal soluer-dark theme id
+// (shown to users as Teal Dark),
 // exam-paper (warm paper, oxblood, square) and cambridge-dark (amber, square)
 // with no per-theme rules. That is the whole point of the token layer: the
-// same login screen serves SmartSolver and the Cambridge IDE.
+// same login screen serves the whole CambridgeParser application.
 // ==========================================================================
 import { computed, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { Mail, Lock, Eye, EyeOff, LoaderCircle, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-vue-next';
+import { Mail, Lock, Eye, EyeOff, LoaderCircle, ArrowRight, AlertCircle, CheckCircle2, BookOpenCheck } from 'lucide-vue-next';
 import { useAuthStore, authErrorMessage, type OAuthProvider } from '@/stores/useAuth';
 import ThemeSwitcher from '@/components/ThemeSwitcher.vue';
 
@@ -144,15 +145,8 @@ const providers: { id: OAuthProvider; label: string; path: string }[] = [
 
       <header class="brand">
         <div class="brand-mark">
-          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24"
-               fill="none" stroke="currentColor" stroke-width="2"
-               stroke-linecap="round" stroke-linejoin="round">
-            <rect width="7" height="9" x="3" y="3" rx="1"/>
-            <rect width="7" height="5" x="14" y="3" rx="1"/>
-            <rect width="7" height="9" x="14" y="12" rx="1"/>
-            <rect width="7" height="5" x="3" y="16" rx="1"/>
-          </svg>
-          <h1>Soluer</h1>
+          <BookOpenCheck aria-hidden="true" />
+          <h1>CambridgeParser</h1>
         </div>
         <h2>{{ mode === 'signin'
           ? 'Welcome back'

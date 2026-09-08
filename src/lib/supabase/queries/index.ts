@@ -27,6 +27,10 @@ export type { FocusTotals, ScatterPoint, AnswerChangeSummary } from './focus';
 
 export { fetchSubjectStats, fetchTopicMastery } from './subjects';
 export { fetchTopicPractice } from './practice';
+export { fetchPaperQuestionTopics } from './questionTopics';
+export type { PaperQuestionTopic } from './questionTopics';
+export { fetchPaperQuestionAnswers } from './paperQuestionAnswers';
+export type { PaperQuestionAnswer } from './paperQuestionAnswers';
 export { fetchActiveGoals } from './goals';
 
 export {

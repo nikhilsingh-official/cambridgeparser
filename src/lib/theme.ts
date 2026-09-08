@@ -21,7 +21,7 @@ export const ALL_THEMES = Object.values(Theme) as Theme[];
 
 /** shown in the switcher. Kept beside the enum so adding a theme is one edit. */
 export const THEME_LABEL: Record<Theme, string> = {
-  [Theme.SoluerDark]: 'Soluer Dark',
+  [Theme.SoluerDark]: 'Teal Dark',
   [Theme.ExamPaper]: 'Exam Paper',
   [Theme.CambridgeDark]: 'Cambridge Dark',
 };

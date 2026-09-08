@@ -54,6 +54,8 @@ import {
 } from './filterScope';
 
 export interface StatsState {
+  /** All completed attempts stay available while the visible scope narrows. */
+  allAttempts: AttemptSummaryView[];
   attempts: AttemptSummaryView[];
   daily: DailyActivityView[];
   hours: HourOfDayView[];
@@ -72,7 +74,7 @@ export interface StatsState {
 }
 
 const EMPTY: StatsState = {
-  attempts: [], daily: [], hours: [], subjects: [], topics: [], practice: [],
+  allAttempts: [], attempts: [], daily: [], hours: [], subjects: [], topics: [], practice: [],
   flags: [], calibration: [], answerChanges: null, options: null,
   ideTotals: null, ideSubmissions: [],
 };
@@ -82,7 +84,7 @@ export type StatsSection = 'progress' | 'topics' | 'focus' | 'engagement' | 'ide
 // each failure clears only the fields owned by that query group. Shared
 // attempt data belongs to progress because it drives the page summary too.
 const EMPTY_BY_SECTION: Record<StatsSection, Partial<StatsState>> = {
-  progress: { attempts: [], subjects: [], options: null },
+  progress: { allAttempts: [], attempts: [], subjects: [], options: null },
   topics: { topics: [], practice: [] },
   focus: { flags: [], calibration: [], answerChanges: null },
   engagement: { daily: [], hours: [] },
@@ -127,24 +129,28 @@ export function useStats() {
     loading.value = true;
     Object.assign(sectionErrors, EMPTY_SECTION_ERRORS);
     try {
-      // one filtered attempt query is shared by every section whose claims
-      // can be derived from attempt grain. This is the CP-004 contract: the
-      // subject filter selects one solver dataset, not a different subset per
-      // chart.
-      const attemptsPromise = fetchAttemptSummaries(supabase, userId, {
-        subjectCodes: filter.subjectCodes,
+      // attempt summaries are small (one row per completed paper), so keep
+      // the full list available for the overall -> subject -> paper navigator
+      // and narrow it once in memory for every scoped section below.
+      const allAttemptsPromise = fetchAttemptSummaries(supabase, userId);
+      const attemptsPromise = allAttemptsPromise.then(attempts => {
+        const codes = filter.subjectCodes;
+        return codes?.length
+          ? attempts.filter(attempt => codes.includes(attempt.subject_code))
+          : attempts;
       });
       // groups run concurrently, but each has its own rejection boundary.
       // A focus-view migration failure, for example, no longer discards valid
       // progress, topic, engagement and IDE responses.
       const results = await loadStatsSections<StatsSection, Partial<StatsState>>({
         progress: async () => {
-          const [attempts, options] = await Promise.all([
+          const [allAttempts, attempts, options] = await Promise.all([
+            allAttemptsPromise,
             attemptsPromise,
             // Options remain unfiltered so a selection is never a one-way door.
             fetchFilterOptions(supabase, userId),
           ]);
-          return { attempts, subjects: aggregateSubjectStats(attempts), options };
+          return { allAttempts, attempts, subjects: aggregateSubjectStats(attempts), options };
         },
         topics: async () => {
           // both reads need whole topic histories. The sole page filter is
@@ -197,6 +203,7 @@ export function useStats() {
 
   // ---------------------------------------------------------------- derived
   const hasData = computed(() => state.attempts.length > 0);
+  const completedSubjects = computed(() => aggregateSubjectStats(state.allAttempts));
 
   const totals = computed(() => {
     const marksAwarded = state.attempts.reduce((n, a) => n + (a.marks_awarded ?? 0), 0);
@@ -302,7 +309,7 @@ export function useStats() {
   const ide = computed(() => readIde(state.ideTotals, state.ideSubmissions));
 
   return {
-    filter, state, loading, error, sectionErrors, hasData, totals, streaks, focus, topics,
+    filter, state, loading, error, sectionErrors, hasData, completedSubjects, totals, streaks, focus, topics,
     practice, queue, rankedTopics, missed, readinessByPaper, ide, reload: load,
   };
 }

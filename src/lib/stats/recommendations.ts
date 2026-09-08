@@ -51,8 +51,10 @@ export function progressRecommendation(input: {
   trend: number | null;
   weakest: { name: string; accuracy: number } | null;
   strongest: { name: string; accuracy: number } | null;
+  /** present only when the input is already scoped to one subject. */
+  subjectName?: string;
 }): Recommendation {
-  const { papers, accuracy, trend, weakest, strongest } = input;
+  const { papers, accuracy, trend, weakest, strongest, subjectName } = input;
 
   if (papers === 0) {
     return { tone: 'info', finding: 'No completed papers yet.',
@@ -68,12 +70,16 @@ export function progressRecommendation(input: {
   if (trend !== null && trend <= -MODEL.flags.notableTrend) {
     return { tone: 'warn',
              finding: `Accuracy is down ${Math.abs(Math.round(trend * 100))} points on your earliest papers.`,
-             action: 'Check whether the recent papers were harder or a different subject before treating this as a slide.' };
+             action: subjectName
+               ? `Compare like-for-like ${subjectName} components before treating this as a slide.`
+               : 'Check whether the recent papers were harder or a different subject before treating this as a slide.' };
   }
   if (trend !== null && trend >= MODEL.flags.notableTrend) {
     return { tone: 'good',
              finding: `Accuracy is up ${Math.round(trend * 100)} points since you started.`,
-             action: weakest ? `${weakest.name} is still your lowest at ${pct(weakest.accuracy)} — the most marks are there.` : undefined };
+             action: subjectName
+               ? `${subjectName} is improving; use the component chart to see which paper is driving it.`
+               : weakest ? `${weakest.name} is still your lowest at ${pct(weakest.accuracy)} — the most marks are there.` : undefined };
   }
   if (weakest && strongest && strongest.accuracy - weakest.accuracy >= MODEL.flags.subjectSpread) {
     return { tone: 'info',
@@ -81,8 +87,10 @@ export function progressRecommendation(input: {
              action: 'A subject gap that wide is usually content, not technique.' };
   }
   return { tone: 'info',
-           finding: `Holding steady at ${accuracy !== null ? pct(accuracy) : '—'} across ${papers} papers.`,
-           action: weakest ? `${weakest.name} at ${pct(weakest.accuracy)} is where the marks are.` : undefined };
+           finding: `Holding steady at ${accuracy !== null ? pct(accuracy) : '—'} across ${papers} papers${subjectName ? ` in ${subjectName}` : ''}.`,
+           action: subjectName
+             ? 'Use the paper score sequence and component trend to find the next repeatable gain.'
+             : weakest ? `${weakest.name} at ${pct(weakest.accuracy)} is where the marks are.` : undefined };
 }
 
 // ------------------------------------------------------------- engagement
