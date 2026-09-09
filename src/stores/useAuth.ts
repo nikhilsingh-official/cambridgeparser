@@ -27,7 +27,8 @@ const initialRecoveryError = typeof window === 'undefined'
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
 export type EmailLoginOptions = { email: string; password: string; }
-export type OAuthProvider = 'google' | 'azure' | 'twitter'
+// expose only the OAuth providers offered by the login screen.
+export type OAuthProvider = 'google' | 'azure' | 'github'
 export type OAuthLoginOptions = { provider: OAuthProvider }
 export type LoginOptions = EmailLoginOptions | OAuthLoginOptions;
 

@@ -197,9 +197,12 @@ flow; it is not prescribed verbatim by Supabase.
 
 These are repository observations and recommendations:
 
-- Hosted Auth **Site URL:** `https://cambridgeparser.com`.
+- Hosted Auth **Site URL:** `https://www.cambridgeparser.com` (the current
+  canonical origin; Vercel redirects the apex to `www`).
 - Hosted exact Redirect URL:
-  `https://cambridgeparser.com/reset-password`.
+  `https://www.cambridgeparser.com/reset-password`.
+- Optionally keep `https://cambridgeparser.com/reset-password` as a second exact
+  Redirect URL in case the apex redirect is changed later.
 - Preview redirect patterns only if password recovery is intentionally tested
   on previews; keep the production entry exact.
 - Local Site URL matches Vite (`http://127.0.0.1:5173`), and local redirect

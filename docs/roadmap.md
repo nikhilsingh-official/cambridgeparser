@@ -281,10 +281,10 @@ Colours are validated palettes in `themes.scss` - one set per theme surface,
 checked with the dataviz validator rather than by eye, in fixed order so a subject
 keeps its colour across a re-filter.
 
-`supabase/seeds/02_dev_sample_data.sql` generates ~5 months of plausible history
-for `dev@local.test` / `devpassword123` so the page is worth looking at locally.
-It runs on `db reset` only, refuses to run where non-dev accounts exist, and is
-deterministic.
+`supabase/archived-seeds/02_dev_sample_data.sql` generates ~5 months of
+plausible history for `dev@local.test` / `devpassword123` so the page is worth
+looking at locally. It is now opt-in, refuses to run where non-dev accounts
+exist, and is deterministic.
 
 Four defects surfaced only by rendering it with real data:
 

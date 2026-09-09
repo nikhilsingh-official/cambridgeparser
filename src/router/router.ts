@@ -16,6 +16,10 @@ const MCQNav = () => import('@/components_navigator/MCQNav.vue')
 const IdeView = () => import('@/views/IdeView.vue')
 const ProblemsView = () => import('@/views/ProblemsView.vue')
 const LearnView = () => import('@/views/LearnView.vue')
+// OAuth providers require public, same-domain policy and terms pages.
+const PrivacyView = () => import('@/views/PrivacyView.vue')
+const TermsView = () => import('@/views/TermsView.vue')
+const DataDeletionView = () => import('@/views/DataDeletionView.vue')
 // recovery must accept the temporary authenticated recovery session, so it
 // is public chrome but deliberately neither guestOnly nor requiresAuth.
 const ResetPassword = () => import('@/components_auth/ResetPassword.vue')
@@ -43,6 +47,9 @@ declare module 'vue-router' {
     supportsNarrowViewport?: boolean
     /** Signed-in, but the page owns the whole viewport (the exam runner). */
     fullscreen?: boolean
+    /** browser metadata for public policy and verification pages. */
+    pageTitle?: string
+    pageDescription?: string
   }
 }
 
@@ -54,6 +61,39 @@ const routes: RouteRecordRaw[] = [
   { path: '/', name: 'Landing', component: LandingView, meta: { publicChrome: true, supportsNarrowViewport: true } },
   { path: '/login', name: 'Login', component: Login, meta: { guestOnly: true, publicChrome: true, supportsNarrowViewport: true } },
   { path: '/reset-password', name: 'ResetPassword', component: ResetPassword, meta: { publicChrome: true, supportsNarrowViewport: true } },
+  {
+    path: '/privacy',
+    name: 'Privacy',
+    component: PrivacyView,
+    meta: {
+      publicChrome: true,
+      supportsNarrowViewport: true,
+      pageTitle: 'Privacy Policy — CambridgeParser',
+      pageDescription: 'How CambridgeParser handles account, OAuth, study, and grading information.',
+    },
+  },
+  {
+    path: '/terms',
+    name: 'Terms',
+    component: TermsView,
+    meta: {
+      publicChrome: true,
+      supportsNarrowViewport: true,
+      pageTitle: 'Terms and Conditions — CambridgeParser',
+      pageDescription: 'Terms for using CambridgeParser study, grading, and authentication services.',
+    },
+  },
+  {
+    path: '/data-deletion',
+    name: 'DataDeletion',
+    component: DataDeletionView,
+    meta: {
+      publicChrome: true,
+      supportsNarrowViewport: true,
+      pageTitle: 'Delete Your Data — CambridgeParser',
+      pageDescription: 'Instructions for deleting a CambridgeParser account and its associated study data.',
+    },
+  },
 
   // ------------------------------------------------------------ paper solver
   // every application route is explicitly protected. Previously all of
@@ -90,6 +130,17 @@ const routes: RouteRecordRaw[] = [
 const router = createRouter({
   history: createWebHistory(),
   routes,
+})
+
+const defaultTitle = 'CambridgeParser — Papers, Pseudocode & Progress'
+const defaultDescription = 'Practise Cambridge past papers and pseudocode, then use evidence from every attempt to decide what to study next.'
+
+// policy URLs expose meaningful browser metadata to users and OAuth brand
+// reviewers, then restore the product defaults when navigation leaves them.
+router.afterEach((to) => {
+  document.title = to.meta.pageTitle ?? defaultTitle
+  const description = document.querySelector<HTMLMetaElement>('meta[name="description"]')
+  if (description) description.content = to.meta.pageDescription ?? defaultDescription
 })
 
 router.beforeEach(async (to) => {

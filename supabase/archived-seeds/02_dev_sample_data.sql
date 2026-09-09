@@ -7,9 +7,10 @@
 -- those charts against an empty database means building them blind, and an
 -- empty chart looks identical to a broken one.
 --
--- WHERE IT RUNS: `supabase db reset` only. `supabase db push` - the way a
--- hosted project is migrated - does not run seeds, so this cannot reach
--- production by the normal deploy path. It is still guarded below.
+-- ARCHIVED: this file is outside `supabase/seeds/`, so neither `supabase db
+-- reset` nor `supabase db push --include-seed` discovers it through the
+-- configured `./seeds/*.sql` glob. Apply it manually only to a throwaway local
+-- database when synthetic dashboard history is explicitly wanted.
 --
 -- WHAT IT IS NOT: a fixture for automated tests. Tests that assert on numbers
 -- should build their own rows; the shape here is deliberately irregular so the

@@ -404,7 +404,14 @@ const workflow = [
         <span class="brand-mark" aria-hidden="true"><BookOpenCheck /></span>
         <span>CambridgeParser</span>
       </RouterLink>
-      <p>Past-paper practice and pseudocode in one focused workspace.</p>
+      <div class="footer-middle">
+        <p>Past-paper practice and pseudocode in one focused workspace.</p>
+        <nav aria-label="Legal links">
+          <RouterLink to="/privacy">Privacy Policy</RouterLink>
+          <RouterLink to="/terms">Terms and Conditions</RouterLink>
+          <RouterLink to="/data-deletion">Data deletion</RouterLink>
+        </nav>
+      </div>
       <a href="#top">Back to top <ArrowRight /></a>
     </footer>
   </main>
@@ -1279,7 +1286,11 @@ const workflow = [
   border-top: 1px solid var(--border);
 }
 
-.landing-footer p { margin: 0; color: var(--muted); font-size: 0.7rem; }
+.footer-middle { text-align: center; }
+.footer-middle p { margin: 0; color: var(--muted); font-size: 0.7rem; }
+.footer-middle nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem 1rem; margin-top: 0.6rem; }
+.footer-middle a { color: var(--muted); font-size: 0.68rem; text-underline-offset: 0.2em; }
+.footer-middle a:hover { color: var(--text); }
 .landing-footer > a:last-child { justify-self: end; color: var(--muted); }
 .landing-footer > a:last-child svg { transform: rotate(-45deg); }
 
@@ -1323,7 +1334,7 @@ a:focus-visible {
   .insight-grid article:last-child { border-bottom: 1px solid var(--border); }
   .insight-icon { margin-bottom: 2rem; }
   .landing-footer { grid-template-columns: 1fr auto; gap: 1rem; }
-  .landing-footer p { grid-column: 1 / -1; grid-row: 2; }
+  .footer-middle { grid-column: 1 / -1; grid-row: 2; }
 }
 
 @media (max-width: 42rem) {

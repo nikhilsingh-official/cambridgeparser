@@ -120,11 +120,10 @@ async function submitOAuth(provider: OAuthProvider) {
 
 // lucide ships no brand marks, so these are inline paths. Kept as a small
 // typed list rather than three near-identical blocks in the template.
-const providers: { id: OAuthProvider; label: string; path: string }[] = [
+const providers: { id: OAuthProvider; label: string; path?: string }[] = [
   {
     id: 'google',
     label: 'Google',
-    path: 'M21.35 11.1h-9.17v2.92h5.27c-.23 1.37-1.6 4.02-5.27 4.02-3.17 0-5.76-2.62-5.76-5.86s2.59-5.86 5.76-5.86c1.81 0 3.02.77 3.71 1.43l2.53-2.44C16.79 3.79 14.7 2.9 12.18 2.9 6.98 2.9 2.77 7.11 2.77 12.3s4.21 9.4 9.41 9.4c5.43 0 9.03-3.82 9.03-9.2 0-.62-.07-1.09-.16-1.4z',
   },
   {
     id: 'azure',
@@ -132,9 +131,9 @@ const providers: { id: OAuthProvider; label: string; path: string }[] = [
     path: 'M3 3h8.5v8.5H3V3zm9.5 0H21v8.5h-8.5V3zM3 12.5h8.5V21H3v-8.5zm9.5 0H21V21h-8.5v-8.5z',
   },
   {
-    id: 'twitter',
-    label: 'X',
-    path: 'M17.53 3h3.17l-6.93 7.92L21.94 21h-6.38l-5-6.54L4.83 21H1.66l7.41-8.47L2 3h6.54l4.52 5.98L17.53 3zm-1.11 16.06h1.76L7.66 4.84H5.78l10.64 14.22z',
+    id: 'github',
+    label: 'GitHub',
+    path: 'M12 .7a12 12 0 0 0-3.79 23.39c.6.11.82-.26.82-.58v-2.23c-3.34.73-4.04-1.42-4.04-1.42-.55-1.39-1.34-1.76-1.34-1.76-1.09-.75.08-.73.08-.73 1.2.09 1.84 1.24 1.84 1.24 1.07 1.84 2.81 1.31 3.5 1 .11-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.52.11-3.18 0 0 1.01-.32 3.3 1.23A11.5 11.5 0 0 1 12 6.8c1.02 0 2.04.14 3 .4 2.29-1.55 3.3-1.23 3.3-1.23.65 1.66.24 2.88.12 3.18.77.84 1.23 1.91 1.23 3.22 0 4.61-2.81 5.62-5.48 5.92.43.37.81 1.1.81 2.22v3c0 .32.22.7.83.58A12 12 0 0 0 12 .7Z',
   },
 ];
 </script>
@@ -231,14 +230,25 @@ const providers: { id: OAuthProvider; label: string; path: string }[] = [
           class="oauth"
           type="button"
           :disabled="busy"
+          :aria-label="oauthLoading === p.id ? `Connecting to ${p.label}` : `Continue with ${p.label}`"
+          :aria-busy="oauthLoading === p.id"
           @click="submitOAuth(p.id)"
         >
-          <LoaderCircle v-if="oauthLoading === p.id" class="btn-icon spin" />
+          <LoaderCircle v-if="oauthLoading === p.id" class="btn-icon spin" aria-hidden="true" />
+          <!-- Google's required multicolour brand mark is intentionally
+               not recoloured through the app theme. -->
+          <svg v-else-if="p.id === 'google'" xmlns="http://www.w3.org/2000/svg"
+               viewBox="0 0 18 18" class="btn-icon" aria-hidden="true">
+            <path fill="#4285f4" d="M17.64 9.205c0-.639-.057-1.252-.164-1.841H9v3.482h4.844a4.14 4.14 0 0 1-1.797 2.716v2.259h2.909c1.702-1.567 2.684-3.875 2.684-6.616Z" />
+            <path fill="#34a853" d="M9 18c2.43 0 4.468-.806 5.956-2.179l-2.909-2.259c-.806.54-1.835.859-3.047.859-2.344 0-4.328-1.585-5.037-3.714H.956v2.332A9 9 0 0 0 9 18Z" />
+            <path fill="#fbbc05" d="M3.963 10.707A5.41 5.41 0 0 1 3.682 9c0-.592.102-1.167.281-1.707V4.961H.956A9 9 0 0 0 0 9c0 1.452.347 2.827.956 4.039l3.007-2.332Z" />
+            <path fill="#ea4335" d="M9 3.579c1.321 0 2.507.454 3.441 1.346l2.581-2.581C13.464.892 11.427 0 9 0A9 9 0 0 0 .956 4.961l3.007 2.332C4.672 5.164 6.656 3.579 9 3.579Z" />
+          </svg>
           <svg v-else xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-               class="btn-icon" fill="currentColor">
+               class="btn-icon" fill="currentColor" aria-hidden="true">
             <path :d="p.path" />
           </svg>
-          <span>{{ p.label }}</span>
+          <span>{{ oauthLoading === p.id ? `Connecting to ${p.label}` : `Continue with ${p.label}` }}</span>
         </button>
       </div>
 
@@ -271,6 +281,17 @@ const providers: { id: OAuthProvider; label: string; path: string }[] = [
             Sign in
           </button>
         </template>
+      </p>
+
+      <!-- keep policy and deletion disclosures directly reachable from
+           every account-provisioning path. -->
+      <p class="legal-notice">
+        By continuing, you agree to our
+        <RouterLink to="/terms">Terms</RouterLink>
+        and acknowledge our
+        <RouterLink to="/privacy">Privacy Policy</RouterLink>.
+        You can also review how to
+        <RouterLink to="/data-deletion">delete your account and data</RouterLink>.
       </p>
     </div>
   </div>
@@ -468,7 +489,7 @@ const providers: { id: OAuthProvider; label: string; path: string }[] = [
 
 .oauth-row {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: 1fr;
   gap: 10px;
 }
 .oauth {
@@ -521,4 +542,19 @@ const providers: { id: OAuthProvider; label: string; path: string }[] = [
 
 // visually separates the two sign-in alternatives without another row.
 .switch-separator { margin: 0 0.35rem; }
+
+// OAuth policy links remain visible before a user grants account access.
+.legal-notice {
+  margin: 0.8rem 0 0;
+  color: $muted;
+  font-family: $font-body;
+  font-size: 0.65rem;
+  line-height: 1.5;
+  text-align: center;
+
+  a {
+    color: $accent;
+    text-underline-offset: 0.18em;
+  }
+}
 </style>

@@ -16,7 +16,7 @@ deployed, routed, or authenticated as separate sites.
 ## Features
 
 - Email/password sign-up, sign-in, password recovery, session restoration, and
-  Google, Microsoft/Azure, or Twitter OAuth entry points.
+  Google, Microsoft/Azure, or GitHub OAuth entry points.
 - A curated browser of solvable IGCSE, O Level, and AS/A Level MCQ papers with
   subject, year, series, variant, and progress filters.
 - A timed PDF paper runner with answer selection, option elimination, flags,
@@ -95,7 +95,8 @@ out the temporary recovery session, and returns the user to normal sign-in.
 | `src/styles/ide.css` | IDE component rules; it does not own design tokens |
 | `scripts/gt/`, `scripts/qtype/` | Current untracked/offline Python analysis tooling; this violates the repository's `api/`-only Python rule and is tracked as CP-020 |
 | `supabase/migrations/` | Database schema, RLS, topic practice, IDE attempts, and grading-quota functions, applied in filename order |
-| `supabase/seeds/` | Subjects, topics, and local sample data |
+| `supabase/seeds/` | Production-safe subject and topic reference data |
+| `supabase/archived-seeds/` | Opt-in synthetic local demo data; never discovered automatically |
 | `supabase/functions/fetch-pdf/` | MCQ question-paper proxy, mark-scheme parser, and trusted key installer |
 | `supabase/functions/grade/` | Authenticated IDE grading, provider routing, quota use, and trusted history recording |
 | `public/resources/` | Committed pseudocode records, layouts, and question images |
@@ -129,12 +130,17 @@ npm run supabase:start
 npm run supabase:reset
 ```
 
-The reset applies every migration and seed. It creates a local development
-account with useful sample history:
+The reset applies every migration and active seed. It loads the subject/topic
+reference data but does not create accounts or synthetic attempt history.
 
-```text
-dev@local.test
-devpassword123
+An archived, opt-in dashboard dataset remains at
+`supabase/archived-seeds/02_dev_sample_data.sql`. Apply it manually only to a
+throwaway local database when that demo history is explicitly useful:
+
+```bash
+psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
+  -v ON_ERROR_STOP=1 \
+  -f supabase/archived-seeds/02_dev_sample_data.sql
 ```
 
 Run both Edge Functions in their own terminal. The solver and IDE will receive
@@ -196,12 +202,35 @@ uses them only for the two service-only persistence RPCs.
 
 OAuth buttons are always rendered, but each provider must also be enabled and
 configured in the target Supabase project. The local config does not enable
-Google, Azure, or Twitter by default.
+Google, Azure, or GitHub by default.
 
-For hosted password recovery, add the exact
-`https://cambridgeparser.com/reset-password` URL to Supabase Auth's redirect
-allow-list and configure production SMTP. Local Auth is aligned with Vite on
-port 5173; recovery messages are visible in the Supabase Mailpit UI.
+Use these public production URLs in OAuth brand/consent configuration:
+
+| Field | URL |
+|---|---|
+| Application homepage | `https://www.cambridgeparser.com` |
+| Privacy Policy | `https://www.cambridgeparser.com/privacy` |
+| Terms and Conditions | `https://www.cambridgeparser.com/terms` |
+| Account/data deletion instructions | `https://www.cambridgeparser.com/data-deletion` |
+
+`www.cambridgeparser.com` is the canonical production origin; the apex currently
+redirects to it. Add `cambridgeparser.com` as an authorized domain and verify
+ownership with the provider where required. Configure the Supabase provider's
+displayed callback URL (normally
+`https://<project-ref>.supabase.co/auth/v1/callback`) as the provider's OAuth
+redirect URI. The public policies use `privacy@cambridgeparser.com`; that
+mailbox, a verified deletion procedure, the operator's legal identity and
+postal location, and the applicable governing law/jurisdiction must be settled
+before publishing OAuth consent. The repository cannot infer those operator
+facts safely.
+
+For hosted password recovery, set the Supabase Auth Site URL to
+`https://www.cambridgeparser.com`, add the exact
+`https://www.cambridgeparser.com/reset-password` URL to the redirect allow-list,
+and configure production SMTP. Adding the apex equivalent as a second exact
+redirect is harmless if the Vercel redirect is ever removed. Local Auth is
+aligned with Vite on port 5173; recovery messages are visible in the Supabase
+Mailpit UI.
 
 ## Tests and validation
 
