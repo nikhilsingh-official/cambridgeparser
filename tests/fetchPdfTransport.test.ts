@@ -6,13 +6,43 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { FunctionsClient } from '@supabase/functions-js';
-import { createFetchPdfResponse } from '../supabase/functions/fetch-pdf/paperResponse.ts';
+import {
+  createFetchPdfJsonResponse,
+  createFetchPdfPreflightResponse,
+  createFetchPdfResponse,
+} from '../supabase/functions/fetch-pdf/paperResponse.ts';
 import { decodeFetchPdfResponse } from '../src/lib/pdf/decodeFetchPdfResponse.ts';
 
 const metadata = {
   answers: [{ question: 1, answer: 'B', marks: '1', page: 2, y: 140 }],
   answerKey: { persisted: true },
 };
+
+test('fetch-pdf accepts the browser CORS preflight used by Supabase FunctionsClient', () => {
+  const request = new Request('https://example.test/functions/v1/fetch-pdf', {
+    method: 'OPTIONS',
+    headers: {
+      Origin: 'https://www.cambridgeparser.com',
+      'Access-Control-Request-Method': 'POST',
+      'Access-Control-Request-Headers': 'authorization,apikey,content-type,x-client-info',
+    },
+  });
+
+  const response = createFetchPdfPreflightResponse(request);
+  assert.ok(response);
+  assert.equal(response.status, 204);
+  assert.equal(response.headers.get('access-control-allow-origin'), '*');
+  assert.match(response.headers.get('access-control-allow-methods') ?? '', /POST/);
+  assert.match(response.headers.get('access-control-allow-headers') ?? '', /authorization/);
+  assert.match(response.headers.get('access-control-allow-headers') ?? '', /x-client-info/);
+});
+
+test('fetch-pdf error responses retain CORS headers', async () => {
+  const response = createFetchPdfJsonResponse(405, { error: 'Method not allowed' });
+  assert.equal(response.status, 405);
+  assert.equal(response.headers.get('access-control-allow-origin'), '*');
+  assert.deepEqual(await response.json(), { error: 'Method not allowed' });
+});
 
 test('representative two-megabyte paper round-trips with compact multipart overhead', async () => {
   // deterministic tracked input keeps this mandatory contract test runnable

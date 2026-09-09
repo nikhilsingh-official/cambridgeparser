@@ -5,7 +5,11 @@ import { getAnswersFromPDF } from "./answerKey.ts";
 // the Edge Function, not the browser, now owns the shared key write.
 import { normalizeTrustedAnswerKey, sha256Hex } from "./trustedAnswerKey.ts";
 // keep PDF bytes binary while returning metadata in the same invocation.
-import { createFetchPdfResponse } from "./paperResponse.ts";
+import {
+  createFetchPdfJsonResponse,
+  createFetchPdfPreflightResponse,
+  createFetchPdfResponse,
+} from "./paperResponse.ts";
 
 const ANSWER_KEY_PARSER_VERSION = 1;
 
@@ -132,21 +136,26 @@ async function fetchFirstPDF(urls: string[], fetchTimeoutMs = 10000) {
 
 Deno.serve(async (req: any) => {
   try {
+    // browser function calls preflight without an auth token; answer it
+    // before the POST-only method guard and include CORS on every later result.
+    const preflight = createFetchPdfPreflightResponse(req);
+    if (preflight) return preflight;
+
     if (req.method !== "POST") {
-      return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405, headers: { "Content-Type": "application/json" } });
+      return createFetchPdfJsonResponse(405, { error: "Method not allowed" });
     }
 
     const payload = await req.json().catch(() => null);
     const schema = payload?.schema;
     if (!schema || !isValidSchema(schema)) {
-      return new Response(JSON.stringify({ error: 'Invalid or missing "schema" in request body' }), { status: 400, headers: { "Content-Type": "application/json" } });
+      return createFetchPdfJsonResponse(400, { error: 'Invalid or missing "schema" in request body' });
     }
 
     const [qpSchema, msSchema] = expandSchema(schema) || [];
     const qpResult = await fetchFirstPDF(getURLs(qpSchema));
     const msResult = await fetchFirstPDF(getURLs(msSchema));
     if(!qpResult || !msResult) {
-      return new Response(JSON.stringify({ error: "PDF not found for the given schema" }), { status: 404, headers: { "Content-Type": "application/json" } });
+      return createFetchPdfJsonResponse(404, { error: "PDF not found for the given schema" });
     }
 
     const headers = new Headers();
@@ -175,6 +184,6 @@ Deno.serve(async (req: any) => {
 
   } catch (err) {
     console.error("Unhandled error:", err);
-    return new Response(JSON.stringify({ error: "Internal server error" }), { status: 500, headers: { "Content-Type": "application/json" } });
+    return createFetchPdfJsonResponse(500, { error: "Internal server error" });
   }
 });
