@@ -31,6 +31,10 @@ import LandingView from '@/views/LandingView.vue'
 // making it a separate round trip would delay the one screen that must be fast.
 import Login from '@/components_auth/Login.vue'
 import { authReady, supabase } from '@/stores/useAuth'
+// the same catalogue drives browser navigation and build-time crawler HTML.
+import { resolveSeoMetadata, type SeoPageKey } from '@/lib/seo'
+// DOM mutation stays out of the universal metadata module Vite imports.
+import { applySeoMetadata } from '@/lib/seoDom'
 
 // route meta is now typed, so `requiresAuth` cannot be misspelled into
 // silence - a typo'd meta key on a protected route would otherwise leave that
@@ -47,9 +51,8 @@ declare module 'vue-router' {
     supportsNarrowViewport?: boolean
     /** Signed-in, but the page owns the whole viewport (the exam runner). */
     fullscreen?: boolean
-    /** browser metadata for public policy and verification pages. */
-    pageTitle?: string
-    pageDescription?: string
+    /** route-specific title, canonical, indexing, social, and JSON-LD metadata. */
+    seoPage?: SeoPageKey
   }
 }
 
@@ -58,9 +61,9 @@ const routes: RouteRecordRaw[] = [
   // lands on before they have an account, and it came from the Cambridge IDE
   // side of the merge.
   // public/account screens are the only intentionally narrow layouts.
-  { path: '/', name: 'Landing', component: LandingView, meta: { publicChrome: true, supportsNarrowViewport: true } },
-  { path: '/login', name: 'Login', component: Login, meta: { guestOnly: true, publicChrome: true, supportsNarrowViewport: true } },
-  { path: '/reset-password', name: 'ResetPassword', component: ResetPassword, meta: { publicChrome: true, supportsNarrowViewport: true } },
+  { path: '/', name: 'Landing', component: LandingView, meta: { publicChrome: true, supportsNarrowViewport: true, seoPage: 'landing' } },
+  { path: '/login', name: 'Login', component: Login, meta: { guestOnly: true, publicChrome: true, supportsNarrowViewport: true, seoPage: 'login' } },
+  { path: '/reset-password', name: 'ResetPassword', component: ResetPassword, meta: { publicChrome: true, supportsNarrowViewport: true, seoPage: 'resetPassword' } },
   {
     path: '/privacy',
     name: 'Privacy',
@@ -68,8 +71,7 @@ const routes: RouteRecordRaw[] = [
     meta: {
       publicChrome: true,
       supportsNarrowViewport: true,
-      pageTitle: 'Privacy Policy — CambridgeParser',
-      pageDescription: 'How CambridgeParser handles account, OAuth, study, and grading information.',
+      seoPage: 'privacy',
     },
   },
   {
@@ -79,8 +81,7 @@ const routes: RouteRecordRaw[] = [
     meta: {
       publicChrome: true,
       supportsNarrowViewport: true,
-      pageTitle: 'Terms and Conditions — CambridgeParser',
-      pageDescription: 'Terms for using CambridgeParser study, grading, and authentication services.',
+      seoPage: 'terms',
     },
   },
   {
@@ -90,8 +91,7 @@ const routes: RouteRecordRaw[] = [
     meta: {
       publicChrome: true,
       supportsNarrowViewport: true,
-      pageTitle: 'Delete Your Data — CambridgeParser',
-      pageDescription: 'Instructions for deleting a CambridgeParser account and its associated study data.',
+      seoPage: 'dataDeletion',
     },
   },
 
@@ -99,9 +99,9 @@ const routes: RouteRecordRaw[] = [
   // every application route is explicitly protected. Previously all of
   // them were open - the dashboard, browser and stats pages rendered fine with
   // no session, and only MCQNav had an ad-hoc onMounted redirect.
-  { path: '/dashboard', name: 'Dashboard', component: DashboardPage, meta: { requiresAuth: true } },
-  { path: '/browser', name: 'Browser', component: BrowserPage, meta: { requiresAuth: true } },
-  { path: '/stats', name: 'Stats', component: StatsPage, meta: { requiresAuth: true } },
+  { path: '/dashboard', name: 'Dashboard', component: DashboardPage, meta: { requiresAuth: true, seoPage: 'dashboard' } },
+  { path: '/browser', name: 'Browser', component: BrowserPage, meta: { requiresAuth: true, seoPage: 'browser' } },
+  { path: '/stats', name: 'Stats', component: StatsPage, meta: { requiresAuth: true, seoPage: 'stats' } },
   {
     path: '/solver/:schema',
     name: 'Solver',
@@ -109,17 +109,17 @@ const routes: RouteRecordRaw[] = [
     props: true,
     // no sidebar during an exam. The runner owns the viewport, and a nav
     // rail is both a distraction and an invitation to leave mid-paper.
-    meta: { requiresAuth: true, fullscreen: true },
+    meta: { requiresAuth: true, fullscreen: true, seoPage: 'solver' },
   },
 
   // ----------------------------------------------------------- cambridge IDE
   // the second half of the merge. These were their own application with
   // their own router, auth and hash-based URLs; they are now a page group in
   // this one, on the same path routing and the same session.
-  { path: '/problems', name: 'Problems', component: ProblemsView, meta: { requiresAuth: true } },
-  { path: '/ide', name: 'Ide', component: IdeView, meta: { requiresAuth: true } },
-  { path: '/ide/:id', name: 'IdeRecord', component: IdeView, props: true, meta: { requiresAuth: true } },
-  { path: '/learn', name: 'Learn', component: LearnView, meta: { requiresAuth: true } },
+  { path: '/problems', name: 'Problems', component: ProblemsView, meta: { requiresAuth: true, seoPage: 'problems' } },
+  { path: '/ide', name: 'Ide', component: IdeView, meta: { requiresAuth: true, seoPage: 'ide' } },
+  { path: '/ide/:id', name: 'IdeRecord', component: IdeView, props: true, meta: { requiresAuth: true, seoPage: 'ideRecord' } },
+  { path: '/learn', name: 'Learn', component: LearnView, meta: { requiresAuth: true, seoPage: 'learn' } },
 
   // there was no catch-all, so an unmatched URL rendered a blank page with
   // no error. This is also what made the broken OAuth redirect to /dashboard
@@ -132,15 +132,11 @@ const router = createRouter({
   routes,
 })
 
-const defaultTitle = 'CambridgeParser — Papers, Pseudocode & Progress'
-const defaultDescription = 'Practise Cambridge past papers and pseudocode, then use evidence from every attempt to decide what to study next.'
-
-// policy URLs expose meaningful browser metadata to users and OAuth brand
-// reviewers, then restore the product defaults when navigation leaves them.
+// update every discoverability surface together so route navigation cannot
+// leave a stale title, canonical, social card, robots rule, or JSON-LD graph.
 router.afterEach((to) => {
-  document.title = to.meta.pageTitle ?? defaultTitle
-  const description = document.querySelector<HTMLMetaElement>('meta[name="description"]')
-  if (description) description.content = to.meta.pageDescription ?? defaultDescription
+  const page = to.meta.seoPage ?? 'landing'
+  applySeoMetadata(resolveSeoMetadata(page, to.path, to.params))
 })
 
 router.beforeEach(async (to) => {

@@ -242,7 +242,8 @@ npx vue-tsc -b
 npm run build
 ```
 
-The current Node suite contains 145 assertions/tests across `tests/**/*.test.ts`
+<!-- keep the documented count aligned with the corpus and SEO tests. -->
+The current Node suite contains 156 assertions/tests across `tests/**/*.test.ts`
 and `tests/**/*.test.mjs`. The build repeats the type check before Vite bundles
 the application.
 
@@ -301,8 +302,10 @@ refresh/back navigation, console/network errors, and narrow-screen layouts.
 
 ## Build and deployment
 
-`npm run build` creates `dist/`. `vercel.json` applies security/cache headers
-and rewrites every route to `index.html` so history-mode deep links work.
+<!-- Vercel's typed configuration supersedes the former static JSON file. -->
+`npm run build` creates `dist/`. `vercel.ts` applies security/cache headers,
+serves generated route-specific metadata documents for known paths, and keeps
+an `index.html` catch-all so history-mode deep links work.
 
 A complete deployment has two independently deployed parts:
 

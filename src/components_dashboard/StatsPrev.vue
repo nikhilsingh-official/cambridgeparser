@@ -16,10 +16,13 @@ import { computed, onMounted, onUnmounted, ref } from 'vue';
 // the preview now opens the full statistics page.
 import { RouterLink } from 'vue-router';
 import { duration, count } from '@/lib/stats/format';
-import type { Movement, RecentActivity } from '@/lib/stats/model';
+// each tile now carries a real fourteen-day series into its mini-chart.
+import MiniTrend from './MiniTrend.vue';
+import type { DailyActivitySeries, Movement, RecentActivity } from '@/lib/stats/model';
 
 const props = defineProps<{
   recent: RecentActivity | null;
+  series: DailyActivitySeries;
   loading: boolean;
 }>();
 
@@ -39,21 +42,39 @@ const SLOTS = [
 interface Card {
   label: string;
   value: string;
+  change: string | null;
   /** true up, false down, null when there is nothing to compare against. */
   up: boolean | null;
+  series: Array<number | null>;
+  color: string;
 }
 
 // Someone in their first week has no previous week. Showing their running
 // total under a green arrow would dress a starting figure as growth, so an
 // incomparable movement shows the plain current figure and no arrow at all -
 // and so does a flat week, where an arrow would have to point somewhere.
-function card(label: string, m: Movement, fmt: (n: number) => string): Card {
-  if (props.loading) return { label, value: DASH, up: null };
-  if (!m.comparable) return { label, value: fmt(m.current), up: null };
+// keep headline values, deltas, visual series, and theme colour together.
+function card(
+  label: string,
+  m: Movement,
+  valueFormat: (n: number) => string,
+  deltaFormat: (n: number) => string,
+  series: Array<number | null>,
+  color: string,
+): Card {
+  if (props.loading) return { label, value: DASH, change: null, up: null, series: [], color };
+  if (!m.comparable) {
+    return { label, value: valueFormat(m.current), change: null, up: null, series, color };
+  }
   return {
     label,
-    value: fmt(Math.abs(m.delta)),
+    // the headline is the current seven-day value. The old implementation
+    // showed only the delta, so two active weeks could misleadingly read "0".
+    value: valueFormat(m.current),
+    change: m.delta === 0 ? 'no change' : deltaFormat(Math.abs(m.delta)),
     up: m.delta === 0 ? null : m.delta > 0,
+    series,
+    color,
   };
 }
 
@@ -63,11 +84,20 @@ const cards = computed<Card[]>(() => {
   const r = props.recent;
   // Accuracy moves in ratio, so its delta is reported in percentage points -
   // "4 pts", never "4%", which would read as a relative change.
+  // every rotating card receives its corresponding fourteen-day series.
   return [
-    card('Accuracy (7d)', r?.accuracy ?? NOTHING, n => `${Math.round(n * 100)} pts`),
-    card('Papers (7d)', r?.papers ?? NOTHING, n => count(n) ?? '0'),
-    card('Questions (7d)', r?.questions ?? NOTHING, n => count(n) ?? '0'),
-    card('Time (7d)', r?.timeMs ?? NOTHING, n => duration(n) ?? '0m'),
+    card('Accuracy (7d)', r?.accuracy ?? NOTHING,
+      n => `${Math.round(n * 100)}%`, n => `${Math.round(n * 100)} pts`,
+      props.series.accuracy, 'var(--series-1)'),
+    card('Papers (7d)', r?.papers ?? NOTHING,
+      n => count(n) ?? '0', n => count(n) ?? '0',
+      props.series.papers, 'var(--series-2)'),
+    card('Questions (7d)', r?.questions ?? NOTHING,
+      n => count(n) ?? '0', n => count(n) ?? '0',
+      props.series.questions, 'var(--series-3)'),
+    card('Time (7d)', r?.timeMs ?? NOTHING,
+      n => duration(n) ?? '0m', n => duration(n) ?? '0m',
+      props.series.timeMs, 'var(--series-4)'),
   ];
 });
 
@@ -111,7 +141,15 @@ onUnmounted(() => clearInterval(timer))
         <div ref="previewRef" class = "preview-container">
             <div v-for="(tile, i) in cards" :key="tile.label" class="item" :class="SLOTS[i]">
                 <div class="label">{{ tile.label }}</div>
-                <div class="metadata"><svg v-if="tile.up !== null" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather" :class="tile.up ? 'feather-arrow-up' : 'feather-arrow-down'"><line x1="12" :y1="tile.up ? 19 : 5" x2="12" :y2="tile.up ? 5 : 19"></line><polyline :points="tile.up ? '5 12 12 5 19 12' : '19 12 12 19 5 12'"></polyline></svg> {{ tile.value }}</div>
+                <div class="metadata">
+                  <strong>{{ tile.value }}</strong>
+                  <span v-if="tile.change" class="change">
+                    <svg v-if="tile.up !== null" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather" :class="tile.up ? 'feather-arrow-up' : 'feather-arrow-down'"><line x1="12" :y1="tile.up ? 19 : 5" x2="12" :y2="tile.up ? 5 : 19"></line><polyline :points="tile.up ? '5 12 12 5 19 12' : '19 12 12 19 5 12'"></polyline></svg>
+                    {{ tile.change }}
+                  </span>
+                </div>
+                <!-- the panel now contains the trend plots it visually promised. -->
+                <MiniTrend :values="tile.series" :label="tile.label" :color="tile.color" />
             </div>
         </div>
     </RouterLink>
@@ -210,6 +248,8 @@ onUnmounted(() => clearInterval(timer))
   display: flex;
   align-items: center;
   justify-content: center;
+  /* separate the current value from its compact comparison. */
+  gap: 0.5rem;
   transition: opacity 1s ease;
   background-color: rgba(0, 0, 0, 0.1);
   /* semantic theme tokens replace the old fixed red/neon arrow colours. */
@@ -220,6 +260,19 @@ onUnmounted(() => clearInterval(timer))
     color: var(--danger);
   }
 }
+
+/* keep the compact comparison subordinate to the current-week value. */
+.change {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+/* reveal the graph with the same rotating-card transition as its labels. */
+.inactive :deep(.mini-trend) { opacity: 0; }
+.active :deep(.mini-trend) { opacity: 1; transition: opacity 0.35s 0.5s ease; }
 
 .label {
   position: absolute;

@@ -26,7 +26,7 @@ import {
   fetchAttemptSummaries, fetchDailyActivity, computeStreaks,
 } from '@/lib/supabase/queries';
 import type { AttemptSummaryView, DailyActivityView, IsoDate } from '@/lib/types/database';
-import { accuracyTrend, recentActivity } from '@/lib/stats/model';
+import { accuracyTrend, dailyActivitySeries, recentActivity } from '@/lib/stats/model';
 // "today" must use the user's calendar timezone, not UTC.
 import { localIsoDate } from '@/lib/date/localIsoDate';
 
@@ -93,7 +93,11 @@ export function useDashboard() {
   });
 
   const recent = computed(() => recentActivity(state.attempts, today()));
+  // real fourteen-day inputs for the four rotating dashboard mini-graphs.
+  const activitySeries = computed(() => dailyActivitySeries(state.attempts, today()));
   const trend = computed(() => accuracyTrend(state.attempts));
 
-  return { state, loading, error, hasData, totals, streaks, recent, trend, reload: load };
+  return {
+    state, loading, error, hasData, totals, streaks, recent, activitySeries, trend, reload: load,
+  };
 }

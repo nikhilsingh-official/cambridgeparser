@@ -1,0 +1,41 @@
+<!-- ========================================================================
+
+     Transparent vector redraw of the CambridgeParser document-and-branch logo.
+     ======================================================================== -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480" role="img" aria-labelledby="logo-title logo-description">
+  <title id="logo-title">CambridgeParser</title>
+  <desc id="logo-description">A document branching into structured data nodes.</desc>
+
+  <g fill="none" stroke="#112645" stroke-linecap="square" stroke-linejoin="miter" stroke-width="14">
+    <path d="M72 64h174l60 60v232l-60 60H72Z" />
+    <path d="M246 64v60h60" fill="#8495a5" />
+    <path d="M246 416v-60h60" fill="#8495a5" />
+
+    <path d="M108 132h88" />
+    <path d="M108 168h138" />
+    <path d="M108 204h138" />
+    <path d="M108 240h138" />
+    <path d="M108 276h138" />
+    <path d="M108 312h138" />
+    <path d="M108 348h88" />
+
+    <path d="M306 240h100" />
+    <path d="m316 231 58-91h29" />
+    <path d="m316 249 58 91h29" />
+    <path d="M424 106h-24v68h24" />
+    <path d="M424 306h-24v68h24" />
+    <path d="M442 106h62" />
+    <path d="m406 240 52-54h46" />
+    <path d="M442 374h62" />
+    <path d="M470 326h14m-14 28h14" stroke="#45a486" />
+    <path d="M500 340h68" />
+  </g>
+
+  <g fill="#45a486" stroke="#112645" stroke-width="14">
+    <circle cx="306" cy="240" r="19" />
+    <circle cx="406" cy="240" r="19" />
+    <circle cx="530" cy="106" r="19" />
+    <circle cx="530" cy="186" r="19" />
+    <circle cx="530" cy="374" r="19" />
+  </g>
+</svg>

@@ -54,11 +54,16 @@ function marksLabel(point) {
             <small>{{ marksLabel(point) }} | {{ point.style || 'unknown' }}</small>
           </div>
         </div>
-        <p v-else class="notice">No structured marking points were extracted.</p>
+        <!-- an examiner answer can still be authoritative when the source
+             format did not split it into individual points. Avoid presenting
+             that data shape as if the mark scheme itself were missing. -->
+        <p v-else class="notice">
+          This mark scheme is available as the examiner's full answer below.
+        </p>
 
-        <details class="ms-answer">
+        <details class="ms-answer" :open="!markingPoints.length">
           <summary>Mark-scheme answer text</summary>
-          <pre class="plain-pre">{{ answerText || 'No answer text.' }}</pre>
+          <pre class="plain-pre">{{ answerText || 'The source paper did not yield readable answer text.' }}</pre>
         </details>
       </section>
 

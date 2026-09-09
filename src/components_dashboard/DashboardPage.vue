@@ -11,7 +11,8 @@ import MetaBar from '@/components/MetaBar.vue';
 // lib/dashboard/useDashboard.ts for why this is not useStats().
 import { useDashboard } from '@/lib/dashboard/useDashboard';
 
-const { loading, totals, streaks, recent } = useDashboard();
+// the dashboard preview consumes the same recent-series model as its totals.
+const { loading, totals, streaks, recent, activitySeries } = useDashboard();
 </script>
 <template>
     <div class = "main-grid">
@@ -19,7 +20,12 @@ const { loading, totals, streaks, recent } = useDashboard();
           <MetaBar></MetaBar>
         </div>
         <Hero></Hero>
-        <StatsPrev :recent="recent" :loading="loading"></StatsPrev>
+        <!-- pass real daily values into the formerly empty rotating panel. -->
+        <StatsPrev
+          :recent="recent"
+          :series="activitySeries"
+          :loading="loading"
+        ></StatsPrev>
         <QuickView
           :papers="totals.papers"
           :marks-awarded="totals.marksAwarded"
@@ -37,7 +43,9 @@ const { loading, totals, streaks, recent } = useDashboard();
   background-color: $background;
   display: grid;
   grid-template-columns: repeat(20, 1fr);
-  grid-template-rows: repeat(20, 1fr);
+  /* minmax(0, 1fr) prevents child min-content sizes from stretching the
+     twenty nominal rows beyond the viewport on the dashboard's first paint. */
+  grid-template-rows: repeat(20, minmax(0, 1fr));
   position: relative;
   padding-left: 5vw;
 }

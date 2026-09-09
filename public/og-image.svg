@@ -1,0 +1,33 @@
+<!-- ========================================================================
+
+     Source artwork for the 1200 x 630 social/search preview image.
+     ======================================================================== -->
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="og-title og-description">
+  <title id="og-title">CambridgeParser</title>
+  <desc id="og-description">Past papers, pseudocode and progress in one workspace.</desc>
+  <defs>
+    <pattern id="grid" width="42" height="42" patternUnits="userSpaceOnUse">
+      <path d="M42 0H0V42" fill="none" stroke="#112645" stroke-opacity="0.055" />
+    </pattern>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#112645" flood-opacity="0.13" />
+    </filter>
+  </defs>
+  <rect width="1200" height="630" fill="#f3f7fa" />
+  <rect width="1200" height="630" fill="url(#grid)" />
+  <circle cx="1090" cy="86" r="190" fill="#45a486" opacity="0.12" />
+  <circle cx="1128" cy="556" r="130" fill="#112645" opacity="0.045" />
+
+  <g filter="url(#shadow)">
+    <rect x="60" y="72" width="420" height="486" rx="32" fill="#ffffff" />
+  </g>
+  <image href="cambridgeparser_logo.svg" x="78" y="128" width="384" height="360" />
+
+  <g font-family="Inter, Arial, sans-serif" fill="#112645">
+    <text x="540" y="218" font-size="66" font-weight="750" letter-spacing="-2">CambridgeParser</text>
+    <text x="544" y="285" font-size="27" font-weight="600" fill="#45a486" letter-spacing="1.5">ONE WORKSPACE FOR CAMBRIDGE REVISION</text>
+    <text x="544" y="370" font-size="38" font-weight="520">Past papers. Pseudocode.</text>
+    <text x="544" y="420" font-size="38" font-weight="520">Progress that stays connected.</text>
+    <text x="544" y="500" font-size="24" fill="#506076">cambridgeparser.com</text>
+  </g>
+</svg>

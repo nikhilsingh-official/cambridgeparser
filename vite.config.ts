@@ -1,9 +1,33 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import path from 'path'
+import { readFile, writeFile } from 'node:fs/promises'
+// build crawler-readable heads from the exact catalogue used at runtime.
+import { STATIC_SEO_ROUTES, renderSeoDocument, resolveSeoMetadata } from './src/lib/seo'
+
+// Vue remains a client-rendered application, but crawlers and link-preview
+// bots receive the correct route title, canonical, robots rule, social card,
+// and JSON-LD before JavaScript runs.
+function staticSeoDocuments() {
+  return {
+    name: 'cambridgeparser-static-seo-documents',
+    apply: 'build' as const,
+    enforce: 'post' as const,
+    async closeBundle() {
+      const outputDirectory = path.resolve(__dirname, 'dist')
+      const template = await readFile(path.join(outputDirectory, 'index.html'), 'utf8')
+
+      await Promise.all(STATIC_SEO_ROUTES.map(async route => {
+        const seo = resolveSeoMetadata(route.page, route.routePath)
+        const html = renderSeoDocument(template, seo)
+        await writeFile(path.join(outputDirectory, route.outputFile), html)
+      }))
+    },
+  }
+}
 
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [vue(), staticSeoDocuments()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src')

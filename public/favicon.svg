@@ -1,10 +1,40 @@
 <!-- ========================================================================
 
-     Compact CambridgeParser book-and-code mark for browser tabs.
+     Browser-tab rendering of the CambridgeParser document-and-branch logo.
      ======================================================================== -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect x="3" y="3" width="58" height="58" rx="10" fill="none" stroke="currentColor" stroke-width="4" />
-  <path d="M16 17h11c4 0 7 3 7 7v25c-2-3-5-5-9-5h-9V17Z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="4" />
-  <path d="M48 17H37c-2 0-3 1-3 3v29c2-3 5-5 9-5h5V17Z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="4" />
-  <path d="m40 27-4 4 4 4m5-8 4 4-4 4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="48 40 536 400" role="img" aria-labelledby="favicon-title">
+  <title id="favicon-title">CambridgeParser</title>
+
+  <g fill="none" stroke="#112645" stroke-linecap="square" stroke-linejoin="miter" stroke-width="16">
+    <path d="M72 64h174l60 60v232l-60 60H72Z" />
+    <path d="M246 64v60h60" fill="#8495a5" />
+    <path d="M246 416v-60h60" fill="#8495a5" />
+
+    <path d="M108 132h88" />
+    <path d="M108 168h138" />
+    <path d="M108 204h138" />
+    <path d="M108 240h138" />
+    <path d="M108 276h138" />
+    <path d="M108 312h138" />
+    <path d="M108 348h88" />
+
+    <path d="M306 240h100" />
+    <path d="m316 231 58-91h29" />
+    <path d="m316 249 58 91h29" />
+    <path d="M424 106h-24v68h24" />
+    <path d="M424 306h-24v68h24" />
+    <path d="M442 106h62" />
+    <path d="m406 240 52-54h46" />
+    <path d="M442 374h62" />
+    <path d="M470 326h14m-14 28h14" stroke="#45a486" />
+    <path d="M500 340h68" />
+  </g>
+
+  <g fill="#45a486" stroke="#112645" stroke-width="16">
+    <circle cx="306" cy="240" r="20" />
+    <circle cx="406" cy="240" r="20" />
+    <circle cx="530" cy="106" r="20" />
+    <circle cx="530" cy="186" r="20" />
+    <circle cx="530" cy="374" r="20" />
+  </g>
 </svg>

@@ -44,8 +44,16 @@ resources/legacy/
 *.jpeg
 *.tif
 *.tiff
-!src/website/frontend/public/resources/images/
-!src/website/frontend/public/resources/images/*.png
+# these are runtime IDE assets now that the former frontend was merged at
+# the repository root. The old src/website/frontend exception matched nothing.
+!public/resources/images/
+!public/resources/images/*.png
+# deployable browser/search assets generated from the transparent vector.
+!public/favicon-32x32.png
+!public/apple-touch-icon.png
+!public/icon-192.png
+!public/icon-512.png
+!public/og-image.png
 !docs/reference/
 !docs/reference/*.png
 

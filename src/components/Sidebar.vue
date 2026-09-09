@@ -22,7 +22,8 @@ async function handleLogout() {
             <div class="sidebar-group">
                 <li class="sidebar-item">
                     <div class="sidebar-icon sidebar-header-icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="35" height="35" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-layout-dashboard-icon lucide-layout-dashboard"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+                        <!-- use the product mark, not a duplicate dashboard icon. -->
+                        <img class="sidebar-logo" src="/cambridgeparser_logo.svg" alt="">
                     </div>
                     <h1 class="sidebar-text sidebar-header-text">CambridgeParser</h1>
                 </li>
@@ -211,6 +212,9 @@ async function handleLogout() {
           white-space: nowrap;
           transition: opacity 0.2s ease;
           color: $text;
+          /* flex children default to min-width:auto, which let the brand
+             escape the expanded rail instead of fitting inside it. */
+          min-width: 0;
         }
       }
       /* placeholders no longer advertise an action they cannot perform. */
@@ -223,11 +227,33 @@ async function handleLogout() {
       .sidebar-header-icon {
         justify-content: center;
       }
+
+      /* the transparent public logo is the single sidebar brand asset. */
+      .sidebar-logo {
+        display: block;
+        width: 35px;
+        height: 35px;
+        object-fit: contain;
+        flex: 0 0 auto;
+        padding: 3px;
+        border-radius: 6px;
+        background: var(--paper);
+      }
+
+      /* h1's browser default was 2em (261px in the measured layout), too
+         wide for the 15vw hover rail. The brand should read like navigation. */
+      .sidebar-header-text {
+        overflow: hidden;
+        font-size: 1rem;
+        font-weight: 600;
+        text-overflow: ellipsis;
+      }
     }
   }
 
   &:hover {
-    width: 15vw;
+    /* a wordmark needs a content-based floor on ordinary laptop widths. */
+    width: clamp(15rem, 18vw, 18rem);
     .sidebar-label,
     .sidebar-text {
       opacity: 1 !important;

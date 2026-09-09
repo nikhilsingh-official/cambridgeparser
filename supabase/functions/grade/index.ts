@@ -9,8 +9,10 @@ import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2.84.0';
 import { gradeTrustedRecord, RESULT_SCHEMA_VERSION } from './grading.ts';
 // import the application's committed corpus into the Edge bundle. This is
-// one source of records for both the browser and grader, not a runtime fetch.
-import gradingCorpus from '../../../public/resources/pseudocode_question_records.json' with { type: 'json' };
+// the browser corpus intentionally omits answers so opening DevTools cannot
+// reveal a mark scheme before submission. The Edge Function ships its own
+// trusted copy containing the official answer and extracted marking points.
+import gradingCorpus from './pseudocode_question_records.json' with { type: 'json' };
 
 const MAX_REQUEST_BYTES = 256_000;
 const MAX_SOURCE_CHARS = 20_000;

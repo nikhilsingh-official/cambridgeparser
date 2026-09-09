@@ -1004,6 +1004,59 @@ export interface RecentActivity {
   accuracy: Movement;
 }
 
+// the dashboard preview needs the shape of recent activity, not only the
+// two seven-day totals above. Keeping this aggregation beside recentActivity
+// makes "a day" and "accuracy" mean the same thing in both displays.
+export interface DailyActivitySeries {
+  dates: string[];
+  papers: number[];
+  questions: number[];
+  timeMs: number[];
+  /** Mean marked-paper accuracy for each day; null means no marked paper. */
+  accuracy: Array<number | null>;
+}
+
+/** Four daily series used by the dashboard's rotating mini-chart. */
+export function dailyActivitySeries(
+  attempts: DatedAttempt[],
+  today: string,
+  days = MODEL.flags.recentWindowDays * 2,
+): DailyActivitySeries {
+  const length = Math.max(1, Math.floor(days));
+  const todayUtc = Date.parse(`${today}T00:00:00Z`);
+  const dates = Array.from({ length }, (_, index) => (
+    new Date(todayUtc - (length - index - 1) * 86_400_000).toISOString().slice(0, 10)
+  ));
+  const byDate = new Map(dates.map((date, index) => [date, index]));
+  const papers = Array<number>(length).fill(0);
+  const questions = Array<number>(length).fill(0);
+  const timeMs = Array<number>(length).fill(0);
+  const accuracySums = Array<number>(length).fill(0);
+  const accuracyCounts = Array<number>(length).fill(0);
+
+  for (const attempt of attempts) {
+    const index = byDate.get(attempt.local_date);
+    if (index === undefined) continue;
+    papers[index]! += 1;
+    questions[index]! += attempt.questions_recorded ?? 0;
+    timeMs[index]! += attempt.duration_ms ?? 0;
+    if (attempt.accuracy !== null) {
+      accuracySums[index]! += attempt.accuracy;
+      accuracyCounts[index]! += 1;
+    }
+  }
+
+  return {
+    dates,
+    papers,
+    questions,
+    timeMs,
+    accuracy: accuracySums.map((sum, index) => (
+      accuracyCounts[index] ? sum / accuracyCounts[index]! : null
+    )),
+  };
+}
+
 /**
  * The last week against the week before it.
  *

@@ -13,7 +13,7 @@ import {
   daysBetween, isFading, proximity, bandOf, Band, revisionPriority, readiness,
   gradeAt, GRADE_ORDER, thresholdsFor, masteryBar, gradeTone, isPaperCeiling, isTierCapped,
   sessionThresholdsFor, bestThresholds, needsPractice,
-  accuracyTrend, recentActivity, readIde,
+  accuracyTrend, dailyActivitySeries, recentActivity, readIde,
   isGuess, isOverconfident, isUnderconfident, type FlaggableQuestion,
   readTopic, buildQueue, missedQuestions,
   type PracticeRow, type DatedAttempt,
@@ -741,6 +741,25 @@ test('recentActivity treats a missing count as zero, not as NaN', () => {
   assert.equal(r.questions.current, 0);
   assert.equal(r.timeMs.current, 0);
   assert.ok(Number.isFinite(r.questions.delta));
+});
+
+test('dailyActivitySeries returns an oldest-to-newest fourteen-day dashboard window', () => {
+  const series = dailyActivitySeries([
+    att({ local_date: ago(0), accuracy: 0.8, questions_recorded: 20, duration_ms: 120_000 }),
+    att({ local_date: ago(0), accuracy: 0.6, questions_recorded: 10, duration_ms: 60_000 }),
+    att({ local_date: ago(3), accuracy: null, questions_recorded: 5, duration_ms: null }),
+    att({ local_date: ago(14), accuracy: 1, questions_recorded: 99, duration_ms: 99 }),
+  ], TODAY);
+
+  assert.equal(series.dates.length, 14);
+  assert.equal(series.dates.at(-1), TODAY);
+  assert.equal(series.papers.at(-1), 2);
+  assert.equal(series.questions.at(-1), 30);
+  assert.equal(series.timeMs.at(-1), 180_000);
+  assert.equal(series.accuracy.at(-1), 0.7);
+  assert.equal(series.papers.at(-4), 1);
+  assert.equal(series.accuracy.at(-4), null, 'an unmarked paper is not zero accuracy');
+  assert.equal(series.papers[0], 0, 'attempts outside the window are excluded');
 });
 
 // --------------------------------------------------------------------------

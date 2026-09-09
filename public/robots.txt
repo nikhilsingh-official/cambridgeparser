@@ -1,0 +1,5 @@
+# Route-specific noindex directives remain crawlable so search engines can see them.
+User-agent: *
+Allow: /
+
+Sitemap: https://www.cambridgeparser.com/sitemap.xml

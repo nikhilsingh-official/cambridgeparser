@@ -2,14 +2,45 @@
 <html lang="en" data-theme-storage="cambridgeparser-theme">
   <head>
     <meta charset="UTF-8" />
-    <!-- CambridgeParser's own mark replaces the removed Vite starter icon. -->
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- one transparent brand mark across tabs, installed apps, and search. -->
+    <link rel="icon" type="image/svg+xml" href="/cambridgeparser_logo.svg" sizes="any" />
+    <link rel="alternate icon" type="image/png" href="/favicon-32x32.png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
+    <link rel="manifest" href="/site.webmanifest" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- describes the unified paper, pseudocode, and progress platform. -->
+    <meta name="application-name" content="CambridgeParser" />
+    <meta name="apple-mobile-web-app-title" content="CambridgeParser" />
+    <meta name="color-scheme" content="dark light" />
+
+    <!-- landing defaults are replaced from the same catalogue for every route. -->
     <meta
       name="description"
-      content="Practise Cambridge past papers and pseudocode, then use evidence from every attempt to decide what to study next."
+      content="Practise Cambridge International past papers and pseudocode in one workspace, with automatic marking, study analytics, and progress tracking."
     />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <link rel="canonical" href="https://www.cambridgeparser.com/" />
+
+    <!-- static social metadata is crawler-readable without running Vue. -->
+    <meta property="og:site_name" content="CambridgeParser" />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="en_GB" />
+    <meta property="og:title" content="CambridgeParser | Past Papers &amp; Pseudocode IDE" />
+    <meta property="og:description" content="Practise Cambridge International past papers and pseudocode in one workspace, with automatic marking, study analytics, and progress tracking." />
+    <meta property="og:url" content="https://www.cambridgeparser.com/" />
+    <meta property="og:image" content="https://www.cambridgeparser.com/og-image.png" />
+    <meta property="og:image:secure_url" content="https://www.cambridgeparser.com/og-image.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="CambridgeParser document and structured-data logo beside the product name." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="CambridgeParser | Past Papers &amp; Pseudocode IDE" />
+    <meta name="twitter:description" content="Practise Cambridge International past papers and pseudocode in one workspace, with automatic marking, study analytics, and progress tracking." />
+    <meta name="twitter:image" content="https://www.cambridgeparser.com/og-image.png" />
+    <meta name="twitter:image:alt" content="CambridgeParser document and structured-data logo beside the product name." />
+
+    <!-- truthful schema only; no fabricated ratings, price, or affiliation. -->
+    <script id="seo-structured-data" type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebSite","@id":"https://www.cambridgeparser.com/#website","url":"https://www.cambridgeparser.com/","name":"CambridgeParser","description":"Practise Cambridge International past papers and pseudocode in one workspace, with automatic marking, study analytics, and progress tracking.","inLanguage":"en","image":"https://www.cambridgeparser.com/og-image.png"},{"@type":"WebApplication","@id":"https://www.cambridgeparser.com/#webapp","name":"CambridgeParser","url":"https://www.cambridgeparser.com/","description":"Practise Cambridge International past papers and pseudocode in one workspace, with automatic marking, study analytics, and progress tracking.","applicationCategory":"EducationalApplication","operatingSystem":"Any","browserRequirements":"Requires JavaScript and a modern web browser.","educationalUse":["assessment","practice","self study"],"audience":{"@type":"EducationalAudience","educationalRole":"student"},"image":"https://www.cambridgeparser.com/og-image.png","isPartOf":{"@id":"https://www.cambridgeparser.com/#website"}}]}</script>
     <meta name="theme-color" content="#171717" />
 
     <!-- runs before CSS paints so there is no wrong-theme flash. The app's
@@ -50,8 +81,8 @@
     />
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
-    <!-- keeps the product name first while communicating its wider scope. -->
-    <title>CambridgeParser — Papers, Pseudocode &amp; Progress</title>
+    <!-- concise, descriptive, and aligned with the visible landing-page H1. -->
+    <title>CambridgeParser | Past Papers &amp; Pseudocode IDE</title>
   </head>
   <body>
     <div id="app"></div>
