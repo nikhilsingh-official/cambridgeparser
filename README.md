@@ -243,7 +243,7 @@ npm run build
 ```
 
 <!-- keep the documented count aligned with the corpus and SEO tests. -->
-The current Node suite contains 156 assertions/tests across `tests/**/*.test.ts`
+The current Node suite contains 158 assertions/tests across `tests/**/*.test.ts`
 and `tests/**/*.test.mjs`. The build repeats the type check before Vite bundles
 the application.
 

@@ -23,7 +23,8 @@ test('every IDE screenshot referenced by a layout is a real PNG asset', async ()
       .filter(Boolean)
   ));
 
-  assert.equal(new Set(references).size, 325);
+  // the 39-question 0478 import adds 76 question/context renders.
+  assert.equal(new Set(references).size, 401);
   for (const reference of references) {
     const bytes = await readFile(path.join(root, 'public/resources', reference));
     assert.equal(bytes.subarray(1, 4).toString('ascii'), 'PNG', reference);
@@ -32,22 +33,47 @@ test('every IDE screenshot referenced by a layout is a real PNG asset', async ()
 
 test('the Edge Function corpus retains trusted answers and structured rubrics', async () => {
   const payload = await readJson('supabase/functions/grade/pseudocode_question_records.json');
-  assert.equal(payload.records.length, 176);
+  // 176 AS/A Level records plus 39 unique IGCSE records.
+  assert.equal(payload.records.length, 215);
   assert.equal(
     payload.records.filter(record => record.mark_scheme?.answer_text?.trim()).length,
-    176,
+    215,
     'every grading record needs examiner-answer text',
   );
   assert.equal(
     payload.records.filter(record => record.mark_scheme?.marking_points?.length).length,
-    176,
+    215,
   );
   assert.ok(payload.records.every(record => Number.isInteger(record.mark_scheme?.max_marks)));
+  // generated reporting metadata must agree with the discarded rows it
+  // summarizes, even though those rows are not used by the runtime grader.
+  const discardReasons = (payload.discarded || []).reduce((counts, record) => {
+    counts[record.reason] = (counts[record.reason] || 0) + 1;
+    return counts;
+  }, {});
+  assert.deepEqual(payload.summary?.discard_reasons, discardReasons);
 });
 
 test('the browser corpus does not expose mark-scheme answers before submission', async () => {
   const payload = await readJson('public/resources/pseudocode_question_records.json');
-  assert.equal(payload.records.length, 176);
+  assert.equal(payload.records.length, 215);
   assert.ok(payload.records.every(record => !record.mark_scheme?.answer_text));
   assert.ok(payload.records.every(record => !record.mark_scheme?.marking_points));
+  // pin the syllabus-level outcome so a later corpus rebuild cannot
+  // silently drop the newly extracted IGCSE records.
+  assert.equal(
+    payload.records.filter(record => record.paper_code?.startsWith('0478_')).length,
+    39,
+  );
+  // IGCSE tags must cite 0478 Topics 7–8, never 9618 sections 9–12.
+  const igcseTags = payload.records
+    .filter(record => record.paper_code?.startsWith('0478_'))
+    .flatMap(record => record.syllabus_tags || []);
+  assert.ok(igcseTags.length > 0);
+  assert.ok(igcseTags.every(tag => ['7', '8'].includes(tag.section)));
+  assert.ok(igcseTags.every(tag => tag.syllabus_ref.startsWith(`${tag.section}.`)));
+  assert.ok(igcseTags.every(tag => (
+    tag.section_label === 'Algorithm design and problem-solving'
+      || tag.section_label === 'Programming'
+  )));
 });

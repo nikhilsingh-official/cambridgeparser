@@ -270,9 +270,27 @@ onUnmounted(() => clearInterval(timer))
   font-size: 0.68rem;
 }
 
-/* reveal the graph with the same rotating-card transition as its labels. */
-.inactive :deep(.mini-trend) { opacity: 0; }
-.active :deep(.mini-trend) { opacity: 1; transition: opacity 0.35s 0.5s ease; }
+/* every card keeps its trend visible. Inactive cards reserve the bottom
+   label band and render a compact sparkline; only the active card expands to
+   the full chart with its date labels. */
+.inactive :deep(.mini-trend) {
+  inset: 0.4rem 0.55rem calc(30px + 0.4rem);
+  opacity: 1;
+  transition: inset 1s ease-in-out;
+}
+
+.active :deep(.mini-trend) {
+  inset: 3.4rem 1rem 1rem;
+  opacity: 1;
+  transition: inset 1s ease-in-out;
+}
+
+/* compact cards have too little vertical space for axis captions or the
+   no-data sentence; the graph itself remains visible in every state. */
+.inactive :deep(.mini-trend > small),
+.inactive :deep(.mini-trend > span) {
+  display: none;
+}
 
 .label {
   position: absolute;
