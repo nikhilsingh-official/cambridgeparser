@@ -23,8 +23,9 @@ test('every IDE screenshot referenced by a layout is a real PNG asset', async ()
       .filter(Boolean)
   ));
 
-  // the 39-question 0478 import adds 76 question/context renders.
-  assert.equal(new Set(references).size, 401);
+  // all 381 canonical questions now have a rendered question image, with
+  // context renders for every sub-question that needs its parent prompt.
+  assert.equal(new Set(references).size, 698);
   for (const reference of references) {
     const bytes = await readFile(path.join(root, 'public/resources', reference));
     assert.equal(bytes.subarray(1, 4).toString('ascii'), 'PNG', reference);
@@ -33,16 +34,16 @@ test('every IDE screenshot referenced by a layout is a real PNG asset', async ()
 
 test('the Edge Function corpus retains trusted answers and structured rubrics', async () => {
   const payload = await readJson('supabase/functions/grade/pseudocode_question_records.json');
-  // 176 AS/A Level records plus 39 unique IGCSE records.
-  assert.equal(payload.records.length, 215);
+  // 176 AS/A Level records plus 205 unique IGCSE records.
+  assert.equal(payload.records.length, 381);
   assert.equal(
     payload.records.filter(record => record.mark_scheme?.answer_text?.trim()).length,
-    215,
+    381,
     'every grading record needs examiner-answer text',
   );
   assert.equal(
     payload.records.filter(record => record.mark_scheme?.marking_points?.length).length,
-    215,
+    381,
   );
   assert.ok(payload.records.every(record => Number.isInteger(record.mark_scheme?.max_marks)));
   // generated reporting metadata must agree with the discarded rows it
@@ -52,18 +53,30 @@ test('the Edge Function corpus retains trusted answers and structured rubrics', 
     return counts;
   }, {});
   assert.deepEqual(payload.summary?.discard_reasons, discardReasons);
+  // canonical records originate in 65 IGCSE papers; duplicate provenance
+  // retains the four variants whose questions were wholly duplicated, proving
+  // that all 69 valid 0478 papers were processed rather than silently skipped.
+  const igcseRecords = payload.records.filter(record => record.paper_code?.startsWith('0478_'));
+  const igcseSourcePapers = new Set(igcseRecords.map(record => record.paper_code));
+  for (const record of igcseRecords) {
+    for (const duplicate of record.provenance?.duplicate_sources || []) {
+      if (duplicate.paper_code?.startsWith('0478_')) igcseSourcePapers.add(duplicate.paper_code);
+    }
+  }
+  assert.equal(igcseRecords.length, 205);
+  assert.equal(igcseSourcePapers.size, 69);
 });
 
 test('the browser corpus does not expose mark-scheme answers before submission', async () => {
   const payload = await readJson('public/resources/pseudocode_question_records.json');
-  assert.equal(payload.records.length, 215);
+  assert.equal(payload.records.length, 381);
   assert.ok(payload.records.every(record => !record.mark_scheme?.answer_text));
   assert.ok(payload.records.every(record => !record.mark_scheme?.marking_points));
   // pin the syllabus-level outcome so a later corpus rebuild cannot
   // silently drop the newly extracted IGCSE records.
   assert.equal(
     payload.records.filter(record => record.paper_code?.startsWith('0478_')).length,
-    39,
+    205,
   );
   // IGCSE tags must cite 0478 Topics 7–8, never 9618 sections 9–12.
   const igcseTags = payload.records

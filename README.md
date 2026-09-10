@@ -24,9 +24,9 @@ deployed, routed, or authenticated as separate sites.
   result review, and persisted attempts.
 - Dashboard and statistics views backed by real attempt, topic, focus-area,
   recommendation, and IDE-submission data.
-- A searchable Cambridge 9618 pseudocode question corpus with tag filtering,
-  direct question links, editor source persistence, formatting, and a WASM
-  parser that reports syntax diagnostics.
+- A searchable Cambridge 0478, 9608, and 9618 pseudocode question corpus with
+  tag filtering, direct question links, editor source persistence, formatting,
+  and a WASM parser that reports syntax diagnostics.
 - Fill-in-the-blank and free-form IDE questions with authenticated AI grading,
   trusted server-side mark schemes, daily quota enforcement, and progress
   recording.
