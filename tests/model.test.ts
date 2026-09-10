@@ -1,3 +1,4 @@
+// Tests for src/lib/stats/model.ts - the metric model.
 //
 // This file exists because model.ts makes CLAIMS ABOUT A STUDENT. A chart that
 // renders wrong looks wrong; a mastery estimate that is wrong looks exactly

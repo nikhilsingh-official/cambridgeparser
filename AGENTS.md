@@ -61,7 +61,8 @@ Concise imperative subjects, optionally scoped — `stats: build the page`,
 `auth: move the IDE to Supabase`. Explain *why* in the body, and state what was
 verified and what was not.
 
-Do not add authorship-attribution headers or inline authorship markers to generated or edited files.
+Do not add authorship-attribution headers or inline authorship markers to
+generated or edited files.
 
 ## Security & Configuration Tips
 

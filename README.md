@@ -395,4 +395,3 @@ same-named union type instead of `enum` (see `src/lib/types/enums.ts`).
 
 All theme colors come from tokens in `src/styles/themes.scss`; do not define
 tokens in `src/styles/ide.css` or hard-code chart palette colors in components.
-hand-written files require an `` comment.

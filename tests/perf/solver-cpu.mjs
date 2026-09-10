@@ -1,4 +1,5 @@
 // ==========================================================================
+// NOT part of `npm test` - it needs a browser, a running
 // dev server and a live Supabase.
 //
 // This is the regression check for the MutationObserver feedback loop that

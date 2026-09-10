@@ -1,4 +1,5 @@
 // ==========================================================================
+// Generated file - do not edit by hand.
 //
 // Cambridge grade thresholds, two ways. The source extraction tool is
 // archived outside this repository; review any replacement dataset manually.

@@ -1,3 +1,4 @@
+// Regression test for the MutationObserver feedback loop
 // that pinned the Paper Solver at 100% CPU. Run: npm run test
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
