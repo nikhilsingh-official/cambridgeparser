@@ -1,3 +1,9 @@
+import {
+  PUBLIC_PRODUCT_CONTENT,
+  renderPublicContent,
+  type PublicContentPageKey,
+} from './publicSeoContent.ts';
+
 // ============================================================================
 //
 // One metadata catalogue for runtime navigation and build-time crawler HTML.
@@ -14,9 +20,29 @@ type SeoPageDefinition = {
 
 export const SEO_PAGES = {
   landing: {
-    title: 'CambridgeParser | Past Papers & Pseudocode IDE',
-    description: 'Practise Cambridge International past papers and pseudocode in one workspace, with automatic marking, study analytics, and progress tracking.',
+    title: 'Cambridge Past Paper Solver & Pseudocode IDE',
+    description: PUBLIC_PRODUCT_CONTENT.landing.summary,
     canonicalPath: '/',
+  },
+  pastPaperSolver: {
+    title: 'Cambridge Past Paper Solver | CambridgeParser',
+    description: PUBLIC_PRODUCT_CONTENT.pastPaperSolver.summary,
+    canonicalPath: '/cambridge-past-paper-solver',
+  },
+  pseudocodeIde: {
+    title: 'Cambridge Pseudocode IDE | CambridgeParser',
+    description: PUBLIC_PRODUCT_CONTENT.pseudocodeIde.summary,
+    canonicalPath: '/cambridge-pseudocode-ide',
+  },
+  igcsePseudocode: {
+    title: 'IGCSE Computer Science Pseudocode | CambridgeParser',
+    description: PUBLIC_PRODUCT_CONTENT.igcsePseudocode.summary,
+    canonicalPath: '/igcse-computer-science-pseudocode',
+  },
+  aLevelPseudocode: {
+    title: 'A Level Computer Science Pseudocode | CambridgeParser',
+    description: PUBLIC_PRODUCT_CONTENT.aLevelPseudocode.summary,
+    canonicalPath: '/a-level-computer-science-pseudocode',
   },
   login: {
     title: 'Sign In | CambridgeParser',
@@ -89,6 +115,10 @@ export type SeoPageKey = keyof typeof SEO_PAGES;
 
 export const INDEXABLE_SEO_PAGES: ReadonlySet<SeoPageKey> = new Set([
   'landing',
+  'pastPaperSolver',
+  'pseudocodeIde',
+  'igcsePseudocode',
+  'aLevelPseudocode',
   'privacy',
   'terms',
   'dataDeletion',
@@ -100,6 +130,10 @@ export const STATIC_SEO_ROUTES: ReadonlyArray<{
   outputFile: string;
 }> = [
   { page: 'landing', routePath: '/', outputFile: 'index.html' },
+  { page: 'pastPaperSolver', routePath: '/cambridge-past-paper-solver', outputFile: 'cambridge-past-paper-solver.html' },
+  { page: 'pseudocodeIde', routePath: '/cambridge-pseudocode-ide', outputFile: 'cambridge-pseudocode-ide.html' },
+  { page: 'igcsePseudocode', routePath: '/igcse-computer-science-pseudocode', outputFile: 'igcse-computer-science-pseudocode.html' },
+  { page: 'aLevelPseudocode', routePath: '/a-level-computer-science-pseudocode', outputFile: 'a-level-computer-science-pseudocode.html' },
   { page: 'login', routePath: '/login', outputFile: 'login.html' },
   { page: 'resetPassword', routePath: '/reset-password', outputFile: 'reset-password.html' },
   { page: 'privacy', routePath: '/privacy', outputFile: 'privacy.html' },
@@ -123,6 +157,28 @@ export type ResolvedSeoMetadata = {
   imageUrl: string;
   imageAlt: string;
   structuredData: Record<string, unknown> | null;
+  prerenderedBodyHtml: string | null;
+};
+
+function isPublicContentPage(page: SeoPageKey): page is PublicContentPageKey {
+  return page in PUBLIC_PRODUCT_CONTENT;
+}
+
+const PUBLIC_POLICY_HEADINGS: Partial<Record<SeoPageKey, string>> = {
+  privacy: 'Privacy Policy',
+  terms: 'Terms and Conditions',
+  dataDeletion: 'Data Deletion',
+};
+
+const DATE_MODIFIED_BY_PAGE: Partial<Record<SeoPageKey, string>> = {
+  landing: '2026-09-11',
+  pastPaperSolver: '2026-09-11',
+  pseudocodeIde: '2026-09-11',
+  igcsePseudocode: '2026-09-11',
+  aLevelPseudocode: '2026-09-11',
+  privacy: '2026-09-11',
+  terms: '2026-09-09',
+  dataDeletion: '2026-09-09',
 };
 
 function cleanRoutePath(path: string): string {
@@ -149,6 +205,7 @@ function structuredDataFor(
           '@id': websiteId,
           url: `${SEO_ORIGIN}/`,
           name: 'CambridgeParser',
+          alternateName: 'cambridgeparser.com',
           description,
           inLanguage: 'en',
           image: SEO_IMAGE_URL,
@@ -181,7 +238,7 @@ function structuredDataFor(
     description,
     url: canonicalUrl,
     inLanguage: 'en',
-    dateModified: '2026-09-09',
+    dateModified: DATE_MODIFIED_BY_PAGE[page] ?? '2026-09-09',
     isPartOf: {
       '@type': 'WebSite',
       '@id': websiteId,
@@ -218,6 +275,11 @@ export function resolveSeoMetadata(
     imageUrl: SEO_IMAGE_URL,
     imageAlt: 'CambridgeParser document and structured-data logo beside the product name.',
     structuredData: structuredDataFor(page, title, definition.description, canonicalUrl),
+    prerenderedBodyHtml: isPublicContentPage(page)
+      ? renderPublicContent(page)
+      : isIndexable
+        ? `<main class="seo-prerender"><article><h1>${escapeHtml(PUBLIC_POLICY_HEADINGS[page] ?? title)}</h1><p>${escapeHtml(definition.description)}</p><p><a href="/">Return to CambridgeParser</a></p></article></main>`
+        : null,
   };
 }
 
@@ -259,10 +321,22 @@ export function renderSeoDocument(html: string, seo: ResolvedSeoMetadata): strin
   rendered = replaceAttributeTag(rendered, 'name', 'twitter:image:alt', 'content', seo.imageAlt);
 
   const scriptPattern = /\s*<script id="seo-structured-data" type="application\/ld\+json">[\s\S]*?<\/script>/i;
-  if (!seo.structuredData) return rendered.replace(scriptPattern, '');
-  const json = JSON.stringify(seo.structuredData).replace(/</g, '\\u003c');
-  return rendered.replace(
-    scriptPattern,
-    `\n    <script id="seo-structured-data" type="application/ld+json">${json}</script>`,
-  );
+  if (!seo.structuredData) {
+    rendered = rendered.replace(scriptPattern, '');
+  } else {
+    const json = JSON.stringify(seo.structuredData).replace(/</g, '\\u003c');
+    rendered = rendered.replace(
+      scriptPattern,
+      `\n    <script id="seo-structured-data" type="application/ld+json">${json}</script>`,
+    );
+  }
+
+  if (seo.prerenderedBodyHtml) {
+    rendered = rendered.replace(
+      /<div\s+id="app"\s*><\/div>/i,
+      `<div id="app">${seo.prerenderedBodyHtml}</div>`,
+    );
+  }
+
+  return rendered;
 }

@@ -27,6 +27,9 @@ import {
   TrendingUp,
 } from 'lucide-vue-next';
 import ThemeSwitcher from '@/components/ThemeSwitcher.vue';
+import { PUBLIC_PRODUCT_CONTENT } from '@/lib/publicSeoContent';
+
+const landingContent = PUBLIC_PRODUCT_CONTENT.landing;
 
 const productAreas = [
   {
@@ -37,7 +40,10 @@ const productAreas = [
     description:
       'Work directly on the original PDF with a timer, question navigation, option elimination, flags, and a locked review after you finish.',
     points: ['Original paper layout', 'Question-by-question controls', 'Persisted attempts'],
-    links: [{ to: '/browser', label: 'Browse papers' }],
+    links: [
+      { to: '/cambridge-past-paper-solver', label: 'Explore the solver' },
+      { to: '/browser', label: 'Browse papers' },
+    ],
   },
   {
     index: '02',
@@ -55,11 +61,11 @@ const productAreas = [
     eyebrow: 'Pseudocode lab',
     title: 'Practice Paper 2 with exam-level discipline.',
     description:
-      'Learn core syllabus techniques, search the 9618 question corpus, write or complete pseudocode, and receive feedback against the real rubric.',
+      'Search 0478, 9608, and 9618 exam questions, write or complete pseudocode, and receive feedback against the question-specific rubric.',
     points: ['Guided syllabus lessons', 'Searchable question corpus', 'WASM parser diagnostics', 'Rubric-grounded grading'],
     links: [
+      { to: '/cambridge-pseudocode-ide', label: 'Explore the IDE' },
       { to: '/problems', label: 'Explore problems' },
-      { to: '/learn', label: 'Learn a topic' },
     ],
   },
 ];
@@ -105,9 +111,9 @@ const workflow = [
       </RouterLink>
 
       <div class="nav-links" aria-label="Page sections">
-        <a href="#platform">Platform</a>
+        <RouterLink to="/cambridge-past-paper-solver">Past paper solver</RouterLink>
+        <RouterLink to="/cambridge-pseudocode-ide">Pseudocode IDE</RouterLink>
         <a href="#workflow">How it works</a>
-        <a href="#insights">Insights</a>
       </div>
 
       <div class="nav-actions">
@@ -123,13 +129,10 @@ const workflow = [
         <div class="hero-copy">
           <p class="eyebrow"><Sparkles /> One workspace for Cambridge revision</p>
           <h1 id="hero-title">
-            Study the paper.<br />
-            <span>Understand the pattern.</span>
+            Cambridge past paper solver<br />
+            <span>and pseudocode IDE</span>
           </h1>
-          <p class="hero-lede">
-            Sit real MCQ papers, practise 9618 pseudocode, and turn both into a
-            clear picture of what to work on next.
-          </p>
+          <p class="hero-lede">{{ landingContent.summary }}</p>
 
           <div class="hero-actions">
             <RouterLink class="button button-primary" to="/login">
@@ -283,7 +286,7 @@ const workflow = [
               <li><CircleCheck /> Review answers against the marking scheme</li>
               <li><CircleCheck /> Attempts persist into dashboard and stats</li>
             </ul>
-            <RouterLink class="text-link" to="/browser">Find a paper <ArrowRight /></RouterLink>
+            <RouterLink class="text-link" to="/cambridge-past-paper-solver">Explore the solver <ArrowRight /></RouterLink>
           </div>
 
           <div class="paper-stack" aria-hidden="true">
@@ -347,7 +350,7 @@ const workflow = [
               <li><CircleCheck /> Local parser feedback without a server round trip</li>
               <li><CircleCheck /> Marking points shown beside the response</li>
             </ul>
-            <RouterLink class="text-link" to="/problems">Open the problem set <ArrowRight /></RouterLink>
+            <RouterLink class="text-link" to="/cambridge-pseudocode-ide">Explore the pseudocode IDE <ArrowRight /></RouterLink>
           </div>
         </article>
       </section>
@@ -405,7 +408,16 @@ const workflow = [
         <span>CambridgeParser</span>
       </RouterLink>
       <div class="footer-middle">
-        <p>Past-paper practice and pseudocode in one focused workspace.</p>
+        <p>
+          Independent study software for past-paper and pseudocode practice.
+          Not affiliated with or endorsed by Cambridge International Education.
+        </p>
+        <nav aria-label="Product links">
+          <RouterLink to="/cambridge-past-paper-solver">Past paper solver</RouterLink>
+          <RouterLink to="/cambridge-pseudocode-ide">Pseudocode IDE</RouterLink>
+          <RouterLink to="/igcse-computer-science-pseudocode">IGCSE pseudocode</RouterLink>
+          <RouterLink to="/a-level-computer-science-pseudocode">AS &amp; A Level pseudocode</RouterLink>
+        </nav>
         <nav aria-label="Legal links">
           <RouterLink to="/privacy">Privacy Policy</RouterLink>
           <RouterLink to="/terms">Terms and Conditions</RouterLink>
@@ -570,7 +582,7 @@ const workflow = [
   max-width: 46rem;
   margin: 0;
   font-family: var(--font-display);
-  font-size: clamp(3.5rem, 6.4vw, 6.7rem);
+  font-size: clamp(3.2rem, 5vw, 5.4rem);
   font-weight: 560;
   letter-spacing: -0.065em;
   line-height: 0.93;

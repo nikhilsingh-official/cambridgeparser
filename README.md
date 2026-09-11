@@ -304,8 +304,8 @@ refresh/back navigation, console/network errors, and narrow-screen layouts.
 
 <!-- Vercel's typed configuration supersedes the former static JSON file. -->
 `npm run build` creates `dist/`. `vercel.ts` applies security/cache headers,
-serves generated route-specific metadata documents for known paths, and keeps
-an `index.html` catch-all so history-mode deep links work.
+serves generated route-specific HTML documents for known paths, preserves
+explicit history-mode deep links, and lets unknown URLs return the custom 404.
 
 A complete deployment has two independently deployed parts:
 

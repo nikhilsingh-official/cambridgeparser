@@ -17,6 +17,10 @@ const noIndex = [
 ];
 
 const metadataDocuments = [
+  ['/cambridge-past-paper-solver', '/cambridge-past-paper-solver.html'],
+  ['/cambridge-pseudocode-ide', '/cambridge-pseudocode-ide.html'],
+  ['/igcse-computer-science-pseudocode', '/igcse-computer-science-pseudocode.html'],
+  ['/a-level-computer-science-pseudocode', '/a-level-computer-science-pseudocode.html'],
   ['/login', '/login.html'],
   ['/reset-password', '/reset-password.html'],
   ['/privacy', '/privacy.html'],
@@ -36,6 +40,7 @@ export const config = {
   framework: 'vite',
   buildCommand: 'npm run build',
   outputDirectory: 'dist',
+  trailingSlash: false,
   headers: [
     {
       source: '/(.*)',
@@ -59,8 +64,15 @@ export const config = {
       headers: [{ key: 'Cache-Control', value: 'public, max-age=0, s-maxage=3600' }],
     })),
   ],
+  redirects: [
+    {
+      source: '/(.*)',
+      has: [{ type: 'host', value: 'cambridgeparser.vercel.app' }],
+      destination: 'https://www.cambridgeparser.com/$1',
+      permanent: true,
+    },
+  ],
   rewrites: [
     ...metadataDocuments.map(([source, destination]) => ({ source, destination })),
-    { source: '/(.*)', destination: '/index.html' },
   ],
 };

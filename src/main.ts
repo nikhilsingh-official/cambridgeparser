@@ -7,6 +7,7 @@ import { useAuthStore } from "@/stores/useAuth";
 // through main.scss because vite injects main.scss into every component's
 // <style> block - see the header comment in themes.scss.
 import "@/styles/themes.scss";
+import "@/styles/public-seo.scss";
 // the Cambridge IDE's component styles and the mono face it ships. Both
 // came from that app's own entrypoint when it was a separate site; themes.scss
 // stays first so its tokens are defined before ide.css reads them.

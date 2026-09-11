@@ -1,219 +1,194 @@
-<!-- =========================================================================
+# SEO release and growth runbook
 
-     Production SEO deployment and search-console runbook for
-     cambridgeparser.com. Reviewed against first-party documentation on
-     2026-09-09.
-     ========================================================================= -->
+Reviewed against Google Search Central, Search Console, and Vercel documentation
+on 2026-09-11. These steps improve discovery and search clarity; none guarantees
+indexing or a particular ranking.
 
-# SEO deployment and console setup
+## What the application now does
 
-This is an implementation and release checklist, not a promise of placement or
-ranking. Google explicitly says that meeting its requirements, submitting a
-sitemap, or requesting indexing does not guarantee crawling, indexing, or a
-particular result appearance ([Search Essentials](https://developers.google.com/search/docs/essentials),
-[recrawl guidance](https://developers.google.com/search/docs/crawling-indexing/ask-google-to-recrawl)).
+The production build generates crawler-readable HTML for these canonical,
+indexable routes:
 
-## Canonical and indexable surface
+- `/`
+- `/cambridge-past-paper-solver`
+- `/cambridge-pseudocode-ide`
+- `/igcse-computer-science-pseudocode`
+- `/a-level-computer-science-pseudocode`
+- `/privacy`, `/terms`, and `/data-deletion`
 
-Use `https://www.cambridgeparser.com` as the one production origin. In Vercel,
-assign both the apex and `www` domains to the project, make `www` primary, and
-configure a permanent apex-to-`www` redirect. Vercel recommends `www` as the
-primary host and documents the project-domain redirect; Google treats redirects
-and `rel="canonical"` as stronger canonical signals than sitemap inclusion
-([Vercel domain redirects](https://vercel.com/docs/domains/working-with-domains/deploying-and-redirecting),
-[Google canonicalization](https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls)).
+The five product pages include an H1, opening copy, useful sections, CTAs, and
+ordinary `<a href>` internal links in the initial HTML. They do not depend on
+Google's JavaScript rendering stage for their main meaning. The content is
+generated from `src/lib/publicSeoContent.ts`, which also supplies the rendered
+Vue product pages, so crawler and user copy cannot quietly drift apart. The
+landing page uses the same central summary and search-focused heading in its
+richer Vue layout.
 
-The intended crawl policy is:
+This is build-time static HTML, not server-side rendering. Vue replaces the
+initial markup when the application starts. That is appropriate for stable
+marketing content; authenticated pages remain client-rendered and `noindex`.
+Google can process JavaScript, but static or server-rendered primary content
+removes a separate rendering dependency and works for crawlers that do not run
+JavaScript ([Google JavaScript SEO](https://developers.google.com/search/docs/crawling-indexing/javascript/javascript-seo-basics)).
 
-| Route group | Index? | Sitemap? | Reason |
-|---|---:|---:|---|
-| `/` | Yes | Yes | Public product landing page |
-| `/privacy`, `/terms`, `/data-deletion` | Yes | Yes | Public, stable policy pages that support provider trust |
-| `/login`, `/reset-password` | No | No | Transactional/account screens with no useful search landing content |
-| `/dashboard`, `/browser`, `/stats`, `/solver/**`, `/problems`, `/ide/**`, `/learn` | No | No | Authenticated application state, not independently crawlable public content |
+The sitemap now contains five product pages and three legal pages. Known app
+deep links have explicit Vercel rewrites; there is no catch-all homepage
+rewrite. An unknown hard URL can therefore return the custom `404.html` with a
+real 404 response instead of a soft 404. The stable
+`cambridgeparser.vercel.app` alias is configured to redirect to the same path
+on `www.cambridgeparser.com`.
 
-Apply a self-referencing canonical to every indexable route. Canonical URLs,
-internal links, Open Graph URLs, and sitemap entries must all use HTTPS, `www`,
-and the same trailing-slash policy. Use `noindex, nofollow` on account recovery
-and authenticated routes. Do not try to hide them only with `robots.txt`:
-Google must be able to crawl a URL to read a page-level `noindex` directive, and
-robots.txt is not an indexing-removal mechanism
-([robots meta specification](https://developers.google.com/search/docs/crawling-indexing/robots-meta-tag),
-[robots.txt introduction](https://developers.google.com/search/docs/crawling-indexing/robots/intro)).
+## Deployment acceptance checks
 
-Return a real HTTP `404` for unknown routes when the hosting architecture makes
-that possible. The current SPA fallback sends `index.html` for every path, so
-its client-side catch-all can otherwise look like a soft 404 to crawlers.
+Run these after the new Vercel deployment is promoted to production:
 
-## Metadata and rendering
-
-Each indexable page should have a distinct, concise `<title>`, one descriptive
-meta description, a single clear visible `<h1>`, a canonical link, and matching
-Open Graph metadata. Google uses titles, headings, prominent content,
-`og:title`, link text, and other signals when creating title links; it may use a
-meta description for the result snippet
-([title-link guidance](https://developers.google.com/search/docs/appearance/title-link),
-[supported meta tags](https://developers.google.com/search/docs/crawling-indexing/special-tags)).
-
-For social previews, provide `og:title`, `og:type=website`, `og:image`, and
-`og:url`; also provide `og:description`, `og:site_name`, and `og:image:alt`.
-Those fields follow the published Open Graph protocol
-([Open Graph protocol](https://ogp.me/)). The preview image should be an absolute
-HTTPS URL, stable, publicly accessible, and large enough to remain legible when
-cropped. Social preview metadata should describe the visible page, not add
-search keywords that are absent from it.
-
-This is a client-rendered Vue SPA. Google can process JavaScript-set titles and
-descriptions, but says canonical information is clearest in the original HTML
-and should not conflict with JavaScript. Social preview fetchers may not execute
-the app at all. Treat build-time prerendering or SSR for the four public route
-groups as the highest-value next architectural SEO improvement; until then,
-keep the source-document fallback metadata accurate and update route metadata
-consistently ([Google JavaScript SEO basics](https://developers.google.com/search/docs/crawling-indexing/javascript/javascript-seo-basics)).
-
-Keep the favicon stable, square, crawlable, and visually representative. Google
-supports common favicon formats, requires at least 8 by 8 pixels, and recommends
-more than 48 by 48 pixels ([favicon guidance](https://developers.google.com/search/docs/appearance/favicon-in-search)).
-
-## Discovery files
-
-Serve `/robots.txt` as plain text:
-
-```text
-User-agent: *
-Allow: /
-Sitemap: https://www.cambridgeparser.com/sitemap.xml
+```bash
+curl -sS https://www.cambridgeparser.com/ | grep -E '<h1>Cambridge past paper solver|381 canonical'
+curl -sS https://www.cambridgeparser.com/igcse-computer-science-pseudocode | grep -E '<h1>IGCSE|205 canonical'
+curl -sSI https://www.cambridgeparser.com/not-a-real-page
+curl -sSI https://cambridgeparser.vercel.app/cambridge-pseudocode-ide
+curl -sS https://www.cambridgeparser.com/sitemap.xml
 ```
 
-Do not place access-control secrets or ineffective attempts to secure account
-pages in this file; it is public. Serve a UTF-8 XML sitemap at the site root
-using fully qualified canonical URLs. Include only pages intended for search,
-and use `<lastmod>` only when it can be kept truthful. Google treats sitemap
-submission as a discovery hint, recommends root placement, and limits each
-sitemap to 50,000 URLs or 50 MB uncompressed
-([Google sitemap guidance](https://developers.google.com/search/docs/crawling-indexing/sitemaps/build-sitemap)).
+Expected results:
 
-For the current public site, the sitemap should contain `/`, `/privacy`,
-`/terms`, and `/data-deletion`. Add future content only when it is public,
-substantive, linked from the site, canonical, and returns a successful response.
+- the first two responses contain useful body content without executing JS;
+- the unknown URL returns HTTP 404, not 200 or a homepage redirect;
+- the Vercel production alias permanently redirects to the equivalent `www`
+  URL;
+- the sitemap exposes all eight canonical public URLs.
+
+Also inspect one private route such as `/dashboard` and confirm both its HTML
+robots tag and `X-Robots-Tag` say `noindex`.
+
+## Google Search Console: exact next steps
+
+1. Add or retain a **Domain property** for `cambridgeparser.com`, verified with
+   the DNS TXT record. This covers HTTP/HTTPS, apex, `www`, and other
+   subdomains ([property types](https://support.google.com/webmasters/answer/34592)).
+2. In **Sitemaps**, submit exactly
+   `https://www.cambridgeparser.com/sitemap.xml`. Re-submit the same sitemap
+   after this deployment if Search Console shows the old four-URL fetch.
+3. In **URL Inspection**, test the live URL for `/` and each of the four public
+   product pages. Check that the page is allowed to index, the rendered HTML
+   and screenshot are complete, and the user-declared canonical is the same
+   `www` URL.
+4. Request indexing once for the homepage and four product pages after the
+   deployment. Repeated requests do not accelerate crawling
+   ([recrawl guidance](https://developers.google.com/search/docs/crawling-indexing/ask-google-to-recrawl)).
+5. After Google processes them, confirm the Google-selected canonical matches
+   the user-declared canonical. Investigate any “Duplicate” or “Crawled -
+   currently not indexed” result page by page rather than changing every tag.
+6. In **Performance → Search results**, compare 28-day periods. Track queries
+   containing `cambridge`, `past paper`, `solver`, `pseudocode`, `0478`, `9608`,
+   and `9618`, then filter by page to see which intent each landing page owns.
+7. Watch **Page indexing**, **Core Web Vitals**, **HTTPS**, **Manual actions**,
+   and **Security issues**. Use **Links** to identify which useful pages gain
+   external references.
+
+Search Console has no keyword field that makes a page rank. It reports how
+Google discovered, indexed, and presented the site; an indexing request is not
+a ranking request ([URL Inspection](https://support.google.com/webmasters/answer/9012289)).
+
+## Vercel: exact next steps
+
+1. Deploy this revision and make `www.cambridgeparser.com` the primary
+   production domain. Keep the apex assigned and permanently redirected to
+   `www` ([Vercel custom domains](https://vercel.com/docs/domains/set-up-custom-domain)).
+2. Confirm that the configured host redirect catches the exact stable alias
+   `cambridgeparser.vercel.app`. If the project dashboard shows a different
+   production alias, update the host condition in `vercel.ts`.
+3. Enable **Web Analytics** and **Speed Insights** in the project dashboard.
+   Their Vue components and packages are already installed in the application
+   ([Web Analytics](https://vercel.com/docs/analytics/package),
+   [Speed Insights](https://vercel.com/docs/speed-insights/quickstart)).
+4. Let field data accumulate, then use Speed Insights to find route-specific
+   LCP, INP, and CLS problems. Treat the public landing templates first; they
+   are the search entry points.
+5. Keep preview deployments protected. Vercel normally adds `noindex` to
+   preview and outdated production deployments, but a stable production alias
+   needs its own redirect or noindex treatment
+   ([Vercel response headers](https://vercel.com/docs/headers/response-headers),
+   [duplicate-content guidance](https://vercel.com/kb/guide/avoiding-duplicate-content-with-vercel-app-urls)).
+
+## On-page and content priorities
+
+The homepage is now the broad platform page. Its title and H1 clearly describe
+a Cambridge past paper solver and pseudocode IDE. The dedicated solver page is
+narrower: it explains the PDF, timer, marking, review, and paper-browser
+workflow. Keep those purposes distinct so the two pages do not become
+near-duplicates.
+
+The strongest next growth work is useful public material, not more meta tags:
+
+- publish original worked pseudocode examples by technique, with explanations
+  that are useful without signing in;
+- publish a transparent coverage/methodology page explaining syllabus codes,
+  years, deduplication, topic tagging, and known gaps;
+- add genuine product screenshots with descriptive filenames, visible captions,
+  useful alt text, explicit dimensions, and compressed WebP/AVIF sources;
+- add an About/contact page identifying who maintains the tool and how coverage
+  is checked;
+- add public release notes when coverage or parser behavior changes;
+- link each guide contextually to its qualification page and appropriate app
+  action.
+
+Do not publish hundreds of thin syllabus/year/query variants. Do not expose
+copyrighted paper content merely to create indexable pages. Google recommends
+original, useful, people-first content rather than pages made mainly to capture
+search variations
+([helpful-content guidance](https://developers.google.com/search/docs/fundamentals/creating-helpful-content)).
+
+Use concise, descriptive titles and one clear main heading. Exact phrases do
+not need repetition; Google can construct title links from the title, headings,
+prominent copy, and link text
+([title-link guidance](https://developers.google.com/search/docs/appearance/title-link)).
+
+## Internal links, canonicals, and sitemap discipline
+
+Every public page must remain reachable through ordinary descriptive links,
+not only JavaScript click handlers. Crawlable anchors help discovery and give
+the destination context
+([link guidance](https://developers.google.com/search/docs/crawling-indexing/links-crawlable)).
+
+Keep `https://www.cambridgeparser.com` as the only canonical origin. Each
+indexable page needs an absolute self-referencing canonical, and internal links
+and sitemap entries should use the same URL form. Vercel is configured to
+redirect trailing-slash variants to that URL form. Redirects and canonicals are
+strong consolidation signals; sitemap inclusion is weaker
+([canonicalization guidance](https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls)).
+
+List only canonical, indexable URLs in the sitemap. Use `<lastmod>` only for a
+substantive page update. Google ignores sitemap `<priority>` and `<changefreq>`,
+and sitemap submission does not guarantee indexing
+([sitemap guidance](https://developers.google.com/search/docs/crawling-indexing/sitemaps/build-sitemap)).
+
+Keep login, password recovery, dashboard, solver sessions, problem records,
+and personal analytics out of the sitemap and marked `noindex`. Do not block a
+URL in `robots.txt` when a crawler needs to fetch it to observe `noindex`
+([robots meta guidance](https://developers.google.com/search/docs/crawling-indexing/robots-meta-tag)).
 
 ## Structured data
 
-Place one JSON-LD graph on the homepage, ensuring every assertion matches
-visible content:
+The homepage has truthful `WebSite` and `WebApplication` data; public secondary
+pages use `WebPage`. This helps machines understand the site but is not a
+general ranking boost. Do not fabricate ratings, prices, reviews, organization
+details, or FAQs for rich-result eligibility. Markup must describe content the
+visitor can see
+([structured-data policies](https://developers.google.com/search/docs/appearance/structured-data/sd-policies),
+[site-name guidance](https://developers.google.com/search/docs/appearance/site-names)).
 
-- `WebSite`: `name: "CambridgeParser"`, an honest `alternateName` such as
-  `"cambridgeparser.com"`, and canonical `url`. Google identifies this as the
-  principal way to state a preferred site name
-  ([site-name guidance](https://developers.google.com/search/docs/appearance/site-names)).
-- `Organization`: only if CambridgeParser is genuinely operated as an
-  organization. Include a stable `@id`, name, canonical URL, crawlable logo, and
-  only verified `sameAs` profiles/contact details. Do not invent an address,
-  legal name, or social account. Google recommends homepage-level Organization
-  markup and truthful applicable properties
-  ([Organization guidance](https://developers.google.com/search/docs/appearance/structured-data/organization)).
-- `WebApplication`: suitable as a Schema.org description of this browser app,
-  with truthful fields such as name, URL, description, browser requirements,
-  `applicationCategory: "EducationalApplication"`, and `operatingSystem:
-  "Any"` ([Schema.org WebApplication](https://schema.org/WebApplication)). A
-  Google Software App rich result additionally requires `offers.price` and a
-  genuine `aggregateRating` or `review`. Do not fabricate ratings or reviews
-  merely to pass validation
-  ([Google SoftwareApplication requirements](https://developers.google.com/search/docs/appearance/structured-data/software-app)).
+## Authority and distribution
 
-Use `BreadcrumbList` only on public pages that expose a real breadcrumb trail
-and meaningful hierarchy. The current shallow policy pages do not need it.
-Google requires at least two breadcrumb list items and recommends representing
-a normal user path rather than blindly mirroring the URL
-([breadcrumb guidance](https://developers.google.com/search/docs/appearance/structured-data/breadcrumb)).
+An established Reddit result has history, crawlable discussion, and incoming
+links. Technical SEO makes CambridgeParser eligible to compete; it does not
+create independent authority. Earn relevant references by sharing genuinely
+useful guides and tools with teachers, school computing departments, revision
+communities, and maintainers of legitimate resource lists. Ask for links only
+where the page helps that audience, and avoid bought links, automated directory
+submissions, and copied forum posts.
 
-Do not mark the authenticated solver corpus as Course, Q&A, Quiz, or Practice
-Problem content. Those features require qualifying content to be present on a
-public crawlable page and to satisfy feature-specific rules. If CambridgeParser
-later publishes durable public lesson/problem pages, assess each page against
-the relevant Google feature guidance rather than applying site-wide markup
-([structured-data feature list](https://developers.google.com/search/docs/appearance),
-[Education Q&A requirements](https://developers.google.com/search/docs/appearance/structured-data/education-qa)).
-
-Validate general Schema.org syntax with the
-[Schema Markup Validator](https://validator.schema.org/) and supported Google
-features with the [Rich Results Test](https://search.google.com/test/rich-results).
-Valid markup is only an eligibility signal and does not guarantee a rich result
-([structured-data guidelines](https://developers.google.com/search/docs/appearance/structured-data/sd-policies)).
-
-## Google Search Console release steps
-
-1. Add a Domain property named `cambridgeparser.com`. Verify it with the exact
-   DNS TXT record Search Console supplies. A Domain property includes protocols
-   and all subdomains and can only be DNS-verified
-   ([property types](https://support.google.com/webmasters/answer/34592),
-   [ownership verification](https://support.google.com/webmasters/answer/9008080)).
-2. Retain the DNS record permanently and give access to named accounts rather
-   than sharing credentials. Use an owner account that can also support Google
-   OAuth brand/domain verification.
-3. Open **Sitemaps**, submit `https://www.cambridgeparser.com/sitemap.xml`, and
-   resolve fetch or parsing errors. Also retain the sitemap directive in
-   `robots.txt`.
-4. In **URL Inspection**, test the live canonical homepage and each policy page.
-   Confirm successful fetch, rendered content, indexability, structured data,
-   and that the user-declared and Google-selected canonicals converge. Then use
-   **Request indexing** once per materially changed URL. Repeated requests do
-   not make crawling faster
-   ([URL Inspection](https://support.google.com/webmasters/answer/9012289),
-   [recrawl guidance](https://developers.google.com/search/docs/crawling-indexing/ask-google-to-recrawl)).
-5. Monitor **Page indexing**, **Sitemaps**, **Core Web Vitals**, **HTTPS**,
-   **Manual actions**, **Security issues**, and the **Performance** report after
-   deployment. New property data can take several days to appear.
-
-Search Console has no setting that supplies page keywords or guarantees a site
-name. The website itself remains the source of titles, content, links,
-canonicals, and structured data.
-
-## Page experience and performance
-
-Monitor field data in Search Console and individual templates in PageSpeed
-Insights. Google's “good” Core Web Vitals thresholds are LCP at or below 2.5
-seconds, INP at or below 200 milliseconds, and CLS at or below 0.1. Optimize the
-landing page independently from authenticated application bundles, reserve
-image/layout dimensions, avoid render-blocking assets, and verify mobile
-behavior ([Core Web Vitals](https://developers.google.com/search/docs/appearance/core-web-vitals)).
-
-Also keep HTTPS valid, avoid mixed content and intrusive interstitials, and
-ensure the primary content remains usable on mobile. Google states there is no
-single page-experience signal and that good metrics do not guarantee rankings
-([page-experience guidance](https://developers.google.com/search/docs/appearance/page-experience)).
-
-## Bing Webmaster Tools and IndexNow
-
-After Search Console verification, create a Bing Webmaster Tools account and
-import the verified property and sitemap from Google, or verify it manually.
-Bing documents direct Search Console import and automatic verification
-([Bing site verification](https://www2.bing.com/webmasters/help/add-and-verify-site-12184f8b)).
-Inspect sitemap processing and crawl/index reports there as well
-([Bing sitemaps](https://www.bing.com/webmasters/help/sitemaps-3b5cf6ed)).
-
-IndexNow is optional for this small, mostly static public surface. It becomes
-useful when public pages are frequently created, updated, or deleted. If added:
-
-1. Generate an IndexNow key and host its verification text file on the same
-   canonical host.
-2. Submit only changed canonical public URLs from the deployment/content
-   pipeline—not on every page view and not authenticated URLs.
-3. Monitor submissions in Bing Webmaster Tools' IndexNow report.
-
-Bing recommends IndexNow for automated change notification across participating
-engines; a notification still does not guarantee indexing
-([Bing URL submission](https://www.bing.com/webmasters/help/URL-Submission-62f2860b),
-[IndexNow protocol](https://www.indexnow.org/documentation)).
-
-## Ongoing content opportunities
-
-Technical metadata cannot substitute for public useful content. The strongest
-future search surface would be stable, internally linked, server-rendered pages
-for syllabus topics, pseudocode concepts, worked examples, and original study
-guides. Each should answer a distinct student need, expose meaningful text
-without login, have its own title/description/canonical, and link naturally to
-the relevant app workflow. Google recommends people-first content and says no
-special files or schema are required for its AI search features
-([people-first content](https://developers.google.com/search/docs/fundamentals/creating-helpful-content),
-[AI features and websites](https://developers.google.com/search/docs/appearance/ai-features)).
+Use Search Console impressions as the first signal. New pages often move from
+discovery to low-position impressions before meaningful clicks. Evaluate
+changes over weeks, not hours, while continuing to improve the public pages
+that already receive relevant impressions.

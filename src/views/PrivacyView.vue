@@ -15,7 +15,7 @@ import { RouterLink } from 'vue-router';
     eyebrow="Privacy notice"
     title="Privacy Policy"
     summary="What CambridgeParser collects, why it is needed, and the choices you have when using the paper solver, pseudocode IDE, and third-party sign-in."
-    effective-date="9 September 2026"
+    effective-date="11 September 2026"
   >
     <section>
       <h2>1. Who this policy covers</h2>
@@ -66,8 +66,11 @@ import { RouterLink } from 'vue-router';
         Our hosting, authentication, database, and security providers may
         process IP address, browser and device information, request timestamps,
         referring pages, and diagnostic or security logs when you access the
-        Service. We do not currently use third-party advertising trackers or
-        behavioral advertising.
+        Service. We use Vercel Web Analytics and Speed Insights to measure page
+        visits and real-world performance so we can understand and improve the
+        Service. These tools are configured without advertising cookies or
+        cross-site behavioral profiles. We do not use third-party advertising
+        trackers or behavioral advertising.
       </p>
     </section>
 

@@ -4,6 +4,7 @@
 // ============================================================================
 
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import {
   INDEXABLE_SEO_PAGES,
@@ -12,18 +13,23 @@ import {
   renderSeoDocument,
   resolveSeoMetadata,
 } from '../src/lib/seo.ts';
+import { config as vercelConfig } from '../vercel.ts';
 
 const expectedPages = [
+  'aLevelPseudocode',
   'browser',
   'dashboard',
   'dataDeletion',
   'ide',
   'ideRecord',
+  'igcsePseudocode',
   'landing',
   'learn',
   'login',
+  'pastPaperSolver',
   'privacy',
   'problems',
+  'pseudocodeIde',
   'resetPassword',
   'solver',
   'stats',
@@ -44,9 +50,13 @@ test('every application page has unique, concise metadata', () => {
 
 test('only public product and policy pages are indexable', () => {
   assert.deepEqual([...INDEXABLE_SEO_PAGES].sort(), [
+    'aLevelPseudocode',
     'dataDeletion',
+    'igcsePseudocode',
     'landing',
+    'pastPaperSolver',
     'privacy',
+    'pseudocodeIde',
     'terms',
   ]);
 
@@ -95,4 +105,60 @@ test('static crawler documents replace every critical head value', () => {
   assert.match(rendered, /property="og:url" content="https:\/\/www\.cambridgeparser\.com\/privacy"/);
   assert.match(rendered, /"@type":"WebPage"/);
   assert.doesNotMatch(rendered, /content="old"/);
+});
+
+test('public product documents contain useful HTML before JavaScript runs', () => {
+  const template = '<!doctype html><html><head><title>old</title></head><body><div id="app"></div></body></html>';
+  const pages = [
+    ['landing', 'Cambridge past paper solver and pseudocode IDE'],
+    ['pastPaperSolver', 'Cambridge past paper solver'],
+    ['pseudocodeIde', 'Cambridge pseudocode IDE'],
+    ['igcsePseudocode', 'IGCSE Computer Science pseudocode practice'],
+    ['aLevelPseudocode', 'A Level Computer Science pseudocode practice'],
+  ] as const;
+
+  for (const [page, heading] of pages) {
+    const metadata = SEO_PAGES[page];
+    const rendered = renderSeoDocument(
+      template,
+      resolveSeoMetadata(page, metadata.canonicalPath),
+    );
+    assert.match(rendered, /<main[\s>]/, page);
+    assert.match(rendered, new RegExp(`<h1[^>]*>${heading}<\\/h1>`, 'i'), page);
+    assert.match(rendered, /<a href="\//, page);
+    assert.doesNotMatch(rendered, /<div id="app"><\/div>/, page);
+  }
+});
+
+test('sitemap exposes every indexable public product page', async () => {
+  const sitemap = await readFile(new URL('../public/sitemap.xml', import.meta.url), 'utf8');
+  for (const path of [
+    '/',
+    '/cambridge-past-paper-solver',
+    '/cambridge-pseudocode-ide',
+    '/igcse-computer-science-pseudocode',
+    '/a-level-computer-science-pseudocode',
+    '/privacy',
+    '/terms',
+    '/data-deletion',
+  ]) {
+    assert.match(sitemap, new RegExp(`<loc>https://www\\.cambridgeparser\\.com${path === '/' ? '/' : path}<\\/loc>`));
+  }
+});
+
+test('Vercel serves known routes without turning unknown URLs into soft 404s', async () => {
+  assert.equal(vercelConfig.trailingSlash, false);
+  const rewrites = vercelConfig.rewrites;
+  assert.equal(rewrites.some(rewrite => rewrite.source === '/(.*)'), false);
+  assert.ok(rewrites.some(rewrite => rewrite.source === '/cambridge-past-paper-solver'));
+  assert.ok(rewrites.some(rewrite => rewrite.source === '/solver/(.*)'));
+
+  const notFound = await readFile(new URL('../public/404.html', import.meta.url), 'utf8');
+  assert.match(notFound, /<meta name="robots" content="noindex, nofollow"/);
+  assert.match(notFound, /<h1>That page does not exist\.<\/h1>/);
+
+  assert.ok(vercelConfig.redirects.some(redirect =>
+    redirect.has.some(condition => condition.type === 'host' && condition.value === 'cambridgeparser.vercel.app')
+    && redirect.destination === 'https://www.cambridgeparser.com/$1'
+  ));
 });

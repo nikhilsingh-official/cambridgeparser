@@ -22,6 +22,8 @@ import Sidebar from '@/components/Sidebar.vue';
 // unsupported phone layouts are replaced with an explicit non-interactive gate.
 import MobileUnsupported from '@/components/MobileUnsupported.vue';
 import { shouldBlockMobileLayout } from '@/lib/layout/mobileAccess';
+import { Analytics } from '@vercel/analytics/vue';
+import { SpeedInsights } from '@vercel/speed-insights/vue';
 
 const route = useRoute();
 const showShell = computed(() => !route.meta.publicChrome && !route.meta.fullscreen);
@@ -37,6 +39,8 @@ onBeforeUnmount(() => window.removeEventListener('resize', updateViewportWidth))
 </script>
 
 <template>
+  <Analytics />
+  <SpeedInsights />
   <!-- do not mount app pages behind the blocker; this prevents hidden
        keyboard interaction and stops unsupported solver sessions from starting. -->
   <MobileUnsupported v-if="blockMobileLayout" />

@@ -20,6 +20,7 @@ const LearnView = () => import('@/views/LearnView.vue')
 const PrivacyView = () => import('@/views/PrivacyView.vue')
 const TermsView = () => import('@/views/TermsView.vue')
 const DataDeletionView = () => import('@/views/DataDeletionView.vue')
+const PublicProductView = () => import('@/views/PublicProductView.vue')
 // recovery must accept the temporary authenticated recovery session, so it
 // is public chrome but deliberately neither guestOnly nor requiresAuth.
 const ResetPassword = () => import('@/components_auth/ResetPassword.vue')
@@ -62,6 +63,34 @@ const routes: RouteRecordRaw[] = [
   // side of the merge.
   // public/account screens are the only intentionally narrow layouts.
   { path: '/', name: 'Landing', component: LandingView, meta: { publicChrome: true, supportsNarrowViewport: true, seoPage: 'landing' } },
+  {
+    path: '/cambridge-past-paper-solver',
+    name: 'PastPaperSolverInfo',
+    component: PublicProductView,
+    props: { page: 'pastPaperSolver' },
+    meta: { publicChrome: true, supportsNarrowViewport: true, seoPage: 'pastPaperSolver' },
+  },
+  {
+    path: '/cambridge-pseudocode-ide',
+    name: 'PseudocodeIdeInfo',
+    component: PublicProductView,
+    props: { page: 'pseudocodeIde' },
+    meta: { publicChrome: true, supportsNarrowViewport: true, seoPage: 'pseudocodeIde' },
+  },
+  {
+    path: '/igcse-computer-science-pseudocode',
+    name: 'IgcsePseudocodeInfo',
+    component: PublicProductView,
+    props: { page: 'igcsePseudocode' },
+    meta: { publicChrome: true, supportsNarrowViewport: true, seoPage: 'igcsePseudocode' },
+  },
+  {
+    path: '/a-level-computer-science-pseudocode',
+    name: 'ALevelPseudocodeInfo',
+    component: PublicProductView,
+    props: { page: 'aLevelPseudocode' },
+    meta: { publicChrome: true, supportsNarrowViewport: true, seoPage: 'aLevelPseudocode' },
+  },
   { path: '/login', name: 'Login', component: Login, meta: { guestOnly: true, publicChrome: true, supportsNarrowViewport: true, seoPage: 'login' } },
   { path: '/reset-password', name: 'ResetPassword', component: ResetPassword, meta: { publicChrome: true, supportsNarrowViewport: true, seoPage: 'resetPassword' } },
   {
