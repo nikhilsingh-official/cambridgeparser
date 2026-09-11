@@ -1,14 +1,11 @@
-<!--
-It documents the repository as verified during the August–September 2026 release review.
--->
-
 # CambridgeParser
 
-[cambridgeparser.com](https://cambridgeparser.com) is one Vue application for
-Cambridge International students. It combines a timed multiple-choice paper
-solver with a Cambridge pseudocode IDE, a searchable question corpus, learning
-material, and progress analytics. Both areas use the same routes, account,
-Supabase project, navigation shell, and theme system.
+[www.cambridgeparser.com](https://www.cambridgeparser.com) is a Cambridge past
+paper solver and pseudocode IDE for Cambridge International students. The Vue
+application combines timed multiple-choice practice, 381 curated pseudocode
+questions, rubric-based feedback, learning material, and progress analytics.
+Both study tools use the same account, Supabase project, router, navigation
+shell, and theme system.
 
 The solver and IDE were separate applications in the past. They must not be
 deployed, routed, or authenticated as separate sites.
@@ -30,8 +27,9 @@ deployed, routed, or authenticated as separate sites.
 - Fill-in-the-blank and free-form IDE questions with authenticated AI grading,
   trusted server-side mark schemes, daily quota enforcement, and progress
   recording.
-- A public landing page, an authenticated learning page, and light, dark, and
-  monochrome themes.
+- Crawlable public product and syllabus pages with route-specific titles,
+  canonical URLs, social metadata, structured data, a sitemap, and a real 404.
+- An authenticated learning page and light, dark, and monochrome themes.
 
 ## Architecture
 
@@ -43,7 +41,7 @@ deployed, routed, or authenticated as separate sites.
 | MCQ paper retrieval | Authenticated `fetch-pdf` Supabase Edge Function; fetches the PDFs, parses and atomically installs a verified answer key, then returns binary PDF data and metadata in one multipart response |
 | IDE grading | Authenticated Supabase `grade` Edge Function; Google AI Studio is primary and OpenRouter is the fallback |
 | IDE corpus/parser | Committed records and images in `public/resources`, plus a committed WASM parser built from `pseudocode-parser/` |
-| Hosting | Vercel serves the Vite `dist/` client and rewrites history-mode deep links; Supabase hosts both server functions |
+| Hosting | Vercel serves route-specific static HTML and the Vite client, records Web Analytics and Speed Insights, and preserves known history-mode deep links; Supabase hosts both server functions |
 
 The browser never supplies an authoritative mark or user ID. The grading
 function derives identity from the caller's JWT and records the model result
@@ -56,6 +54,11 @@ transactional, idempotent RPC boundary. Completed histories are read-only.
 | Route | Access | Purpose |
 |---|---|---|
 | `/` | Public; signed-in users go to `/dashboard` | Product landing page |
+| `/cambridge-past-paper-solver` | Public, indexable | Detailed solver product page |
+| `/cambridge-pseudocode-ide` | Public, indexable | Detailed pseudocode IDE product page |
+| `/igcse-computer-science-pseudocode` | Public, indexable | Cambridge 0478 corpus and practice coverage |
+| `/a-level-computer-science-pseudocode` | Public, indexable | Cambridge 9608/9618 corpus and practice coverage |
+| `/privacy`, `/terms`, `/data-deletion` | Public | OAuth policies and account-deletion instructions |
 | `/login` | Signed-out users | Email/OAuth sign-in and account creation |
 | `/reset-password` | Public callback with a Supabase recovery session | Validate and set a replacement password |
 | `/dashboard` | Authenticated | Summary and entry points into solver and IDE work |
@@ -90,10 +93,9 @@ out the temporary recovery session, and returns the user to normal sign-in.
 | `src/components_navigator/` | Full-screen MCQ paper runner |
 | `src/components_stats/` | Statistics and recommendations |
 | `src/components_ide/`, `src/views/` | IDE, problems, learn, login, and landing views |
-| `src/lib/` | PDF annotation/rendering, statistics, IDE services, domain logic, and Supabase reads/writes |
+| `src/lib/` | PDF annotation/rendering, statistics, IDE services, SEO content/metadata, domain logic, and Supabase reads/writes |
 | `src/styles/themes.scss` | The only source of cross-theme design tokens |
 | `src/styles/ide.css` | IDE component rules; it does not own design tokens |
-| `scripts/gt/`, `scripts/qtype/` | Current untracked/offline Python analysis tooling; this violates the repository's `api/`-only Python rule and is tracked as CP-020 |
 | `supabase/migrations/` | Database schema, RLS, topic practice, IDE attempts, and grading-quota functions, applied in filename order |
 | `supabase/seeds/` | Production-safe subject and topic reference data |
 | `supabase/archived-seeds/` | Opt-in synthetic local demo data; never discovered automatically |
@@ -242,10 +244,10 @@ npx vue-tsc -b
 npm run build
 ```
 
-<!-- keep the documented count aligned with the corpus and SEO tests. -->
-The current Node suite contains 158 assertions/tests across `tests/**/*.test.ts`
-and `tests/**/*.test.mjs`. The build repeats the type check before Vite bundles
-the application.
+The Node suite covers domain logic, service boundaries, corpus integrity, and
+generated SEO documents across `tests/**/*.test.ts` and
+`tests/**/*.test.mjs`. The build repeats the type check before Vite bundles the
+application.
 
 Run the four SQL suites after `npm run supabase:reset`:
 
@@ -302,10 +304,12 @@ refresh/back navigation, console/network errors, and narrow-screen layouts.
 
 ## Build and deployment
 
-<!-- Vercel's typed configuration supersedes the former static JSON file. -->
 `npm run build` creates `dist/`. `vercel.ts` applies security/cache headers,
 serves generated route-specific HTML documents for known paths, preserves
-explicit history-mode deep links, and lets unknown URLs return the custom 404.
+explicit history-mode deep links, redirects the Vercel hostname to the canonical
+custom domain, and lets unknown URLs return the custom 404. The generated
+public product pages contain their useful headings and copy in the initial HTML;
+they do not require a crawler to execute Vue before discovering the content.
 
 A complete deployment has two independently deployed parts:
 
@@ -338,7 +342,8 @@ not prove the Vercel rewrite or unified app is live.
 - Google AI Studio and OpenRouter. Model availability, quotas, response
   contracts, and keys affect IDE grading. OpenRouter fallback requires its own
   configured key; it cannot help when only Google credentials are present.
-- Vercel static hosting and history-route rewrites.
+- Vercel static hosting, Web Analytics, Speed Insights, and history-route
+  rewrites.
 - PDF.js for rendering/annotating papers, CodeMirror for editing, the Rust/WASM
   parser for diagnostics, and ECharts for analytics.
 
@@ -376,9 +381,6 @@ not prove the Vercel rewrite or unified app is live.
 - The committed question corpus is not regenerated in this repository, so
   corpus corrections require an external extraction workflow and a reviewed
   data update.
-- The current worktree contains offline Python analysis files outside `api/`, in
-  conflict with `AGENTS.md`. Resolve CP-020 before committing those files.
-
 The ranked current issue register, including production gates and evidence, is
 [`docs/preproduction_issues.md`](docs/preproduction_issues.md). The measured
 transport, analytics-model, and frontend bundle options for CP-016, CP-018, and
